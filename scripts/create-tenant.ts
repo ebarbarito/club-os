@@ -7,8 +7,10 @@
 //     --primary "#1c5c41" --accent "#c9a14a" --dark "#0a261b" --bg "#f6f3ea" \
 //     --logo "https://.../logo.png" \
 //     --admin-email ana@club.com --admin-name "Ana Belmonte" --admin-password "cambiar123"
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { createAdminClient } from '../src/lib/supabase/admin';
+
+config({ path: '.env.local' });
 
 function arg(name: string, fallback?: string): string {
   const i = process.argv.indexOf(`--${name}`);
