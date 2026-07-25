@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
+/* Tokens del design handoff (Green Level) usados como default de tenant.
+   Se sobreescriben en runtime por tenant vía ThemeProvider (ver
+   src/lib/tenant/theme.tsx), que setea estas mismas variables inline
+   según tenants.theme (JSON en DB): primary, accent, dark, bg. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-green-900: #0a261b;
+  --color-accent: #1c5c41;
+  --color-accent-deep: #13392a;
+  --color-bg: #f6f3ea;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3efe3;
+  --color-surface-3: #ece5cf;
+  --color-text: #16201b;
+  --color-text-soft: #5a6862;
+  --color-text-mute: #8a958f;
+  --color-line: rgba(22, 32, 27, 0.1);
+  --color-line-2: rgba(22, 32, 27, 0.16);
+  --color-amber: #c9a14a;
+  --color-amber-bg: #f6ecd0;
+  --color-amber-tx: #8a6d2a;
+  --color-red: #a8442c;
+  --color-red-bg: #f1ddd6;
+  --color-blue: #2c5a6b;
+  --color-blue-bg: #d9e6ec;
+  --color-purple: #7c5cbf;
+  --color-purple-bg: #ece6f7;
+  --color-gold: #c9a14a;
 }
 
+/* Mapea los tokens a utilities de Tailwind v4 (bg-accent, text-green-900, etc). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --font-sans: var(--font-hanken), Arial, Helvetica, sans-serif;
+  --font-display: var(--font-archivo), Arial, Helvetica, sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-green-900: var(--color-green-900);
+  --color-accent: var(--color-accent);
+  --color-accent-deep: var(--color-accent-deep);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-3: var(--color-surface-3);
+  --color-text-soft: var(--color-text-soft);
+  --color-text-mute: var(--color-text-mute);
+  --color-line: var(--color-line);
+  --color-line-2: var(--color-line-2);
+  --color-amber: var(--color-amber);
+  --color-amber-bg: var(--color-amber-bg);
+  --color-amber-tx: var(--color-amber-tx);
+  --color-red: var(--color-red);
+  --color-red-bg: var(--color-red-bg);
+  --color-blue: var(--color-blue);
+  --color-blue-bg: var(--color-blue-bg);
+  --color-purple: var(--color-purple);
+  --color-purple-bg: var(--color-purple-bg);
+  --color-gold: var(--color-gold);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
 }
