@@ -4,6 +4,7 @@ export type ViewId =
   | 'resumen'
   | 'dispensas'
   | 'socios'
+  | 'catalogo'
   | 'stock'
   | 'salas'
   | 'sensores'
@@ -16,7 +17,7 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     name: 'Administrador',
     desc: 'Acceso total: caja, balance, salas, socios y stock',
     home: 'resumen',
-    nav: ['resumen', 'dispensas', 'socios', 'stock', 'salas', 'sensores', 'caja', 'balance', 'usuarios'],
+    nav: ['resumen', 'dispensas', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'balance', 'usuarios'],
   },
   dispensador: {
     name: 'Dispensador/a',
@@ -36,6 +37,7 @@ export const TITLES: Record<ViewId, [string, string]> = {
   resumen: ['Resumen', 'Vista general del club'],
   dispensas: ['Dispensa', 'Pedidos y dispensas registradas'],
   socios: ['Socios', 'Altas, validaciones y padrón'],
+  catalogo: ['Catálogo', 'Genéticas del club — base del sitio público y del stock'],
   stock: ['Stock', 'Inventario por genética'],
   salas: ['Salas & Cultivo', 'Plantas, etapas y sensores'],
   sensores: ['Sensores', 'Seguimiento en vivo por sala'],

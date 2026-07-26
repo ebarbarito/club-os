@@ -1,7 +1,7 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
-import { CreateStrainForm } from './create-strain-form';
 import { AdjustStockForm } from './adjust-stock-form';
 
 function levelColor(grams: number, min: number): string {
@@ -33,9 +33,12 @@ export default async function StockPage() {
           <h1 className="font-display text-2xl font-bold text-text">Stock</h1>
           <p className="text-text-soft">Inventario por genética</p>
         </div>
-        <ModalTrigger label="+ Agregar genética" title="Nueva genética">
-          <CreateStrainForm />
-        </ModalTrigger>
+        <Link
+          href="/panel/catalogo"
+          className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
+        >
+          Gestionar genéticas en Catálogo
+        </Link>
       </div>
 
       <div className="rounded-xl border border-line bg-surface overflow-hidden">

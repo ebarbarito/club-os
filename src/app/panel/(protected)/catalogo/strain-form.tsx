@@ -1,0 +1,94 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useModalClose } from '@/components/modal-trigger';
+import { createStrain, updateStrain } from './actions';
+
+const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
+const labelCls = 'block text-xs font-medium text-text-soft mb-1';
+
+type Strain = {
+  id: string;
+  name: string;
+  type: string;
+  thc: number | null;
+  cbd: number | null;
+  price_per_gram: number;
+  active: boolean;
+};
+
+export function StrainForm({ strain }: { strain?: Strain }) {
+  const router = useRouter();
+  const close = useModalClose();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(formData: FormData) {
+    startTransition(async () => {
+      const res = strain ? await updateStrain(formData) : await createStrain(formData);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
+      close();
+      router.refresh();
+    });
+  }
+
+  return (
+    <form action={submit} className="grid grid-cols-2 gap-3">
+      {strain && <input type="hidden" name="id" value={strain.id} />}
+      <div className="col-span-2">
+        <label className={labelCls}>Nombre</label>
+        <input name="name" required defaultValue={strain?.name} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Tipo</label>
+        <select name="type" className={inputCls} defaultValue={strain?.type ?? 'Híbrida'}>
+          <option>Indica</option>
+          <option>Sativa</option>
+          <option>Híbrida</option>
+          <option>Alto CBD</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Precio por gramo</label>
+        <input
+          name="price_per_gram"
+          type="number"
+          min="0"
+          step="1"
+          required
+          defaultValue={strain?.price_per_gram}
+          className={inputCls}
+        />
+      </div>
+      <div>
+        <label className={labelCls}>THC %</label>
+        <input name="thc" type="number" min="0" max="100" step="0.1" defaultValue={strain?.thc ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>CBD %</label>
+        <input name="cbd" type="number" min="0" max="100" step="0.1" defaultValue={strain?.cbd ?? ''} className={inputCls} />
+      </div>
+
+      {strain && (
+        <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
+          <input type="checkbox" name="active" defaultChecked={strain.active} />
+          Activa (visible en el sitio público y en Stock)
+        </label>
+      )}
+
+      {error && <p className="col-span-2 text-red text-sm">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={pending}
+        className="col-span-2 rounded-lg bg-accent text-white font-semibold text-sm py-2 disabled:opacity-60"
+      >
+        {pending ? 'Guardando…' : strain ? 'Guardar cambios' : 'Crear genética'}
+      </button>
+    </form>
+  );
+}

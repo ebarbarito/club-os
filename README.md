@@ -22,11 +22,15 @@ Repo hermano: [`Sensores`](../Sensores) — firmware IoT + InfluxDB Cloud
    ```
 4. En local, como no hay subdominios reales, seteá en `.env.local`:
    ```
-   CLUB_OS_DEV_TENANT=greenlevel
+   CLUB_OS_DEFAULT_TENANT=greenlevel
    ```
 5. `npm run dev` → [http://localhost:3000](http://localhost:3000)
 
 ## Deploy
 
-Vercel, proyecto `club-os`. Configurar dominio wildcard `*.tuclub.app` en
-el proyecto de Vercel y las mismas env vars de `.env.example`.
+Vercel, proyecto `club-os`. Mientras no haya un dominio propio con DNS
+wildcard, el deploy sirve un solo club (`CLUB_OS_DEFAULT_TENANT`) en la URL
+`*.vercel.app` default. Cuando se compre un dominio: configurar wildcard
+`*.tuclub.app` en el proyecto de Vercel, setear `CLUB_OS_ROOT_DOMAIN` y
+sacar `CLUB_OS_DEFAULT_TENANT` (o dejarlo como fallback para el propio
+dominio raíz sin subdominio).

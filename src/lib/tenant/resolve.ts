@@ -1,20 +1,18 @@
 // Resuelve el slug de tenant a partir del host de la request.
-// Producción: {slug}.tuclub.app -> slug
-// Local: sin subdominio real -> fallback a ?tenant=slug o CLUB_OS_DEV_TENANT
+// Producción (con dominio propio + wildcard DNS): {slug}.tuclub.app -> slug
+// Cualquier otro host (localhost, *.vercel.app antes de tener dominio
+// propio, etc.) -> CLUB_OS_DEFAULT_TENANT, para poder operar un solo
+// club mientras no haya wildcard DNS configurado.
 const ROOT_DOMAIN = process.env.CLUB_OS_ROOT_DOMAIN ?? 'tuclub.app';
 
 export function slugFromHost(host: string | null): string | null {
-  if (!host) return null;
+  if (!host) return process.env.CLUB_OS_DEFAULT_TENANT ?? null;
   const hostname = host.split(':')[0];
 
   if (hostname.endsWith(`.${ROOT_DOMAIN}`)) {
     const slug = hostname.slice(0, -(ROOT_DOMAIN.length + 1));
-    return slug === 'www' ? null : slug;
+    return slug === 'www' ? (process.env.CLUB_OS_DEFAULT_TENANT ?? null) : slug;
   }
 
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return process.env.CLUB_OS_DEV_TENANT ?? null;
-  }
-
-  return null;
+  return process.env.CLUB_OS_DEFAULT_TENANT ?? null;
 }
