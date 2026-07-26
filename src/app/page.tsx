@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import { getTenantBySlug } from "@/lib/tenant/get-tenant";
+import { getCatalog } from "@/lib/public/get-catalog";
+import { PublicSite } from "@/components/public/public-site";
 
 export default async function Home() {
   const headerList = await headers();
@@ -19,14 +21,7 @@ export default async function Home() {
     );
   }
 
-  return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 bg-bg font-sans">
-      {tenant.logo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={tenant.logo_url} alt={tenant.name} className="h-16 w-16 rounded-2xl" />
-      )}
-      <h1 className="font-display text-3xl font-bold text-accent">{tenant.name}</h1>
-      <p className="text-text-soft">Sitio público — próximamente.</p>
-    </main>
-  );
+  const catalog = await getCatalog(tenant.id);
+
+  return <PublicSite tenant={tenant} catalog={catalog} />;
 }

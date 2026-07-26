@@ -19,6 +19,7 @@ modelo de negocio: `design_handoff_club_os` (fuera de este repo).
 | Tema por club | Paleta configurable (primary/accent/dark/bg) + logo, no temas predefinidos múltiples | Es lo pedido; reusa los design tokens ya definidos en el handoff |
 | Styling | Tailwind v4, tokens CSS por tenant inyectados en runtime | Acelera recrear las ~10 pantallas del handoff sin perder theming dinámico |
 | Orden de build | Fundaciones (tenant/auth/DB/theming) → Club OS (panel) → sitio público | Sin tenant/auth/RLS resueltas, cualquier pantalla necesita retoque después |
+| Acceso del sitio público | Sin relajar RLS para `anon` — todo (catálogo, alta de socio, reservas) pasa por Server Components/Actions con `service_role`, tenant resuelto server-side desde el subdominio (headers, nunca del cliente) | Alta de socio y reservas manejan DNI/salud; una policy RLS abierta a `anon` sería inyectable con la anon key pública. El Server Action es el único punto de control |
 
 ## Cómo fluye una request
 
@@ -26,7 +27,8 @@ modelo de negocio: `design_handoff_club_os` (fuera de este repo).
 {slug}.tuclub.app
       │
       ▼
-middleware.ts ── resuelve slug del host → header x-club-os-tenant-slug
+proxy.ts ── resuelve slug del host → header x-club-os-tenant-slug
+         (renombrado de middleware.ts — convención de Next.js 16)
       │
       ▼
 layout.tsx (Server Component) ── getTenantBySlug(slug) [lectura pública, sin auth]
@@ -54,31 +56,46 @@ token de Influx al cliente.
   porque el sitio público de cada club debe poder mostrarse sin login.
 - RLS acá aísla **tenants entre sí**, no permisos por **rol** dentro de un
   mismo club (admin/dispensador/cultivo) — eso se controla en la app
-  (middleware + `profiles.role`), no a nivel de fila.
+  (proxy + `profiles.role`), no a nivel de fila.
+- El **sitio público** (visitantes sin cuenta) no tiene ningún acceso vía
+  RLS/anon key — todas sus lecturas (catálogo) y escrituras (alta de socio,
+  reservas) pasan por `src/lib/public/` usando `service_role`, con el
+  `tenant_id` resuelto server-side (`getRequestTenant()`, a partir del header
+  de subdominio) y siempre pasado explícito en cada query. El Server Action
+  valida todo (mayoría de edad, socio `valid` antes de reservar, `tenant_id`
+  del socio coincide con el del subdominio) porque no hay red de seguridad
+  de RLS en este camino.
 
 ## Estructura
 
 ```
 src/
-  middleware.ts              resuelve subdominio → tenant
+  proxy.ts                   resuelve subdominio → tenant
   lib/
     tenant/                  resolve.ts, get-tenant.ts, theme.tsx, types.ts
     supabase/                client.ts (browser), server.ts (SSR/RLS), admin.ts (service_role, scripts)
-  app/                       Next.js App Router
+    public/                  get-catalog.ts, actions.ts — sitio público, siempre vía service_role
+    auth/                    get-session-profile.ts
+    roles.ts                 ROLES/TITLES por perfil (admin/dispensador/cultivo)
+  components/
+    public/                  secciones del sitio público (Hero, Catálogo, Carrito, Alta de socio)
+  app/
+    page.tsx                 sitio público (una sola página, por tenant)
+    panel/login               login del staff
+    panel/(protected)/        Club OS: resumen, socios, dispensas, stock, salas,
+                               sensores, caja, balance, usuarios
 supabase/
-  migrations/0001_init.sql   schema completo + RLS
+  migrations/                0001 schema+RLS, 0002 RPCs de negocio, 0003 fix RLS profiles
 scripts/
   create-tenant.ts           alta manual de club (tenant + primer admin)
 ```
 
 ## Pendiente / próximos pasos
 
-1. Crear proyecto Supabase real, correr `supabase/migrations/0001_init.sql`,
-   completar `.env.local` (ver `.env.example`).
-2. Dar de alta el primer tenant real (Green Level) con `npm run tenant:create`.
-3. Login (Supabase Auth) + selector de perfil según `profiles.role`.
-4. Pantallas de Club OS (Resumen, Dispensa, Socios, Stock, Salas, Sensores,
-   Caja, Balance, Usuarios) — ver detalle de cada una en el handoff.
-5. Proxy Influx multi-tenant (adaptar `api/influx` de `Sensores`, agregar
-   filtro `club_id`).
-6. Recién después: sitio público (catálogo, reserva, alta de socio).
+1. Conexión real a InfluxDB para sensores en vivo (proxy multi-tenant,
+   adaptar `api/influx` de `Sensores` agregando filtro `club_id`).
+2. Pulido visual: hoy las pantallas son Tailwind funcional, no una réplica
+   pixel-perfect del CSS del handoff.
+3. Documentación adjunta al alta de socio (Supabase Storage) — no
+   implementada en esta primera pasada del sitio público.
+4. Self-service / UI de super-admin para alta de tenants (hoy es manual).
