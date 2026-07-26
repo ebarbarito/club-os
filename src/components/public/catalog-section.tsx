@@ -40,9 +40,14 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
               <h3 className="font-display font-bold text-text">{item.name}</h3>
               <span className="text-xs rounded-full bg-surface-3 px-2 py-0.5 text-text-soft">{item.type}</span>
             </div>
-            <p className="text-text-mute text-xs mb-3">
-              {item.thc ? `THC ${item.thc}%` : ''} {item.cbd ? `· CBD ${item.cbd}%` : ''}
-            </p>
+            {item.crossInfo && <p className="text-text-mute text-xs mb-1">{item.crossInfo}</p>}
+            {(item.thc || item.cbd) && (
+              <p className="text-text-mute text-xs mb-1">
+                {item.thc ? `THC ${item.thc}%` : ''} {item.cbd ? `· CBD ${item.cbd}%` : ''}
+              </p>
+            )}
+            {item.aroma && <p className="text-text-soft text-xs mb-1">{item.aroma}</p>}
+            {item.effects && <p className="text-accent text-xs font-medium mb-3">{item.effects}</p>}
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-text">{money(item.price_per_gram)}/g</span>
               <span className={`text-xs ${item.grams > 0 ? 'text-accent' : 'text-red'}`}>

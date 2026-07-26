@@ -8,6 +8,10 @@ export type CatalogItem = {
   cbd: number | null;
   price_per_gram: number;
   grams: number;
+  crossInfo: string | null;
+  composition: string | null;
+  aroma: string | null;
+  effects: string | null;
 };
 
 // Catálogo público: no hay RLS de lectura anónima para strains/stock a
@@ -17,7 +21,7 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from('strains')
-    .select('id, name, type, thc, cbd, price_per_gram, stock(grams)')
+    .select('id, name, type, thc, cbd, price_per_gram, cross_info, composition, aroma, effects, stock(grams)')
     .eq('tenant_id', tenantId)
     .eq('active', true)
     .order('name');
@@ -32,6 +36,10 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
       cbd: s.cbd,
       price_per_gram: s.price_per_gram,
       grams: stock?.grams ?? 0,
+      crossInfo: s.cross_info,
+      composition: s.composition,
+      aroma: s.aroma,
+      effects: s.effects,
     };
   });
 }

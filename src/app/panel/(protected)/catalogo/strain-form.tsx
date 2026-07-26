@@ -16,6 +16,11 @@ type Strain = {
   cbd: number | null;
   price_per_gram: number;
   active: boolean;
+  cross_info: string | null;
+  composition: string | null;
+  aroma: string | null;
+  effects: string | null;
+  notes: string | null;
 };
 
 export function StrainForm({ strain }: { strain?: Strain }) {
@@ -71,6 +76,35 @@ export function StrainForm({ strain }: { strain?: Strain }) {
       <div>
         <label className={labelCls}>CBD %</label>
         <input name="cbd" type="number" min="0" max="100" step="0.1" defaultValue={strain?.cbd ?? ''} className={inputCls} />
+      </div>
+
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Ficha técnica (opcional)</p>
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Cruza</label>
+        <input name="cross_info" defaultValue={strain?.cross_info ?? ''} className={inputCls} placeholder="ej. Sandía x Yeti" />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Composición</label>
+        <input
+          name="composition"
+          defaultValue={strain?.composition ?? ''}
+          className={inputCls}
+          placeholder="ej. 40% Indica / 60% Sativa"
+        />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Sabor y aroma</label>
+        <input name="aroma" defaultValue={strain?.aroma ?? ''} className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Efectos</label>
+        <input name="effects" defaultValue={strain?.effects ?? ''} className={inputCls} placeholder="ej. Cerebral · Eufórico · Social" />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Notas de cultivo</label>
+        <textarea name="notes" defaultValue={strain?.notes ?? ''} rows={2} className={inputCls} />
       </div>
 
       {strain && (

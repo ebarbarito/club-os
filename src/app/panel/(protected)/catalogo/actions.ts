@@ -25,6 +25,11 @@ export async function createStrain(formData: FormData) {
       thc: formData.get('thc') ? Number(formData.get('thc')) : null,
       cbd: formData.get('cbd') ? Number(formData.get('cbd')) : null,
       price_per_gram: Number(formData.get('price_per_gram') ?? 0),
+      cross_info: (formData.get('cross_info') as string) || null,
+      composition: (formData.get('composition') as string) || null,
+      aroma: (formData.get('aroma') as string) || null,
+      effects: (formData.get('effects') as string) || null,
+      notes: (formData.get('notes') as string) || null,
     })
     .select()
     .single();
@@ -59,6 +64,11 @@ export async function updateStrain(formData: FormData) {
       cbd: formData.get('cbd') ? Number(formData.get('cbd')) : null,
       price_per_gram: Number(formData.get('price_per_gram') ?? 0),
       active: formData.get('active') === 'on',
+      cross_info: (formData.get('cross_info') as string) || null,
+      composition: (formData.get('composition') as string) || null,
+      aroma: (formData.get('aroma') as string) || null,
+      effects: (formData.get('effects') as string) || null,
+      notes: (formData.get('notes') as string) || null,
     })
     .eq('id', id);
   if (error) return { error: error.message };
