@@ -3,12 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
-import { money, monthLabel, monthRange, shiftMonth, fmtDate } from '@/lib/format';
-
-function currentMonthKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
+import { money, monthLabel, monthRange, shiftMonth, fmtDate, currentMonthKeyAR } from '@/lib/format';
 
 export default async function BalancePage({
   searchParams,
@@ -20,7 +15,7 @@ export default async function BalancePage({
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
   const { month } = await searchParams;
-  const activeMonth = month ?? currentMonthKey();
+  const activeMonth = month ?? currentMonthKeyAR();
 
   const supabase = await createClient();
   const { start, end } = monthRange(activeMonth);
@@ -42,7 +37,7 @@ export default async function BalancePage({
     byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + signed);
   }
 
-  const last3Months = [shiftMonth(currentMonthKey(), -2), shiftMonth(currentMonthKey(), -1), currentMonthKey()];
+  const last3Months = [shiftMonth(currentMonthKeyAR(), -2), shiftMonth(currentMonthKeyAR(), -1), currentMonthKeyAR()];
   const chartData = await Promise.all(
     last3Months.map(async (key) => {
       const range = monthRange(key);
@@ -134,7 +129,7 @@ export default async function BalancePage({
         </div>
       </div>
 
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>

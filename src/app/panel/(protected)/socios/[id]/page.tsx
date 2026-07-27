@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Badge } from '@/components/badge';
 import { MEMBER_STATUS } from '@/lib/status-meta';
 import { fmtDate } from '@/lib/format';
@@ -22,6 +23,21 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const supabase = await createClient();
   const { data: member } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
   if (!member) notFound();
+
+  const { data: documents } = await supabase
+    .from('member_documents')
+    .select('id, label, storage_path')
+    .eq('member_id', id);
+
+  // Bucket privado — la URL firmada es la única forma de verlo, y vence
+  // a los pocos minutos (no queda un link público dando vueltas).
+  const admin = createAdminClient();
+  const documentsWithUrl = await Promise.all(
+    (documents ?? []).map(async (doc) => {
+      const { data } = await admin.storage.from('documentos').createSignedUrl(doc.storage_path, 300);
+      return { ...doc, url: data?.signedUrl ?? null };
+    }),
+  );
 
   const meta = MEMBER_STATUS[member.status as keyof typeof MEMBER_STATUS];
 
@@ -69,6 +85,27 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           <div><dt className="text-text-mute">Matrícula</dt><dd>{member.matricula ?? '—'}</dd></div>
           <div className="col-span-2"><dt className="text-text-mute">Patología</dt><dd>{member.patologia ?? '—'}</dd></div>
         </dl>
+      </div>
+
+      <div className="rounded-xl border border-line bg-surface p-5 mb-4">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-3">Documentación</p>
+        {documentsWithUrl.length === 0 ? (
+          <p className="text-text-mute text-sm">Sin documentos adjuntos.</p>
+        ) : (
+          <div className="flex gap-3 flex-wrap">
+            {documentsWithUrl.map((doc) => (
+              <a
+                key={doc.id}
+                href={doc.url ?? '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-line-2 px-3 py-2 text-xs font-semibold text-text-soft hover:border-accent hover:text-accent"
+              >
+                {doc.label ?? 'Documento'} ↗
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       {(member.status === 'pending' || member.status === 'draft') && (

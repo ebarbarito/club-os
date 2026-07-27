@@ -52,6 +52,36 @@ export async function addMovement(formData: FormData) {
   return {};
 }
 
+// No se edita un movimiento que vino de una dispensa (category='Dispensa')
+// — ese registro tiene que quedar en sync con dispensa_payments/dispensas.
+// Solo se editan ingresos/egresos manuales cargados desde acá.
+export async function editMovement(formData: FormData) {
+  const profile = await requireAdminProfile();
+  const supabase = await createClient();
+
+  const id = String(formData.get('id'));
+  const { data: current } = await supabase.from('ledger').select('category').eq('id', id).maybeSingle();
+  if (!current) return { error: 'Movimiento no encontrado' };
+  if (current.category === 'Dispensa') {
+    return { error: 'Este movimiento viene de una dispensa — se edita desde ahí, no desde Caja' };
+  }
+
+  const { error } = await supabase
+    .from('ledger')
+    .update({
+      category: String(formData.get('category') ?? 'Otro'),
+      concept: String(formData.get('concept') ?? ''),
+      amount: Number(formData.get('amount') ?? 0),
+      method: String(formData.get('method') ?? 'efectivo'),
+    })
+    .eq('id', id)
+    .eq('tenant_id', profile.tenantId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/caja');
+  return {};
+}
+
 export async function closeShift(formData: FormData) {
   await requireAdminProfile();
   const supabase = await createClient();

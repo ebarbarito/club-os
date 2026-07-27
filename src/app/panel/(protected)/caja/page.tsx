@@ -7,6 +7,7 @@ import { ROLES } from '@/lib/roles';
 import { OpenShiftForm } from './open-shift-form';
 import { MovementForm } from './movement-form';
 import { CloseShiftForm } from './close-shift-form';
+import { EditMovementForm } from './edit-movement-form';
 
 export default async function CajaPage() {
   const profile = await getSessionProfile();
@@ -104,7 +105,7 @@ export default async function CajaPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-line bg-surface overflow-hidden mb-6">
+          <div className="rounded-xl border border-line bg-surface overflow-x-auto mb-6">
             <table className="w-full text-sm">
               <thead className="bg-surface-2 text-text-soft text-left">
                 <tr>
@@ -113,6 +114,7 @@ export default async function CajaPage() {
                   <th className="px-4 py-2.5 font-medium">Medio</th>
                   <th className="px-4 py-2.5 font-medium">Monto</th>
                   <th className="px-4 py-2.5 font-medium">Fecha</th>
+                  <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -126,11 +128,22 @@ export default async function CajaPage() {
                       {money(m.amount)}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(m.created_at)}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      {m.category !== 'Dispensa' && (
+                        <ModalTrigger
+                          label="Editar"
+                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                          title="Editar movimiento"
+                        >
+                          <EditMovementForm movement={m} />
+                        </ModalTrigger>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {movements.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-text-mute">
+                    <td colSpan={6} className="px-4 py-8 text-center text-text-mute">
                       Sin movimientos en este turno.
                     </td>
                   </tr>
@@ -142,7 +155,7 @@ export default async function CajaPage() {
       )}
 
       <h2 className="font-display font-bold text-text mb-2">Historial de cierres</h2>
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>

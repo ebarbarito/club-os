@@ -55,22 +55,21 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
             {item.description && <p className="text-text-soft text-xs mb-3">{item.description}</p>}
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-text">{money(item.price_per_gram)}/g</span>
-              <span className={`text-xs ${item.grams > 0 ? 'text-accent' : 'text-red'}`}>
-                {item.grams > 0 ? `${item.grams} g disponibles` : 'Sin stock'}
+              <span className={`text-xs ${item.available ? 'text-accent' : 'text-red'}`}>
+                {item.available ? 'Disponible' : 'Sin stock'}
               </span>
             </div>
             <div className="flex gap-2">
               <input
                 type="number"
                 min={1}
-                max={item.grams}
                 defaultValue={1}
-                disabled={item.grams <= 0}
+                disabled={!item.available}
                 onChange={(e) => setGrams((prev) => ({ ...prev, [item.id]: Number(e.target.value) }))}
                 className="w-16 rounded-lg border border-line-2 px-2 py-1.5 text-sm"
               />
               <button
-                disabled={item.grams <= 0}
+                disabled={!item.available}
                 onClick={() =>
                   addToCart(
                     { strainId: item.id, name: item.name, pricePerGram: item.price_per_gram },

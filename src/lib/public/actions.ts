@@ -1,9 +1,19 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { headers } from 'next/headers';
 import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
+
+// Documentos de alta: bucket PRIVADO (no público como "media") — DNI y
+// constancia REPROCANN son datos sensibles, se sirven solo vía signed
+// URL generada server-side para un admin autenticado (ver Socios/[id]).
+const DOCUMENT_FIELDS: { field: string; label: string }[] = [
+  { field: 'dni_frente', label: 'DNI (frente)' },
+  { field: 'dni_dorso', label: 'DNI (dorso)' },
+  { field: 'reprocann_doc', label: 'Constancia REPROCANN' },
+];
 
 // El tenant se resuelve server-side a partir del Host (vía proxy.ts,
 // header x-club-os-tenant-slug) — nunca de un campo que mande el cliente.
@@ -57,7 +67,28 @@ export async function createMemberPublic(formData: FormData) {
     .single();
 
   if (error) return { error: error.message };
-  return { memberId: data.id as string };
+  const memberId = data.id as string;
+
+  for (const { field, label } of DOCUMENT_FIELDS) {
+    const file = formData.get(field);
+    if (!(file instanceof File) || file.size === 0) continue;
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${tenant.id}/${memberId}/${field}-${randomUUID()}.${ext}`;
+    const { error: uploadError } = await admin.storage
+      .from('documentos')
+      .upload(path, file, { contentType: file.type || 'image/jpeg' });
+    if (uploadError) continue; // no bloquea el alta si falla la subida de un documento
+
+    await admin.from('member_documents').insert({
+      tenant_id: tenant.id,
+      member_id: memberId,
+      storage_path: path,
+      label,
+    });
+  }
+
+  return { memberId };
 }
 
 export async function checkMemberStatus(memberId: string) {
@@ -97,6 +128,26 @@ export async function createReservation(formData: FormData) {
     .maybeSingle();
   if (!member || member.status !== 'valid') {
     return { error: 'Necesitás ser socio validado para confirmar una reserva' };
+  }
+
+  // El stock no se muestra en el sitio público, pero igual se valida acá
+  // — sin revelar el número exacto disponible, solo si alcanza o no.
+  const { data: stockRows } = await admin
+    .from('stock')
+    .select('strain_id, grams, strain:strains(name)')
+    .eq('tenant_id', tenant.id)
+    .in(
+      'strain_id',
+      items.map((it) => it.strainId),
+    );
+  const stockByStrain = new Map((stockRows ?? []).map((r) => [r.strain_id, r]));
+  for (const it of items) {
+    const row = stockByStrain.get(it.strainId);
+    const strainField = row?.strain;
+    const strain = Array.isArray(strainField) ? strainField[0] : strainField;
+    if (!row || row.grams < it.grams) {
+      return { error: `${strain?.name ?? 'Uno de los productos'} no tiene stock suficiente para la cantidad pedida` };
+    }
   }
 
   const { data: order, error: orderError } = await admin

@@ -7,7 +7,7 @@ export type CatalogItem = {
   thc: number | null;
   cbd: number | null;
   price_per_gram: number;
-  grams: number;
+  available: boolean;
   crossInfo: string | null;
   composition: string | null;
   aroma: string | null;
@@ -19,15 +19,19 @@ export type CatalogItem = {
 // Catálogo público: no hay RLS de lectura anónima para strains/stock a
 // propósito (ver ARCHITECTURE.md) — se usa service_role acá, siempre
 // acotado por tenantId resuelto server-side desde el subdominio.
+//
+// No se expone el gramaje exacto en stock — el socio solo ve "disponible"
+// o "sin stock". La cantidad real solo importa server-side, al validar
+// una reserva (ver createReservation).
 export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from('strains')
     .select(
-      'id, name, type, thc, cbd, price_per_gram, cross_info, composition, aroma, effects, description, images, stock(grams)',
+      'id, name, type, thc, cbd, price_per_gram, status, cross_info, composition, aroma, effects, description, images, stock(grams)',
     )
     .eq('tenant_id', tenantId)
-    .eq('active', true)
+    .in('status', ['activa', 'sin_stock'])
     .order('name');
 
   return (data ?? []).map((s) => {
@@ -39,7 +43,7 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
       thc: s.thc,
       cbd: s.cbd,
       price_per_gram: s.price_per_gram,
-      grams: stock?.grams ?? 0,
+      available: s.status === 'activa' && (stock?.grams ?? 0) > 0,
       crossInfo: s.cross_info,
       composition: s.composition,
       aroma: s.aroma,

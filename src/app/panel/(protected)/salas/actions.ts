@@ -14,15 +14,14 @@ export async function upsertSala(formData: FormData) {
   requireAdmin(profile.role);
 
   const id = formData.get('id') as string | null;
+  const strains: { strainId: string; plants: number }[] = JSON.parse(String(formData.get('sala_strains') ?? '[]'));
   const supabase = await createClient();
 
   const payload = {
     tenant_id: profile.tenantId,
     name: String(formData.get('name') ?? ''),
-    strain_id: (formData.get('strain_id') as string) || null,
     etapa: String(formData.get('etapa') ?? 'vegetativo'),
     etapa_dias: Number(formData.get('etapa_dias') ?? 0),
-    plants: Number(formData.get('plants') ?? 0),
     capacity: Number(formData.get('capacity') ?? 0),
     cosecha_estimada: (formData.get('cosecha_estimada') as string) || null,
     responsable: (formData.get('responsable') as string) || null,
@@ -33,10 +32,30 @@ export async function upsertSala(formData: FormData) {
     sensor_id: (formData.get('sensor_id') as string) || null,
   };
 
-  const { error } = id
-    ? await supabase.from('salas').update(payload).eq('id', id)
-    : await supabase.from('salas').insert(payload);
-  if (error) return { error: error.message };
+  let salaId = id;
+  if (id) {
+    const { error } = await supabase.from('salas').update(payload).eq('id', id);
+    if (error) return { error: error.message };
+  } else {
+    const { data, error } = await supabase.from('salas').insert(payload).select('id').single();
+    if (error) return { error: error.message };
+    salaId = data.id;
+  }
+
+  const { error: deleteError } = await supabase.from('sala_strains').delete().eq('sala_id', salaId!);
+  if (deleteError) return { error: deleteError.message };
+
+  if (strains.length > 0) {
+    const { error: insertError } = await supabase.from('sala_strains').insert(
+      strains.map((s) => ({
+        tenant_id: profile.tenantId,
+        sala_id: salaId,
+        strain_id: s.strainId,
+        plants: s.plants,
+      })),
+    );
+    if (insertError) return { error: insertError.message };
+  }
 
   revalidatePath('/panel/salas');
   return {};

@@ -45,7 +45,7 @@ export default async function UsuariosPage() {
         </ModalTrigger>
       </div>
 
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>

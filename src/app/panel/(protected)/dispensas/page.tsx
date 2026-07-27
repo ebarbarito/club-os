@@ -25,7 +25,7 @@ export default async function DispensaPage({
       .order('created_at', { ascending: false }),
     supabase
       .from('dispensas')
-      .select('*, member:members(name, dni), strain:strains(name), by:profiles(name)')
+      .select('*, member:members(name, dni), strain:strains(name), by:profiles(name), payments:dispensa_payments(method, amount)')
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.from('members').select('id, name, dni').eq('status', 'valid').order('name'),
@@ -67,7 +67,7 @@ export default async function DispensaPage({
       </div>
 
       {activeTab === 'pedidos' ? (
-        <div className="rounded-xl border border-line bg-surface overflow-hidden">
+        <div className="rounded-xl border border-line bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
@@ -139,15 +139,17 @@ export default async function DispensaPage({
           </table>
         </div>
       ) : (
-        <div className="rounded-xl border border-line bg-surface overflow-hidden">
+        <div className="rounded-xl border border-line bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Socio</th>
                 <th className="px-4 py-2.5 font-medium">Genética</th>
                 <th className="px-4 py-2.5 font-medium">Gramos</th>
-                <th className="px-4 py-2.5 font-medium">Importe</th>
-                <th className="px-4 py-2.5 font-medium">Medio</th>
+                <th className="px-4 py-2.5 font-medium">Sugerido</th>
+                <th className="px-4 py-2.5 font-medium">Cobrado</th>
+                <th className="px-4 py-2.5 font-medium">Diferencia</th>
+                <th className="px-4 py-2.5 font-medium">Medios de pago</th>
                 <th className="px-4 py-2.5 font-medium">Fecha</th>
                 <th className="px-4 py-2.5 font-medium">Registró</th>
               </tr>
@@ -157,13 +159,24 @@ export default async function DispensaPage({
                 const member = Array.isArray(d.member) ? d.member[0] : d.member;
                 const strain = Array.isArray(d.strain) ? d.strain[0] : d.strain;
                 const by = Array.isArray(d.by) ? d.by[0] : d.by;
+                const diff = d.suggested_amount != null ? d.amount - d.suggested_amount : null;
                 return (
                   <tr key={d.id} className="border-t border-line">
                     <td className="px-4 py-2.5 font-medium text-text">{member?.name ?? '—'}</td>
                     <td className="px-4 py-2.5 text-text-soft">{strain?.name ?? '—'}</td>
                     <td className="px-4 py-2.5 text-text-soft">{d.grams} g</td>
-                    <td className="px-4 py-2.5 text-text-soft">{money(d.amount)}</td>
-                    <td className="px-4 py-2.5 text-text-soft capitalize">{d.method}</td>
+                    <td className="px-4 py-2.5 text-text-soft">{d.suggested_amount != null ? money(d.suggested_amount) : '—'}</td>
+                    <td className="px-4 py-2.5 text-text font-medium">{money(d.amount)}</td>
+                    <td className={`px-4 py-2.5 ${diff == null || diff === 0 ? 'text-text-mute' : diff > 0 ? 'text-accent' : 'text-red'}`}>
+                      {diff == null ? '—' : diff === 0 ? 'Exacto' : `${diff > 0 ? '+' : ''}${money(diff)}`}
+                    </td>
+                    <td className="px-4 py-2.5 text-text-soft">
+                      {(d.payments ?? []).map((p: { method: string; amount: number }, i: number) => (
+                        <div key={i} className="capitalize">
+                          {p.method} · {money(p.amount)}
+                        </div>
+                      ))}
+                    </td>
                     <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(d.created_at)}</td>
                     <td className="px-4 py-2.5 text-text-soft">{by?.name ?? '—'}</td>
                   </tr>
@@ -171,7 +184,7 @@ export default async function DispensaPage({
               })}
               {(dispensas ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-text-mute">
+                  <td colSpan={9} className="px-4 py-10 text-center text-text-mute">
                     Sin dispensas registradas todavía.
                   </td>
                 </tr>

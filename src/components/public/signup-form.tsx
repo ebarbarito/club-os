@@ -106,6 +106,22 @@ export function SignupForm() {
         <input name="patologia" className={inputCls} />
       </div>
 
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Documentación</p>
+      </div>
+      <div>
+        <label className={labelCls}>DNI (frente)</label>
+        <input name="dni_frente" type="file" accept="image/*,.pdf" required className={`${inputCls} p-1.5`} />
+      </div>
+      <div>
+        <label className={labelCls}>DNI (dorso)</label>
+        <input name="dni_dorso" type="file" accept="image/*,.pdf" required className={`${inputCls} p-1.5`} />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Constancia REPROCANN</label>
+        <input name="reprocann_doc" type="file" accept="image/*,.pdf" required className={`${inputCls} p-1.5`} />
+      </div>
+
       <label className="col-span-2 flex items-start gap-2 text-xs text-text-soft mt-2">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
         Declaro ser mayor de 18 años y acepto que el club valide mis datos y REPROCANN para habilitarme como socio.

@@ -19,9 +19,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const role = ROLES[profile.role];
 
   return (
-    <div className="flex flex-1 min-h-screen bg-bg font-sans">
+    <div className="flex flex-col lg:flex-row flex-1 min-h-screen bg-bg font-sans">
       <Sidebar tenantName={tenant.name} logoUrl={tenant.logo_url} profile={profile} nav={role.nav} />
-      <main className="flex-1 p-6">{children}</main>
+      <main className="flex-1 p-4 sm:p-6 min-w-0">{children}</main>
     </div>
   );
 }

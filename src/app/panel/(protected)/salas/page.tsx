@@ -12,8 +12,8 @@ export default async function SalasPage() {
   const supabase = await createClient();
 
   const [{ data: salas }, { data: strainRows }] = await Promise.all([
-    supabase.from('salas').select('*, strain:strains(id, name)').order('name'),
-    supabase.from('strains').select('id, name').eq('active', true).order('name'),
+    supabase.from('salas').select('*, sala_strains(strain_id, plants, strain:strains(id, name))').order('name'),
+    supabase.from('strains').select('id, name').neq('status', 'inactiva').order('name'),
   ]);
 
   const strains = strainRows ?? [];
@@ -35,22 +35,40 @@ export default async function SalasPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(salas ?? []).map((s) => {
-          const strain = Array.isArray(s.strain) ? s.strain[0] : s.strain;
+          const salaStrains: { strainId: string; strainName: string; plants: number }[] = (s.sala_strains ?? []).map(
+            (ss: { strain_id: string; plants: number; strain: { name: string } | { name: string }[] | null }) => {
+              const strain = Array.isArray(ss.strain) ? ss.strain[0] : ss.strain;
+              return { strainId: ss.strain_id, strainName: strain?.name ?? '—', plants: ss.plants };
+            },
+          );
+          const totalPlants = salaStrains.reduce((sum: number, ss) => sum + ss.plants, 0);
           const etapaMeta = ETAPA[s.etapa as keyof typeof ETAPA];
-          const occupancy = s.capacity > 0 ? Math.min(100, (s.plants / s.capacity) * 100) : 0;
+          const occupancy = s.capacity > 0 ? Math.min(100, (totalPlants / s.capacity) * 100) : 0;
           return (
             <div key={s.id} className="rounded-xl border border-line bg-surface p-4">
               <div className="flex items-start justify-between mb-2">
                 <h3 className="font-display font-bold text-text">{s.name}</h3>
                 <Badge label={`${etapaMeta.label} · día ${s.etapa_dias}`} color={etapaMeta.color} />
               </div>
-              <p className="text-text-soft text-sm mb-3">{strain?.name ?? 'Sin genética asignada'}</p>
+              <div className="text-text-soft text-sm mb-3">
+                {salaStrains.length === 0 ? (
+                  'Sin genéticas asignadas'
+                ) : (
+                  <ul>
+                    {salaStrains.map((ss) => (
+                      <li key={ss.strainId}>
+                        {ss.strainName} · {ss.plants} plantas
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               <div className="mb-3">
                 <div className="flex justify-between text-xs text-text-mute mb-1">
                   <span>Ocupación</span>
                   <span>
-                    {s.plants}/{s.capacity}
+                    {totalPlants}/{s.capacity}
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
@@ -80,14 +98,14 @@ export default async function SalasPage() {
                     className="flex-1 rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                     title={`Configurar — ${s.name}`}
                   >
-                    <SalaForm strains={strains} sala={s} />
+                    <SalaForm strains={strains} sala={{ ...s, salaStrains }} />
                   </ModalTrigger>
                   <ModalTrigger
                     label="Cerrar ciclo"
                     className="flex-1 rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                     title={`Cerrar ciclo — ${s.name}`}
                   >
-                    <CloseCicloForm salaId={s.id} strains={strains} />
+                    <CloseCicloForm salaId={s.id} salaStrains={salaStrains} strains={strains} />
                   </ModalTrigger>
                 </div>
               )}

@@ -15,7 +15,7 @@ type Strain = {
   thc: number | null;
   cbd: number | null;
   price_per_gram: number;
-  active: boolean;
+  status: 'activa' | 'sin_stock' | 'inactiva';
   cross_info: string | null;
   composition: string | null;
   aroma: string | null;
@@ -119,10 +119,14 @@ export function StrainForm({ strain }: { strain?: Strain }) {
       </div>
 
       {strain && (
-        <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
-          <input type="checkbox" name="active" defaultChecked={strain.active} />
-          Activa (visible en el sitio público y en Stock)
-        </label>
+        <div className="col-span-2">
+          <label className={labelCls}>Estado</label>
+          <select name="status" className={inputCls} defaultValue={strain.status}>
+            <option value="activa">Activa</option>
+            <option value="sin_stock">Sin stock (visible, no reservable)</option>
+            <option value="inactiva">Inactiva (oculta del sitio público)</option>
+          </select>
+        </div>
       )}
 
       {error && <p className="col-span-2 text-red text-sm">{error}</p>}

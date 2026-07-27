@@ -31,11 +31,12 @@ export async function registerDispensa(formData: FormData) {
     p_member_id: String(formData.get('member_id')),
     p_strain_id: String(formData.get('strain_id')),
     p_grams: Number(formData.get('grams')),
-    p_method: String(formData.get('method')),
-    p_amount: Number(formData.get('amount')),
+    p_suggested_amount: Number(formData.get('suggested_amount')),
+    p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
   });
   if (error) return { error: error.message };
   revalidatePath('/panel/dispensas');
   revalidatePath('/panel/stock');
+  revalidatePath('/panel/caja');
   return {};
 }

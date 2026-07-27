@@ -8,6 +8,12 @@ import { money } from '@/lib/format';
 import { StrainForm } from './strain-form';
 import { StrainImages } from './strain-images';
 
+const STATUS_META: Record<string, { label: string; color: 'green' | 'amber' | 'gray' }> = {
+  activa: { label: 'Activa', color: 'green' },
+  sin_stock: { label: 'Sin stock', color: 'amber' },
+  inactiva: { label: 'Inactiva', color: 'gray' },
+};
+
 export default async function CatalogoPage() {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
@@ -28,7 +34,7 @@ export default async function CatalogoPage() {
         </ModalTrigger>
       </div>
 
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
+      <div className="rounded-xl border border-line bg-surface overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>
@@ -51,7 +57,7 @@ export default async function CatalogoPage() {
                 </td>
                 <td className="px-4 py-2.5 text-text-soft">{money(s.price_per_gram)}</td>
                 <td className="px-4 py-2.5">
-                  <Badge label={s.active ? 'Activa' : 'Inactiva'} color={s.active ? 'green' : 'gray'} />
+                  <Badge label={STATUS_META[s.status].label} color={STATUS_META[s.status].color} />
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <ModalTrigger

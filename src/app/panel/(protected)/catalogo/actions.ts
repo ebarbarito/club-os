@@ -66,7 +66,7 @@ export async function updateStrain(formData: FormData) {
       thc: formData.get('thc') ? Number(formData.get('thc')) : null,
       cbd: formData.get('cbd') ? Number(formData.get('cbd')) : null,
       price_per_gram: Number(formData.get('price_per_gram') ?? 0),
-      active: formData.get('active') === 'on',
+      status: String(formData.get('status') ?? 'activa'),
       cross_info: (formData.get('cross_info') as string) || null,
       composition: (formData.get('composition') as string) || null,
       aroma: (formData.get('aroma') as string) || null,

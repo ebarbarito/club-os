@@ -11,6 +11,7 @@ const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
 type Member = { id: string; name: string; dni: string };
 type Strain = { id: string; name: string; price_per_gram: number; grams: number };
+type PaymentLine = { method: string; amount: string };
 
 export function RegisterDispensaForm({ members, strains }: { members: Member[]; strains: Strain[] }) {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function RegisterDispensaForm({ members, strains }: { members: Member[]; 
 
   const [strainId, setStrainId] = useState(strains[0]?.id ?? '');
   const [grams, setGrams] = useState('');
-  const [amount, setAmount] = useState('');
+  const [payments, setPayments] = useState<PaymentLine[]>([{ method: 'efectivo', amount: '' }]);
   const [amountTouched, setAmountTouched] = useState(false);
 
   const selectedStrain = strains.find((s) => s.id === strainId);
@@ -30,10 +31,41 @@ export function RegisterDispensaForm({ members, strains }: { members: Member[]; 
     return g * selectedStrain.price_per_gram;
   }, [selectedStrain, grams]);
 
-  const amountValue = amountTouched ? amount : String(suggestedAmount || '');
+  // Mientras haya una sola línea y nadie la tocó a mano, se sincroniza
+  // con el monto sugerido — apenas se edita o se agrega otra línea, deja
+  // de auto-completarse (así se puede dividir el cobro libremente).
+  const displayPayments =
+    !amountTouched && payments.length === 1 ? [{ ...payments[0], amount: String(suggestedAmount || '') }] : payments;
+
+  const total = displayPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const difference = total - suggestedAmount;
+
+  function updateLine(i: number, patch: Partial<PaymentLine>) {
+    setAmountTouched(true);
+    setPayments((prev) => {
+      const base = !amountTouched && prev.length === 1 ? displayPayments : prev;
+      return base.map((p, idx) => (idx === i ? { ...p, ...patch } : p));
+    });
+  }
+
+  function addLine() {
+    setAmountTouched(true);
+    setPayments((prev) => [...(prev.length === 1 && !amountTouched ? displayPayments : prev), { method: 'transferencia', amount: '' }]);
+  }
+
+  function removeLine(i: number) {
+    setPayments((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   function submit(formData: FormData) {
-    formData.set('amount', amountValue);
+    const validPayments = displayPayments.filter((p) => Number(p.amount) > 0);
+    if (validPayments.length === 0) {
+      setError('Cargá al menos un medio de pago con un monto mayor a 0');
+      return;
+    }
+    formData.set('suggested_amount', String(suggestedAmount));
+    formData.set('payments', JSON.stringify(validPayments.map((p) => ({ method: p.method, amount: Number(p.amount) }))));
+
     startTransition(async () => {
       const res = await registerDispensa(formData);
       if (res?.error) {
@@ -80,27 +112,18 @@ export function RegisterDispensaForm({ members, strains }: { members: Member[]; 
           ))}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Gramos</label>
-          <input
-            name="grams"
-            type="number"
-            min="0.1"
-            step="0.1"
-            required
-            value={grams}
-            onChange={(e) => setGrams(e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div>
-          <label className={labelCls}>Medio de pago</label>
-          <select name="method" className={inputCls} defaultValue="efectivo">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-          </select>
-        </div>
+      <div>
+        <label className={labelCls}>Gramos</label>
+        <input
+          name="grams"
+          type="number"
+          min="0.1"
+          step="0.1"
+          required
+          value={grams}
+          onChange={(e) => setGrams(e.target.value)}
+          className={inputCls}
+        />
       </div>
 
       <div className="rounded-lg bg-surface-2 p-3 text-sm space-y-1">
@@ -115,23 +138,50 @@ export function RegisterDispensaForm({ members, strains }: { members: Member[]; 
       </div>
 
       <div>
-        <label className={labelCls}>Monto a cobrar</label>
-        <input
-          name="amount_display"
-          type="number"
-          min="0"
-          step="1"
-          required
-          value={amountValue}
-          onChange={(e) => {
-            setAmountTouched(true);
-            setAmount(e.target.value);
-          }}
-          className={inputCls}
-        />
-        <p className="text-text-mute text-xs mt-1">
-          Precargado con el sugerido — editable por si hay un ajuste o descuento puntual.
-        </p>
+        <div className="flex items-center justify-between mb-1">
+          <label className={labelCls}>Cobro (podés dividir en más de un medio de pago)</label>
+        </div>
+        <div className="space-y-2">
+          {displayPayments.map((p, i) => (
+            <div key={i} className="flex gap-2">
+              <select
+                value={p.method}
+                onChange={(e) => updateLine(i, { method: e.target.value })}
+                className={inputCls}
+              >
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Monto"
+                value={p.amount}
+                onChange={(e) => updateLine(i, { amount: e.target.value })}
+                className={inputCls}
+              />
+              {displayPayments.length > 1 && (
+                <button type="button" onClick={() => removeLine(i)} className="text-red text-xs shrink-0">
+                  Quitar
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={addLine} className="text-accent text-xs font-semibold mt-2">
+          + Dividir en otro medio de pago
+        </button>
+      </div>
+
+      <div className="rounded-lg bg-surface-2 p-3 text-sm flex justify-between">
+        <span className="text-text-soft">Total a cobrar</span>
+        <span className="font-semibold text-text">
+          {money(total)}
+          {difference !== 0 && (
+            <span className={difference > 0 ? 'text-accent' : 'text-red'}> ({difference > 0 ? '+' : ''}{money(difference)} vs. sugerido)</span>
+          )}
+        </span>
       </div>
 
       {error && <p className="text-red text-sm">{error}</p>}
