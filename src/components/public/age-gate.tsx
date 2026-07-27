@@ -29,10 +29,10 @@ export function AgeGate({ clubName }: { clubName: string }) {
           Este sitio contiene información sobre cannabis destinada exclusivamente a mayores de 18 años.
         </p>
         <div className="flex gap-3 justify-center">
-          <button onClick={confirm} className="rounded-lg bg-accent px-5 py-2 font-semibold">
-            Soy mayor de 18
+          <button onClick={confirm} className="rounded-lg bg-gold text-green-900 px-5 py-2 font-semibold">
+            Sí, soy mayor de 18
           </button>
-          <a href="https://www.google.com" className="rounded-lg border border-white/30 px-5 py-2 font-semibold">
+          <a href="https://www.google.com" className="rounded-lg border border-white/30 px-5 py-2 font-semibold hover:border-gold hover:text-gold">
             Salir
           </a>
         </div>

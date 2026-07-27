@@ -110,6 +110,7 @@ export async function createReservation(formData: FormData) {
       pickup_time: delivery === 'pickup' ? (formData.get('pickup_time') as string) || null : null,
       address: delivery === 'shipping' ? (formData.get('address') as string) || null : null,
       zona: (formData.get('zona') as string) || null,
+      method: (formData.get('method') as string) || 'efectivo',
     })
     .select('id')
     .single();

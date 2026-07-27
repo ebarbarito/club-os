@@ -4,10 +4,10 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
 import { AdjustStockForm } from './adjust-stock-form';
 
-function levelColor(grams: number, min: number): string {
-  if (grams <= 0) return 'bg-red';
-  if (grams <= min) return 'bg-amber';
-  return 'bg-accent';
+function levelTextColor(grams: number, min: number): string {
+  if (grams <= 0) return 'text-red';
+  if (grams <= min) return 'text-amber-tx';
+  return 'text-text-soft';
 }
 
 export default async function StockPage() {
@@ -25,6 +25,7 @@ export default async function StockPage() {
     .sort((a, b) => a.strain.name.localeCompare(b.strain.name));
 
   const totalValue = items.reduce((sum, r) => sum + r.grams * r.strain.price_per_gram, 0);
+  const totalGrams = items.reduce((sum, r) => sum + r.grams, 0);
 
   return (
     <div>
@@ -47,6 +48,7 @@ export default async function StockPage() {
             <tr>
               <th className="px-4 py-2.5 font-medium">Genética</th>
               <th className="px-4 py-2.5 font-medium">Disponible</th>
+              <th className="px-4 py-2.5 font-medium">% del total</th>
               <th className="px-4 py-2.5 font-medium">Mínimo</th>
               <th className="px-4 py-2.5 font-medium">Precio/g</th>
               <th className="px-4 py-2.5 font-medium">Valor total</th>
@@ -60,14 +62,9 @@ export default async function StockPage() {
                   <div className="font-medium text-text">{r.strain.name}</div>
                   <div className="text-text-mute text-xs">{r.strain.type}</div>
                 </td>
-                <td className="px-4 py-2.5">
-                  <div className="text-text-soft mb-1">{r.grams} g</div>
-                  <div className="h-1.5 w-28 rounded-full bg-surface-3 overflow-hidden">
-                    <div
-                      className={`h-full ${levelColor(r.grams, r.min_grams)}`}
-                      style={{ width: `${Math.min(100, (r.grams / Math.max(r.min_grams * 2, 1)) * 100)}%` }}
-                    />
-                  </div>
+                <td className={`px-4 py-2.5 font-medium ${levelTextColor(r.grams, r.min_grams)}`}>{r.grams} g</td>
+                <td className="px-4 py-2.5 text-text-soft">
+                  {totalGrams > 0 ? `${((r.grams / totalGrams) * 100).toFixed(1)}%` : '—'}
                 </td>
                 <td className="px-4 py-2.5 text-text-soft">{r.min_grams} g</td>
                 <td className="px-4 py-2.5 text-text-soft">{money(r.strain.price_per_gram)}</td>
@@ -85,7 +82,7 @@ export default async function StockPage() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-text-mute">
+                <td colSpan={7} className="px-4 py-10 text-center text-text-mute">
                   Sin genéticas cargadas todavía.
                 </td>
               </tr>

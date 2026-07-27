@@ -23,12 +23,13 @@ function Nav({ tenant, onOpenCart }: { tenant: Tenant; onOpenCart: () => void })
 
   return (
     <nav className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {tenant.logo_url && (
+      <div className="flex items-center">
+        {tenant.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-8 rounded-lg object-cover" />
+          <img src={tenant.logo_url} alt={tenant.name} className="h-10 w-auto object-contain" />
+        ) : (
+          <span className="font-display font-bold text-text">{tenant.name}</span>
         )}
-        <span className="font-display font-bold text-text">{tenant.name}</span>
       </div>
       <div className="flex items-center gap-4">
         <a href="#geneticas" className="text-sm text-text-soft hover:text-accent">
@@ -43,7 +44,7 @@ function Nav({ tenant, onOpenCart }: { tenant: Tenant; onOpenCart: () => void })
         {!member && (
           <ModalTrigger
             label="Darme de alta"
-            className="text-sm font-semibold text-accent"
+            className="text-sm font-semibold text-amber-tx hover:text-gold"
             title="Alta de socio"
           >
             <SignupForm />
@@ -63,21 +64,25 @@ function Nav({ tenant, onOpenCart }: { tenant: Tenant; onOpenCart: () => void })
 function Hero({ tenant }: { tenant: Tenant }) {
   return (
     <section className="bg-green-900 text-white py-20 px-6 text-center">
+      <p className="inline-flex items-center gap-2 text-gold text-xs font-semibold uppercase tracking-[0.2em] mb-4">
+        <span className="h-px w-6 bg-gold inline-block" />
+        Club social de cannabis
+      </p>
       <h1 className="font-display text-4xl font-bold mb-3">{tenant.name}</h1>
       <p className="text-white/80 max-w-xl mx-auto mb-8">
-        Club social de cannabis — genéticas, membresías y dispensa para socios validados.
+        Genéticas, membresías y dispensa para socios validados.
       </p>
       <div className="flex justify-center gap-8 text-sm text-white/70">
         <div>
-          <p className="font-display text-2xl font-bold text-white">+500</p>
+          <p className="font-display text-2xl font-bold text-gold">+500</p>
           <p>Socios</p>
         </div>
         <div>
-          <p className="font-display text-2xl font-bold text-white">6</p>
+          <p className="font-display text-2xl font-bold text-gold">6</p>
           <p>Genéticas</p>
         </div>
         <div>
-          <p className="font-display text-2xl font-bold text-white">100%</p>
+          <p className="font-display text-2xl font-bold text-gold">100%</p>
           <p>REPROCANN</p>
         </div>
       </div>

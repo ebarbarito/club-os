@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 
@@ -24,8 +23,11 @@ export async function createUser(formData: FormData) {
   });
   if (userError) return { error: userError.message };
 
-  const supabase = await createClient();
-  const { error: profileError } = await supabase.from('profiles').insert({
+  // No hay policy de INSERT en profiles (solo lectura por tenant) — a
+  // propósito, un usuario autenticado normal no debería poder crearse
+  // perfiles a sí mismo. Este alta ya está gateada por requireAdminProfile
+  // arriba, así que usamos service_role para el insert.
+  const { error: profileError } = await admin.from('profiles').insert({
     id: userRes.user.id,
     tenant_id: profile.tenantId,
     name: String(formData.get('name') ?? ''),

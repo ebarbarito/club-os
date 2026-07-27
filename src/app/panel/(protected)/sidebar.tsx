@@ -29,16 +29,13 @@ export function Sidebar({
 
   return (
     <aside className="w-[248px] shrink-0 bg-green-900 text-white flex flex-col">
-      <div className="h-[72px] flex items-center gap-2 px-4 border-b border-white/10">
+      <div className="h-[72px] flex items-center px-4 border-b border-white/10">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt={tenantName} className="h-9 w-9 rounded-lg object-cover" />
+          <img src={logoUrl} alt={tenantName} className="h-12 w-auto object-contain" />
         ) : (
-          <div className="h-9 w-9 rounded-lg bg-accent flex items-center justify-center font-display font-bold text-sm">
-            {tenantName.slice(0, 2).toUpperCase()}
-          </div>
+          <span className="font-display font-semibold truncate">{tenantName}</span>
         )}
-        <span className="font-display font-semibold truncate">{tenantName}</span>
       </div>
 
       <nav className="flex-1 py-3">

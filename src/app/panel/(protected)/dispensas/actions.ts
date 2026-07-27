@@ -15,6 +15,16 @@ export async function advanceOrderStatus(orderId: string, currentStatus: string,
   return {};
 }
 
+// Transición específica a 'entregado': re-confirma la forma de pago
+// (puede haber cambiado entre la reserva y la entrega real).
+export async function completeDelivery(orderId: string, method: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('orders').update({ status: 'entregado', method }).eq('id', orderId);
+  if (error) return { error: error.message };
+  revalidatePath('/panel/dispensas');
+  return {};
+}
+
 export async function registerDispensa(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.rpc('register_dispensa', {
@@ -22,6 +32,7 @@ export async function registerDispensa(formData: FormData) {
     p_strain_id: String(formData.get('strain_id')),
     p_grams: Number(formData.get('grams')),
     p_method: String(formData.get('method')),
+    p_amount: Number(formData.get('amount')),
   });
   if (error) return { error: error.message };
   revalidatePath('/panel/dispensas');

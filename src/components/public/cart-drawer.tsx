@@ -128,6 +128,14 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 )}
                 <input name="zona" placeholder="Zona" className="w-full rounded-lg border border-line-2 px-2 py-1.5 text-sm" />
 
+                <div>
+                  <label className="block text-xs font-medium text-text-soft mb-1">Forma de pago</label>
+                  <select name="method" defaultValue="efectivo" className="w-full rounded-lg border border-line-2 px-2 py-1.5 text-sm">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                </div>
+
                 {error && <p className="text-red text-sm">{error}</p>}
 
                 <button

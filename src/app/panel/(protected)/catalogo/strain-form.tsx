@@ -21,6 +21,7 @@ type Strain = {
   aroma: string | null;
   effects: string | null;
   notes: string | null;
+  description: string | null;
 };
 
 export function StrainForm({ strain }: { strain?: Strain }) {
@@ -105,6 +106,16 @@ export function StrainForm({ strain }: { strain?: Strain }) {
       <div className="col-span-2">
         <label className={labelCls}>Notas de cultivo</label>
         <textarea name="notes" defaultValue={strain?.notes ?? ''} rows={2} className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Descripción</label>
+        <textarea
+          name="description"
+          defaultValue={strain?.description ?? ''}
+          rows={3}
+          className={inputCls}
+          placeholder="Texto libre para mostrar en la ficha del sitio público"
+        />
       </div>
 
       {strain && (

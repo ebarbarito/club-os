@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { money } from '@/lib/format';
 import { useStore } from './store';
+import { ImageCarousel } from './image-carousel';
+import { Eyebrow } from './eyebrow';
 import type { CatalogItem } from '@/lib/public/get-catalog';
 
 const TYPES = ['Todos', 'Indica', 'Sativa', 'Híbrida', 'Alto CBD'];
@@ -16,6 +18,7 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
 
   return (
     <section id="geneticas" className="py-16 px-6 max-w-6xl mx-auto">
+      <Eyebrow>Catálogo</Eyebrow>
       <h2 className="font-display text-3xl font-bold text-text mb-2">Genéticas</h2>
       <p className="text-text-soft mb-6">Catálogo disponible para socios validados.</p>
 
@@ -36,6 +39,7 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((item) => (
           <div key={item.id} className="rounded-xl border border-line bg-surface p-4">
+            <ImageCarousel images={item.images} alt={item.name} />
             <div className="flex items-start justify-between mb-1">
               <h3 className="font-display font-bold text-text">{item.name}</h3>
               <span className="text-xs rounded-full bg-surface-3 px-2 py-0.5 text-text-soft">{item.type}</span>
@@ -47,7 +51,8 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
               </p>
             )}
             {item.aroma && <p className="text-text-soft text-xs mb-1">{item.aroma}</p>}
-            {item.effects && <p className="text-accent text-xs font-medium mb-3">{item.effects}</p>}
+            {item.effects && <p className="text-accent text-xs font-medium mb-2">{item.effects}</p>}
+            {item.description && <p className="text-text-soft text-xs mb-3">{item.description}</p>}
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-text">{money(item.price_per_gram)}/g</span>
               <span className={`text-xs ${item.grams > 0 ? 'text-accent' : 'text-red'}`}>

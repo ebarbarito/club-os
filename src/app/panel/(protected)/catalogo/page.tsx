@@ -6,6 +6,7 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { Badge } from '@/components/badge';
 import { money } from '@/lib/format';
 import { StrainForm } from './strain-form';
+import { StrainImages } from './strain-images';
 
 export default async function CatalogoPage() {
   const profile = await getSessionProfile();
@@ -59,6 +60,7 @@ export default async function CatalogoPage() {
                     title={`Editar — ${s.name}`}
                   >
                     <StrainForm strain={s} />
+                    <StrainImages strainId={s.id} images={s.images ?? []} />
                   </ModalTrigger>
                 </td>
               </tr>
