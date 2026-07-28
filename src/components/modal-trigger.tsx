@@ -36,18 +36,23 @@ export function ModalTrigger({
         {label}
       </button>
       {open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={close}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto"
+          onClick={close}
+        >
           <div
-            className="bg-surface rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
+            className="bg-surface rounded-xl max-w-lg w-full my-auto max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between px-6 pt-6 pb-4 shrink-0">
               <h2 className="font-display text-lg font-bold text-text">{title}</h2>
               <button type="button" onClick={close} className="text-text-mute hover:text-text" aria-label="Cerrar">
                 ✕
               </button>
             </div>
-            <ModalCloseContext.Provider value={close}>{children}</ModalCloseContext.Provider>
+            <div className="px-6 pb-6 overflow-y-auto">
+              <ModalCloseContext.Provider value={close}>{children}</ModalCloseContext.Provider>
+            </div>
           </div>
         </div>
       )}
