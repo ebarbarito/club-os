@@ -17,6 +17,10 @@ const MOD_LABEL: Record<string, string> = {
   solidario: 'Cultivo solidario',
   ong: 'ONG',
 };
+const REPR_TYPE_LABEL: Record<string, string> = {
+  autocultivador: 'Autocultivador',
+  paciente: 'Paciente',
+};
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -71,12 +75,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           <div><dt className="text-text-mute">Email</dt><dd>{member.email ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Zona</dt><dd>{member.zona ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Nacimiento</dt><dd>{fmtDate(member.birth)}</dd></div>
+          <div className="col-span-2"><dt className="text-text-mute">Domicilio</dt><dd>{member.address ?? '—'}</dd></div>
         </dl>
       </div>
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <p className="text-xs font-semibold text-text-mute uppercase mb-3">Salud / REPROCANN</p>
         <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div><dt className="text-text-mute">Tipo</dt><dd>{member.reprocann_type ? REPR_TYPE_LABEL[member.reprocann_type] : '—'}</dd></div>
           <div><dt className="text-text-mute">Estado</dt><dd>{REPR_LABEL[member.reprocann]}</dd></div>
           <div><dt className="text-text-mute">Modalidad</dt><dd>{member.modalidad ? MOD_LABEL[member.modalidad] : '—'}</dd></div>
           <div><dt className="text-text-mute">N° registro</dt><dd>{member.repr_num ?? '—'}</dd></div>
