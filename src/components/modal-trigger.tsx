@@ -12,15 +12,22 @@ export function useModalClose() {
   return useContext(ModalCloseContext);
 }
 
+const SIZE_CLS = {
+  md: 'max-w-lg',
+  xl: 'max-w-4xl',
+};
+
 export function ModalTrigger({
   label,
   className,
   title,
+  size = 'md',
   children,
 }: {
   label: string;
   className?: string;
   title: string;
+  size?: keyof typeof SIZE_CLS;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -41,7 +48,7 @@ export function ModalTrigger({
           onClick={close}
         >
           <div
-            className="bg-surface rounded-xl max-w-lg w-full my-auto max-h-[85vh] flex flex-col"
+            className={`bg-surface rounded-xl ${SIZE_CLS[size]} w-full my-auto max-h-[90vh] flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between px-6 pt-6 pb-4 shrink-0">

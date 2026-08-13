@@ -10,6 +10,7 @@ import { registerDispensa } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
+const ITEM_GRID_CLS = 'sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_5rem_5rem_7rem_1.5rem]';
 
 type CatalogItem = { id: string; code: string | null; name: string; item_type: 'genetica' | 'accesorio'; price_per_gram: number; grams: number };
 type ItemRow = { strainId: string; description: string; quantity: string; unitPrice: string; bonif1: string; bonif2: string };
@@ -140,80 +141,119 @@ export function RegisterDispensaForm({
 
       <div>
         <label className={labelCls}>Artículos</label>
-        <div className="space-y-2">
-          {rows.map((row, i) => (
-            <div key={i} className="rounded-lg border border-line-2 p-2 space-y-1.5">
-              <div className="flex gap-1.5">
-                <select value={row.strainId} onChange={(e) => selectItem(i, e.target.value)} className={`${inputCls} flex-1`}>
-                  <option value="">Elegir artículo…</option>
-                  {items.map((it) => (
-                    <option key={it.id} value={it.id}>
-                      {it.code ? `${it.code} · ` : ''}
-                      {it.name} · disp. {it.grams} {it.item_type === 'genetica' ? 'g' : 'u.'} · {money(it.price_per_gram)}
-                    </option>
-                  ))}
-                </select>
-                {rows.length > 1 && (
-                  <button type="button" onClick={() => removeRow(i)} className="text-red text-xs shrink-0">
-                    Quitar
-                  </button>
-                )}
+        <div className="rounded-lg border border-line-2 overflow-hidden">
+          <div className={`hidden sm:grid ${ITEM_GRID_CLS} gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft`}>
+            <span>Artículo</span>
+            <span>Cantidad</span>
+            <span>Precio unit.</span>
+            <span>Bonif. 1 %</span>
+            <span>Bonif. 2 %</span>
+            <span className="text-right">Total línea</span>
+            <span />
+          </div>
+          <div className="divide-y divide-line-2">
+            {rows.map((row, i) => (
+              <div key={i} className={`p-3 space-y-2 sm:space-y-0 sm:grid ${ITEM_GRID_CLS} sm:gap-2 sm:items-center`}>
+                <div>
+                  <label className={`${labelCls} sm:hidden`}>Artículo</label>
+                  <select value={row.strainId} onChange={(e) => selectItem(i, e.target.value)} className={inputCls}>
+                    <option value="">Elegir artículo…</option>
+                    {items.map((it) => (
+                      <option key={it.id} value={it.id}>
+                        {it.code ? `${it.code} · ` : ''}
+                        {it.name} · disp. {it.grams} {it.item_type === 'genetica' ? 'g' : 'u.'} · {money(it.price_per_gram)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={`${labelCls} sm:hidden`}>Cantidad</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0"
+                    value={row.quantity}
+                    onChange={(e) => updateRow(i, { quantity: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={`${labelCls} sm:hidden`}>Precio unitario</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    value={row.unitPrice}
+                    onChange={(e) => updateRow(i, { unitPrice: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={`${labelCls} sm:hidden`}>Bonificación 1 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                    value={row.bonif1}
+                    onChange={(e) => updateRow(i, { bonif1: e.target.value })}
+                    className={inputCls}
+                    title="Porcentaje de descuento sobre el precio unitario"
+                  />
+                </div>
+                <div>
+                  <label className={`${labelCls} sm:hidden`}>Bonificación 2 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                    value={row.bonif2}
+                    onChange={(e) => updateRow(i, { bonif2: e.target.value })}
+                    className={inputCls}
+                    title="Segundo descuento, se aplica sobre el resultado de la Bonificación 1"
+                  />
+                </div>
+                <div className="flex items-center justify-between sm:block sm:text-right">
+                  <span className={`${labelCls} sm:hidden !mb-0`}>Total línea</span>
+                  <span className="text-sm font-semibold text-text">{money(lineTotal(row))}</span>
+                </div>
+                <div className="flex justify-end">
+                  {rows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRow(i)}
+                      className="text-red text-xs font-semibold shrink-0"
+                      aria-label="Quitar línea"
+                      title="Quitar línea"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="Cant."
-                  value={row.quantity}
-                  onChange={(e) => updateRow(i, { quantity: e.target.value })}
-                  className={inputCls}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Precio"
-                  value={row.unitPrice}
-                  onChange={(e) => updateRow(i, { unitPrice: e.target.value })}
-                  className={inputCls}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="Bonif. 1 %"
-                  value={row.bonif1}
-                  onChange={(e) => updateRow(i, { bonif1: e.target.value })}
-                  className={inputCls}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="Bonif. 2 %"
-                  value={row.bonif2}
-                  onChange={(e) => updateRow(i, { bonif2: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <p className="text-text-mute text-xs text-right">Total línea: {money(lineTotal(row))}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
         <button type="button" onClick={addRow} className="text-accent text-xs font-semibold mt-2">
           + Agregar artículo
         </button>
       </div>
 
-      <div className="rounded-lg bg-surface-2 p-3 text-sm space-y-1">
-        <div className="flex justify-between text-text-soft">
-          <span>Total sugerido (precio de catálogo)</span>
-          <span>{money(suggestedTotal)}</span>
+      <div className="rounded-lg bg-surface-2 p-3 text-sm grid sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-text-mute text-xs" title="Cantidad × precio de catálogo, sin aplicar bonificaciones">
+            Total sugerido (precio de catálogo)
+          </p>
+          <p className="text-text font-medium">{money(suggestedTotal)}</p>
         </div>
-        <div className="flex justify-between font-semibold text-text">
-          <span>Total dispensa</span>
-          <span>{money(realTotal)}</span>
+        <div>
+          <p className="text-text-mute text-xs" title="Lo que efectivamente se cobra, ya con las bonificaciones aplicadas">
+            Total dispensa (a cobrar)
+          </p>
+          <p className="text-text font-bold text-base">{money(realTotal)}</p>
         </div>
       </div>
 

@@ -83,7 +83,8 @@ export function PaymentSplitEditor({
                 type="number"
                 min="0"
                 step="0.01"
-                title="Cotización"
+                placeholder="Cotización"
+                title="Cotización: cuántos pesos vale 1 unidad de esta moneda"
                 value={line.exchangeRate}
                 onChange={(e) => updateLine(i, { exchangeRate: e.target.value })}
                 className={`${inputCls} w-20`}

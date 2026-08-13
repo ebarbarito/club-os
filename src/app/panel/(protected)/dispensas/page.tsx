@@ -55,7 +55,7 @@ export default async function DispensaPage({
           <h1 className="font-display text-2xl font-bold text-text">Dispensa</h1>
           <p className="text-text-soft">Pedidos y dispensas registradas</p>
         </div>
-        <ModalTrigger label="+ Registrar dispensa" title="Registrar dispensa">
+        <ModalTrigger label="+ Registrar dispensa" title="Registrar dispensa" size="xl">
           <RegisterDispensaForm members={validMembers ?? []} items={items} accounts={accounts} />
         </ModalTrigger>
       </div>
