@@ -31,6 +31,7 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
       'id, name, type, thc, cbd, price_per_gram, status, cross_info, composition, aroma, effects, description, images, stock(grams)',
     )
     .eq('tenant_id', tenantId)
+    .eq('item_type', 'genetica')
     .in('status', ['activa', 'sin_stock'])
     .order('name');
 

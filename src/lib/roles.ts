@@ -3,12 +3,14 @@ export type Role = 'admin' | 'dispensador' | 'cultivo';
 export type ViewId =
   | 'resumen'
   | 'dispensas'
+  | 'ctacorriente'
   | 'socios'
   | 'catalogo'
   | 'stock'
   | 'salas'
   | 'sensores'
   | 'caja'
+  | 'cuentas'
   | 'balance'
   | 'usuarios';
 
@@ -17,13 +19,26 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     name: 'Administrador',
     desc: 'Acceso total: caja, balance, salas, socios y stock',
     home: 'resumen',
-    nav: ['resumen', 'dispensas', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'balance', 'usuarios'],
+    nav: [
+      'resumen',
+      'dispensas',
+      'ctacorriente',
+      'socios',
+      'catalogo',
+      'stock',
+      'salas',
+      'sensores',
+      'caja',
+      'cuentas',
+      'balance',
+      'usuarios',
+    ],
   },
   dispensador: {
     name: 'Dispensador/a',
     desc: 'Dispensa, socios, stock y salas (sin caja ni balance)',
     home: 'dispensas',
-    nav: ['resumen', 'dispensas', 'socios', 'stock', 'salas'],
+    nav: ['resumen', 'dispensas', 'ctacorriente', 'socios', 'stock', 'salas'],
   },
   cultivo: {
     name: 'Cultivo',
@@ -36,12 +51,14 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
 export const TITLES: Record<ViewId, [string, string]> = {
   resumen: ['Resumen', 'Vista general del club'],
   dispensas: ['Dispensa', 'Pedidos y dispensas registradas'],
+  ctacorriente: ['Cuenta Corriente', 'Comprobantes adeudados por socio'],
   socios: ['Socios', 'Altas, validaciones y padrón'],
-  catalogo: ['Catálogo', 'Genéticas del club — base del sitio público y del stock'],
-  stock: ['Stock', 'Inventario por genética'],
+  catalogo: ['Catálogo', 'Artículos del club — base del sitio público y del stock'],
+  stock: ['Stock', 'Inventario por artículo'],
   salas: ['Salas & Cultivo', 'Plantas, etapas y sensores'],
   sensores: ['Sensores', 'Seguimiento en vivo por sala'],
   caja: ['Caja', 'Turno, movimientos y arqueo'],
+  cuentas: ['Cuentas', 'Medios de pago configurables'],
   balance: ['Balance', 'Ingresos y egresos del club'],
   usuarios: ['Usuarios', 'Cuentas del equipo'],
 };

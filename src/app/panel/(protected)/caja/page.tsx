@@ -20,25 +20,47 @@ export default async function CajaPage() {
     .select('*, opened_by_profile:profiles(name)')
     .is('closed_at', null)
     .maybeSingle();
+  const { data: accountRows } = await supabase.from('payment_accounts').select('*').eq('active', true).order('name');
+  const accounts = accountRows ?? [];
 
-  let movements: { id: string; type: string; category: string; concept: string; amount: number; method: string; created_at: string }[] = [];
-  let ingEfectivo = 0;
-  let egEfectivo = 0;
-  let ingTransf = 0;
+  type Movement = {
+    id: string;
+    type: string;
+    category: string;
+    concept: string;
+    amount: number;
+    exchange_rate: number;
+    amount_local: number;
+    account_id: string;
+    created_at: string;
+    account: { name: string; is_cash: boolean } | { name: string; is_cash: boolean }[] | null;
+  };
+
+  let movements: Movement[] = [];
+  let cashTotal = 0;
+  const totalsByAccount = new Map<string, number>();
 
   if (shift) {
     const { data } = await supabase
       .from('ledger')
-      .select('*')
+      .select('*, account:payment_accounts(name, is_cash)')
       .eq('shift_id', shift.id)
       .order('created_at', { ascending: false });
     movements = data ?? [];
-    ingEfectivo = movements.filter((m) => m.type === 'ingreso' && m.method === 'efectivo').reduce((s, m) => s + m.amount, 0);
-    egEfectivo = movements.filter((m) => m.type === 'egreso' && m.method === 'efectivo').reduce((s, m) => s + m.amount, 0);
-    ingTransf = movements.filter((m) => m.type === 'ingreso' && m.method === 'transferencia').reduce((s, m) => s + m.amount, 0);
+
+    for (const m of movements) {
+      const account = Array.isArray(m.account) ? m.account[0] : m.account;
+      const signed = m.type === 'ingreso' ? m.amount_local : -m.amount_local;
+      if (account?.is_cash) {
+        cashTotal += signed;
+      } else {
+        totalsByAccount.set(account?.name ?? '—', (totalsByAccount.get(account?.name ?? '—') ?? 0) + signed);
+      }
+    }
   }
 
-  const expectedCash = shift ? shift.opening_cash + ingEfectivo - egEfectivo : 0;
+  const expectedCash = shift ? shift.opening_cash + cashTotal : 0;
+  const grandTotal = shift ? shift.opening_cash + [...totalsByAccount.values()].reduce((s, v) => s + v, 0) : 0;
 
   const { data: history } = await supabase
     .from('caja_shifts')
@@ -62,7 +84,7 @@ export default async function CajaPage() {
       ) : (
         <>
           <div className="rounded-xl border border-line bg-surface p-5 mb-4">
-            <div className="grid grid-cols-4 gap-4 mb-4 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 text-sm">
               <div>
                 <p className="text-text-mute">Apertura</p>
                 <p className="font-display font-bold text-text">{money(shift.opening_cash)}</p>
@@ -71,29 +93,24 @@ export default async function CajaPage() {
                 <p className="text-text-mute">Efectivo en caja</p>
                 <p className="font-display font-bold text-text">{money(expectedCash)}</p>
               </div>
-              <div>
-                <p className="text-text-mute">Transferencias</p>
-                <p className="font-display font-bold text-text">{money(ingTransf)}</p>
-              </div>
+              {[...totalsByAccount.entries()].map(([name, total]) => (
+                <div key={name}>
+                  <p className="text-text-mute">{name}</p>
+                  <p className="font-display font-bold text-text">{money(total)}</p>
+                </div>
+              ))}
               <div>
                 <p className="text-text-mute">Total</p>
-                <p className="font-display font-bold text-accent">{money(expectedCash + ingTransf)}</p>
+                <p className="font-display font-bold text-accent">{money(grandTotal)}</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <ModalTrigger
-                label="+ Ingreso"
+                label="+ Movimiento"
                 className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                title="Registrar ingreso"
+                title="Registrar movimiento"
               >
-                <MovementForm type="ingreso" />
-              </ModalTrigger>
-              <ModalTrigger
-                label="+ Egreso"
-                className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                title="Registrar egreso"
-              >
-                <MovementForm type="egreso" />
+                <MovementForm accounts={accounts} />
               </ModalTrigger>
               <ModalTrigger
                 label="Cerrar caja (arqueo)"
@@ -111,36 +128,39 @@ export default async function CajaPage() {
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Concepto</th>
                   <th className="px-4 py-2.5 font-medium">Categoría</th>
-                  <th className="px-4 py-2.5 font-medium">Medio</th>
+                  <th className="px-4 py-2.5 font-medium">Cuenta</th>
                   <th className="px-4 py-2.5 font-medium">Monto</th>
                   <th className="px-4 py-2.5 font-medium">Fecha</th>
                   <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {movements.map((m) => (
-                  <tr key={m.id} className="border-t border-line">
-                    <td className="px-4 py-2.5 text-text">{m.concept}</td>
-                    <td className="px-4 py-2.5 text-text-soft">{m.category}</td>
-                    <td className="px-4 py-2.5 text-text-soft capitalize">{m.method}</td>
-                    <td className={`px-4 py-2.5 font-medium ${m.type === 'ingreso' ? 'text-accent' : 'text-red'}`}>
-                      {m.type === 'ingreso' ? '+' : '-'}
-                      {money(m.amount)}
-                    </td>
-                    <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(m.created_at)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      {m.category !== 'Dispensa' && (
-                        <ModalTrigger
-                          label="Editar"
-                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                          title="Editar movimiento"
-                        >
-                          <EditMovementForm movement={m} />
-                        </ModalTrigger>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {movements.map((m) => {
+                  const account = Array.isArray(m.account) ? m.account[0] : m.account;
+                  return (
+                    <tr key={m.id} className="border-t border-line">
+                      <td className="px-4 py-2.5 text-text">{m.concept}</td>
+                      <td className="px-4 py-2.5 text-text-soft">{m.category}</td>
+                      <td className="px-4 py-2.5 text-text-soft">{account?.name ?? '—'}</td>
+                      <td className={`px-4 py-2.5 font-medium ${m.type === 'ingreso' ? 'text-accent' : 'text-red'}`}>
+                        {m.type === 'ingreso' ? '+' : '-'}
+                        {money(m.amount_local)}
+                      </td>
+                      <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(m.created_at)}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        {m.category !== 'Dispensa' && m.category !== 'Cuenta corriente' && (
+                          <ModalTrigger
+                            label="Editar"
+                            className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                            title="Editar movimiento"
+                          >
+                            <EditMovementForm movement={m} accounts={accounts} />
+                          </ModalTrigger>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {movements.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-text-mute">

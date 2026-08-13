@@ -17,21 +17,26 @@ export async function createStrain(formData: FormData) {
   if (!profile) return { error: 'No autenticado' };
   requireAdmin(profile.role);
 
+  const itemType = String(formData.get('item_type') ?? 'genetica');
+  const isGenetica = itemType === 'genetica';
+
   const supabase = await createClient();
   const { data: strain, error } = await supabase
     .from('strains')
     .insert({
       tenant_id: profile.tenantId,
+      item_type: itemType,
+      code: (formData.get('code') as string) || null,
       name: String(formData.get('name') ?? ''),
-      type: String(formData.get('type') ?? 'Híbrida'),
-      thc: formData.get('thc') ? Number(formData.get('thc')) : null,
-      cbd: formData.get('cbd') ? Number(formData.get('cbd')) : null,
+      type: isGenetica ? String(formData.get('type') ?? 'Híbrida') : null,
+      thc: isGenetica && formData.get('thc') ? Number(formData.get('thc')) : null,
+      cbd: isGenetica && formData.get('cbd') ? Number(formData.get('cbd')) : null,
       price_per_gram: Number(formData.get('price_per_gram') ?? 0),
-      cross_info: (formData.get('cross_info') as string) || null,
-      composition: (formData.get('composition') as string) || null,
-      aroma: (formData.get('aroma') as string) || null,
-      effects: (formData.get('effects') as string) || null,
-      notes: (formData.get('notes') as string) || null,
+      cross_info: isGenetica ? (formData.get('cross_info') as string) || null : null,
+      composition: isGenetica ? (formData.get('composition') as string) || null : null,
+      aroma: isGenetica ? (formData.get('aroma') as string) || null : null,
+      effects: isGenetica ? (formData.get('effects') as string) || null : null,
+      notes: isGenetica ? (formData.get('notes') as string) || null : null,
       description: (formData.get('description') as string) || null,
     })
     .select()
@@ -57,21 +62,26 @@ export async function updateStrain(formData: FormData) {
   requireAdmin(profile.role);
 
   const id = String(formData.get('id'));
+  const itemType = String(formData.get('item_type') ?? 'genetica');
+  const isGenetica = itemType === 'genetica';
+
   const supabase = await createClient();
   const { error } = await supabase
     .from('strains')
     .update({
+      item_type: itemType,
+      code: (formData.get('code') as string) || null,
       name: String(formData.get('name') ?? ''),
-      type: String(formData.get('type') ?? 'Híbrida'),
-      thc: formData.get('thc') ? Number(formData.get('thc')) : null,
-      cbd: formData.get('cbd') ? Number(formData.get('cbd')) : null,
+      type: isGenetica ? String(formData.get('type') ?? 'Híbrida') : null,
+      thc: isGenetica && formData.get('thc') ? Number(formData.get('thc')) : null,
+      cbd: isGenetica && formData.get('cbd') ? Number(formData.get('cbd')) : null,
       price_per_gram: Number(formData.get('price_per_gram') ?? 0),
       status: String(formData.get('status') ?? 'activa'),
-      cross_info: (formData.get('cross_info') as string) || null,
-      composition: (formData.get('composition') as string) || null,
-      aroma: (formData.get('aroma') as string) || null,
-      effects: (formData.get('effects') as string) || null,
-      notes: (formData.get('notes') as string) || null,
+      cross_info: isGenetica ? (formData.get('cross_info') as string) || null : null,
+      composition: isGenetica ? (formData.get('composition') as string) || null : null,
+      aroma: isGenetica ? (formData.get('aroma') as string) || null : null,
+      effects: isGenetica ? (formData.get('effects') as string) || null : null,
+      notes: isGenetica ? (formData.get('notes') as string) || null : null,
       description: (formData.get('description') as string) || null,
     })
     .eq('id', id);

@@ -11,7 +11,9 @@ const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 type Strain = {
   id: string;
   name: string;
-  type: string;
+  code: string | null;
+  item_type: 'genetica' | 'accesorio';
+  type: string | null;
   thc: number | null;
   cbd: number | null;
   price_per_gram: number;
@@ -29,6 +31,8 @@ export function StrainForm({ strain }: { strain?: Strain }) {
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [itemType, setItemType] = useState<'genetica' | 'accesorio'>(strain?.item_type ?? 'genetica');
+  const isGenetica = itemType === 'genetica';
 
   function submit(formData: FormData) {
     startTransition(async () => {
@@ -46,20 +50,27 @@ export function StrainForm({ strain }: { strain?: Strain }) {
     <form action={submit} className="grid grid-cols-2 gap-3">
       {strain && <input type="hidden" name="id" value={strain.id} />}
       <div className="col-span-2">
+        <label className={labelCls}>Tipo de artículo</label>
+        <select
+          name="item_type"
+          className={inputCls}
+          value={itemType}
+          onChange={(e) => setItemType(e.target.value as 'genetica' | 'accesorio')}
+        >
+          <option value="genetica">Genética</option>
+          <option value="accesorio">Accesorio (encendedor, papel, etc.)</option>
+        </select>
+      </div>
+      <div className="col-span-2">
         <label className={labelCls}>Nombre</label>
         <input name="name" required defaultValue={strain?.name} className={inputCls} />
       </div>
       <div>
-        <label className={labelCls}>Tipo</label>
-        <select name="type" className={inputCls} defaultValue={strain?.type ?? 'Híbrida'}>
-          <option>Indica</option>
-          <option>Sativa</option>
-          <option>Híbrida</option>
-          <option>Alto CBD</option>
-        </select>
+        <label className={labelCls}>Código de artículo</label>
+        <input name="code" defaultValue={strain?.code ?? ''} className={inputCls} placeholder="ej. GEN-001" />
       </div>
       <div>
-        <label className={labelCls}>Precio por gramo</label>
+        <label className={labelCls}>Precio {isGenetica ? '(por gramo)' : '(por unidad)'}</label>
         <input
           name="price_per_gram"
           type="number"
@@ -70,43 +81,61 @@ export function StrainForm({ strain }: { strain?: Strain }) {
           className={inputCls}
         />
       </div>
-      <div>
-        <label className={labelCls}>THC %</label>
-        <input name="thc" type="number" min="0" max="100" step="0.1" defaultValue={strain?.thc ?? ''} className={inputCls} />
-      </div>
-      <div>
-        <label className={labelCls}>CBD %</label>
-        <input name="cbd" type="number" min="0" max="100" step="0.1" defaultValue={strain?.cbd ?? ''} className={inputCls} />
-      </div>
 
-      <div className="col-span-2 border-t border-line pt-3 mt-1">
-        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Ficha técnica (opcional)</p>
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>Cruza</label>
-        <input name="cross_info" defaultValue={strain?.cross_info ?? ''} className={inputCls} placeholder="ej. Sandía x Yeti" />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>Composición</label>
-        <input
-          name="composition"
-          defaultValue={strain?.composition ?? ''}
-          className={inputCls}
-          placeholder="ej. 40% Indica / 60% Sativa"
-        />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>Sabor y aroma</label>
-        <input name="aroma" defaultValue={strain?.aroma ?? ''} className={inputCls} />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>Efectos</label>
-        <input name="effects" defaultValue={strain?.effects ?? ''} className={inputCls} placeholder="ej. Cerebral · Eufórico · Social" />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>Notas de cultivo</label>
-        <textarea name="notes" defaultValue={strain?.notes ?? ''} rows={2} className={inputCls} />
-      </div>
+      {isGenetica && (
+        <div>
+          <label className={labelCls}>Tipo de genética</label>
+          <select name="type" className={inputCls} defaultValue={strain?.type ?? 'Híbrida'}>
+            <option>Indica</option>
+            <option>Sativa</option>
+            <option>Híbrida</option>
+            <option>Alto CBD</option>
+          </select>
+        </div>
+      )}
+
+      {isGenetica && (
+        <>
+          <div>
+            <label className={labelCls}>THC %</label>
+            <input name="thc" type="number" min="0" max="100" step="0.1" defaultValue={strain?.thc ?? ''} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>CBD %</label>
+            <input name="cbd" type="number" min="0" max="100" step="0.1" defaultValue={strain?.cbd ?? ''} className={inputCls} />
+          </div>
+
+          <div className="col-span-2 border-t border-line pt-3 mt-1">
+            <p className="text-xs font-semibold text-text-mute uppercase mb-2">Ficha técnica (opcional)</p>
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Cruza</label>
+            <input name="cross_info" defaultValue={strain?.cross_info ?? ''} className={inputCls} placeholder="ej. Sandía x Yeti" />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Composición</label>
+            <input
+              name="composition"
+              defaultValue={strain?.composition ?? ''}
+              className={inputCls}
+              placeholder="ej. 40% Indica / 60% Sativa"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Sabor y aroma</label>
+            <input name="aroma" defaultValue={strain?.aroma ?? ''} className={inputCls} />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Efectos</label>
+            <input name="effects" defaultValue={strain?.effects ?? ''} className={inputCls} placeholder="ej. Cerebral · Eufórico · Social" />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Notas de cultivo</label>
+            <textarea name="notes" defaultValue={strain?.notes ?? ''} rows={2} className={inputCls} />
+          </div>
+        </>
+      )}
+
       <div className="col-span-2">
         <label className={labelCls}>Descripción</label>
         <textarea
@@ -136,7 +165,7 @@ export function StrainForm({ strain }: { strain?: Strain }) {
         disabled={pending}
         className="col-span-2 rounded-lg bg-accent text-white font-semibold text-sm py-2 disabled:opacity-60"
       >
-        {pending ? 'Guardando…' : strain ? 'Guardar cambios' : 'Crear genética'}
+        {pending ? 'Guardando…' : strain ? 'Guardar cambios' : 'Crear artículo'}
       </button>
     </form>
   );

@@ -7,6 +7,7 @@ import { money, fmtDateTime } from '@/lib/format';
 import { RegisterDispensaForm } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
 import { ConfirmDeliveryForm } from './confirm-delivery-form';
+import { VoidDispensaForm } from './void-dispensa-form';
 
 export default async function DispensaPage({
   searchParams,
@@ -18,26 +19,34 @@ export default async function DispensaPage({
 
   const supabase = await createClient();
 
-  const [{ data: orders }, { data: dispensas }, { data: validMembers }, { data: stockRows }] = await Promise.all([
-    supabase
-      .from('orders')
-      .select('*, member:members(name, dni), items:order_items(grams, strain:strains(name, price_per_gram))')
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('dispensas')
-      .select('*, member:members(name, dni), strain:strains(name), by:profiles(name), payments:dispensa_payments(method, amount)')
-      .order('created_at', { ascending: false })
-      .limit(50),
-    supabase.from('members').select('id, name, dni').eq('status', 'valid').order('name'),
-    supabase.from('stock').select('grams, strain:strains(id, name, price_per_gram)').gt('grams', 0),
-  ]);
+  const [{ data: orders }, { data: dispensas }, { data: validMembers }, { data: stockRows }, { data: accountRows }] =
+    await Promise.all([
+      supabase
+        .from('orders')
+        .select('*, member:members(name, dni), items:order_items(grams, strain:strains(name, price_per_gram))')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('dispensas')
+        .select(
+          '*, member:members(name, dni), by:profiles(name), items:dispensa_items(quantity, total, strain:strains(name, item_type)), payments:dispensa_payments(amount_local, account:payment_accounts(name))',
+        )
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('members').select('id, name, dni, member_number').eq('status', 'valid').order('member_number'),
+      supabase.from('stock').select('grams, strain:strains(id, code, name, item_type, price_per_gram, status)'),
+      supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
+    ]);
 
-  const strains = (stockRows ?? [])
+  const items = (stockRows ?? [])
     .map((s) => {
       const strain = Array.isArray(s.strain) ? s.strain[0] : s.strain;
-      return strain ? { id: strain.id, name: strain.name, price_per_gram: strain.price_per_gram, grams: s.grams } : null;
+      return strain && strain.status === 'activa'
+        ? { id: strain.id, code: strain.code, name: strain.name, item_type: strain.item_type, price_per_gram: strain.price_per_gram, grams: s.grams }
+        : null;
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
+
+  const accounts = accountRows ?? [];
 
   return (
     <div>
@@ -47,7 +56,7 @@ export default async function DispensaPage({
           <p className="text-text-soft">Pedidos y dispensas registradas</p>
         </div>
         <ModalTrigger label="+ Registrar dispensa" title="Registrar dispensa">
-          <RegisterDispensaForm members={validMembers ?? []} strains={strains} />
+          <RegisterDispensaForm members={validMembers ?? []} items={items} accounts={accounts} />
         </ModalTrigger>
       </div>
 
@@ -144,41 +153,66 @@ export default async function DispensaPage({
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Socio</th>
-                <th className="px-4 py-2.5 font-medium">Genética</th>
-                <th className="px-4 py-2.5 font-medium">Gramos</th>
+                <th className="px-4 py-2.5 font-medium">Artículos</th>
                 <th className="px-4 py-2.5 font-medium">Sugerido</th>
                 <th className="px-4 py-2.5 font-medium">Cobrado</th>
                 <th className="px-4 py-2.5 font-medium">Diferencia</th>
                 <th className="px-4 py-2.5 font-medium">Medios de pago</th>
                 <th className="px-4 py-2.5 font-medium">Fecha</th>
                 <th className="px-4 py-2.5 font-medium">Registró</th>
+                <th className="px-4 py-2.5 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {(dispensas ?? []).map((d) => {
                 const member = Array.isArray(d.member) ? d.member[0] : d.member;
-                const strain = Array.isArray(d.strain) ? d.strain[0] : d.strain;
                 const by = Array.isArray(d.by) ? d.by[0] : d.by;
+                const paid = (d.payments ?? []).reduce((s: number, p: { amount_local: number }) => s + p.amount_local, 0);
                 const diff = d.suggested_amount != null ? d.amount - d.suggested_amount : null;
+                const voided = !!d.voided_at;
                 return (
-                  <tr key={d.id} className="border-t border-line">
+                  <tr key={d.id} className={`border-t border-line ${voided ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-2.5 font-medium text-text">{member?.name ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-text-soft">{strain?.name ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-text-soft">{d.grams} g</td>
+                    <td className="px-4 py-2.5 text-text-soft">
+                      {(d.items ?? []).map((it: { quantity: number; strain: { name: string; item_type: string } | { name: string; item_type: string }[] | null }, i: number) => {
+                        const strain = Array.isArray(it.strain) ? it.strain[0] : it.strain;
+                        return (
+                          <div key={i}>
+                            {strain?.name} · {it.quantity} {strain?.item_type === 'genetica' ? 'g' : 'u.'}
+                          </div>
+                        );
+                      })}
+                    </td>
                     <td className="px-4 py-2.5 text-text-soft">{d.suggested_amount != null ? money(d.suggested_amount) : '—'}</td>
-                    <td className="px-4 py-2.5 text-text font-medium">{money(d.amount)}</td>
+                    <td className="px-4 py-2.5 text-text font-medium">{money(paid)}</td>
                     <td className={`px-4 py-2.5 ${diff == null || diff === 0 ? 'text-text-mute' : diff > 0 ? 'text-accent' : 'text-red'}`}>
                       {diff == null ? '—' : diff === 0 ? 'Exacto' : `${diff > 0 ? '+' : ''}${money(diff)}`}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft">
-                      {(d.payments ?? []).map((p: { method: string; amount: number }, i: number) => (
-                        <div key={i} className="capitalize">
-                          {p.method} · {money(p.amount)}
-                        </div>
-                      ))}
+                      {(d.payments ?? []).map((p: { amount_local: number; account: { name: string } | { name: string }[] | null }, i: number) => {
+                        const account = Array.isArray(p.account) ? p.account[0] : p.account;
+                        return (
+                          <div key={i}>
+                            {account?.name ?? '—'} · {money(p.amount_local)}
+                          </div>
+                        );
+                      })}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(d.created_at)}</td>
                     <td className="px-4 py-2.5 text-text-soft">{by?.name ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      {voided ? (
+                        <Badge label="Anulada" color="red" />
+                      ) : (
+                        <ModalTrigger
+                          label="Anular"
+                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-red hover:text-red"
+                          title="Anular dispensa"
+                        >
+                          <VoidDispensaForm dispensaId={d.id} />
+                        </ModalTrigger>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

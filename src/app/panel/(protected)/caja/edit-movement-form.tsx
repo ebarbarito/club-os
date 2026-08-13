@@ -3,16 +3,17 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
+import type { PaymentAccount } from '@/components/payment-split';
 import { editMovement } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
-const CATEGORIES = ['Insumos', 'Alquiler', 'Servicios', 'Membresía', 'Operativo', 'Otro'];
+const CATEGORIES = ['Alquiler', 'Ferretería', 'Eventos', 'Almacén', 'Insumos', 'Servicios', 'Membresía', 'Operativo', 'Otro'];
 
-type Movement = { id: string; category: string; concept: string; amount: number; method: string };
+type Movement = { id: string; category: string; concept: string; amount: number; exchange_rate: number; account_id: string };
 
-export function EditMovementForm({ movement }: { movement: Movement }) {
+export function EditMovementForm({ movement, accounts }: { movement: Movement; accounts: PaymentAccount[] }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
@@ -51,12 +52,19 @@ export function EditMovementForm({ movement }: { movement: Movement }) {
           <input name="amount" type="number" min="0" step="1" required defaultValue={movement.amount} className={inputCls} />
         </div>
         <div>
-          <label className={labelCls}>Medio</label>
-          <select name="method" className={inputCls} defaultValue={movement.method}>
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
+          <label className={labelCls}>Cuenta</label>
+          <select name="account_id" className={inputCls} defaultValue={movement.account_id}>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
           </select>
         </div>
+      </div>
+      <div>
+        <label className={labelCls}>Cotización</label>
+        <input name="exchange_rate" type="number" min="0" step="0.01" defaultValue={movement.exchange_rate} className={inputCls} />
       </div>
 
       {error && <p className="text-red text-sm">{error}</p>}

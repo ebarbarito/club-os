@@ -22,18 +22,18 @@ export default async function BalancePage({
 
   const { data: movements } = await supabase
     .from('ledger')
-    .select('*')
+    .select('*, account:payment_accounts(name)')
     .gte('created_at', start)
     .lt('created_at', end)
     .order('created_at', { ascending: false });
 
   const rows = movements ?? [];
-  const ingresos = rows.filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount, 0);
-  const egresos = rows.filter((r) => r.type === 'egreso').reduce((s, r) => s + r.amount, 0);
+  const ingresos = rows.filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount_local, 0);
+  const egresos = rows.filter((r) => r.type === 'egreso').reduce((s, r) => s + r.amount_local, 0);
 
   const byCategory = new Map<string, number>();
   for (const r of rows) {
-    const signed = r.type === 'ingreso' ? r.amount : -r.amount;
+    const signed = r.type === 'ingreso' ? r.amount_local : -r.amount_local;
     byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + signed);
   }
 
@@ -43,11 +43,11 @@ export default async function BalancePage({
       const range = monthRange(key);
       const { data } = await supabase
         .from('ledger')
-        .select('type, amount')
+        .select('type, amount_local')
         .gte('created_at', range.start)
         .lt('created_at', range.end);
-      const ing = (data ?? []).filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount, 0);
-      const eg = (data ?? []).filter((r) => r.type === 'egreso').reduce((s, r) => s + r.amount, 0);
+      const ing = (data ?? []).filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount_local, 0);
+      const eg = (data ?? []).filter((r) => r.type === 'egreso').reduce((s, r) => s + r.amount_local, 0);
       return { key, ing, eg };
     }),
   );
@@ -136,23 +136,26 @@ export default async function BalancePage({
               <th className="px-4 py-2.5 font-medium">Fecha</th>
               <th className="px-4 py-2.5 font-medium">Rubro</th>
               <th className="px-4 py-2.5 font-medium">Concepto</th>
-              <th className="px-4 py-2.5 font-medium">Medio</th>
+              <th className="px-4 py-2.5 font-medium">Cuenta</th>
               <th className="px-4 py-2.5 font-medium">Monto</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-line">
-                <td className="px-4 py-2.5 text-text-soft">{fmtDate(r.created_at)}</td>
-                <td className="px-4 py-2.5 text-text-soft">{r.category}</td>
-                <td className="px-4 py-2.5 text-text">{r.concept}</td>
-                <td className="px-4 py-2.5 text-text-soft capitalize">{r.method}</td>
-                <td className={`px-4 py-2.5 font-medium ${r.type === 'ingreso' ? 'text-accent' : 'text-red'}`}>
-                  {r.type === 'ingreso' ? '+' : '-'}
-                  {money(r.amount)}
-                </td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const account = Array.isArray(r.account) ? r.account[0] : r.account;
+              return (
+                <tr key={r.id} className="border-t border-line">
+                  <td className="px-4 py-2.5 text-text-soft">{fmtDate(r.created_at)}</td>
+                  <td className="px-4 py-2.5 text-text-soft">{r.category}</td>
+                  <td className="px-4 py-2.5 text-text">{r.concept}</td>
+                  <td className="px-4 py-2.5 text-text-soft">{account?.name ?? '—'}</td>
+                  <td className={`px-4 py-2.5 font-medium ${r.type === 'ingreso' ? 'text-accent' : 'text-red'}`}>
+                    {r.type === 'ingreso' ? '+' : '-'}
+                    {money(r.amount_local)}
+                  </td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-text-mute">

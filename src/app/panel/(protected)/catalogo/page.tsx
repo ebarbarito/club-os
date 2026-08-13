@@ -14,6 +14,11 @@ const STATUS_META: Record<string, { label: string; color: 'green' | 'amber' | 'g
   inactiva: { label: 'Inactiva', color: 'gray' },
 };
 
+const ITEM_TYPE_LABEL: Record<string, string> = {
+  genetica: 'Genética',
+  accesorio: 'Accesorio',
+};
+
 export default async function CatalogoPage() {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
@@ -27,9 +32,9 @@ export default async function CatalogoPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-text">Catálogo</h1>
-          <p className="text-text-soft">Genéticas del club — se muestran en el sitio público y alimentan Stock</p>
+          <p className="text-text-soft">Artículos del club (genéticas y accesorios) — alimentan Stock y Dispensa</p>
         </div>
-        <ModalTrigger label="+ Nueva genética" title="Nueva genética">
+        <ModalTrigger label="+ Nuevo artículo" title="Nuevo artículo">
           <StrainForm />
         </ModalTrigger>
       </div>
@@ -38,9 +43,10 @@ export default async function CatalogoPage() {
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Genética</th>
-              <th className="px-4 py-2.5 font-medium">THC / CBD</th>
-              <th className="px-4 py-2.5 font-medium">Precio/g</th>
+              <th className="px-4 py-2.5 font-medium">Código</th>
+              <th className="px-4 py-2.5 font-medium">Artículo</th>
+              <th className="px-4 py-2.5 font-medium">Tipo</th>
+              <th className="px-4 py-2.5 font-medium">Precio</th>
               <th className="px-4 py-2.5 font-medium">Estado</th>
               <th className="px-4 py-2.5 font-medium"></th>
             </tr>
@@ -48,13 +54,12 @@ export default async function CatalogoPage() {
           <tbody>
             {(strains ?? []).map((s) => (
               <tr key={s.id} className="border-t border-line">
+                <td className="px-4 py-2.5 text-text-mute">{s.code ?? '—'}</td>
                 <td className="px-4 py-2.5">
                   <div className="font-medium text-text">{s.name}</div>
-                  <div className="text-text-mute text-xs">{s.type}</div>
+                  {s.type && <div className="text-text-mute text-xs">{s.type}</div>}
                 </td>
-                <td className="px-4 py-2.5 text-text-soft">
-                  {s.thc ? `THC ${s.thc}%` : '—'} {s.cbd ? `· CBD ${s.cbd}%` : ''}
-                </td>
+                <td className="px-4 py-2.5 text-text-soft">{ITEM_TYPE_LABEL[s.item_type]}</td>
                 <td className="px-4 py-2.5 text-text-soft">{money(s.price_per_gram)}</td>
                 <td className="px-4 py-2.5">
                   <Badge label={STATUS_META[s.status].label} color={STATUS_META[s.status].color} />
@@ -66,15 +71,15 @@ export default async function CatalogoPage() {
                     title={`Editar — ${s.name}`}
                   >
                     <StrainForm strain={s} />
-                    <StrainImages strainId={s.id} images={s.images ?? []} />
+                    {s.item_type === 'genetica' && <StrainImages strainId={s.id} images={s.images ?? []} />}
                   </ModalTrigger>
                 </td>
               </tr>
             ))}
             {(strains ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-text-mute">
-                  Sin genéticas cargadas todavía.
+                <td colSpan={6} className="px-4 py-10 text-center text-text-mute">
+                  Sin artículos cargados todavía.
                 </td>
               </tr>
             )}

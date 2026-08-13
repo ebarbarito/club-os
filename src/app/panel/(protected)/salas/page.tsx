@@ -13,7 +13,7 @@ export default async function SalasPage() {
 
   const [{ data: salas }, { data: strainRows }] = await Promise.all([
     supabase.from('salas').select('*, sala_strains(strain_id, plants, strain:strains(id, name))').order('name'),
-    supabase.from('strains').select('id, name').neq('status', 'inactiva').order('name'),
+    supabase.from('strains').select('id, name').eq('item_type', 'genetica').neq('status', 'inactiva').order('name'),
   ]);
 
   const strains = strainRows ?? [];
