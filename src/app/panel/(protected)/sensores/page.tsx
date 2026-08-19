@@ -1,7 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
+import { fetchSalaSeries, RANGE_KEYS } from '@/lib/influx';
 import { SensoresView } from './sensores-view';
 
-export default async function SensoresPage() {
+export default async function SensoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sala?: string; range?: string }>;
+}) {
+  const { sala: salaParam, range: rangeParam } = await searchParams;
+  const range = RANGE_KEYS.includes(rangeParam ?? '') ? (rangeParam as string) : '24h';
+
   const supabase = await createClient();
   const { data: salas } = await supabase
     .from('salas')
@@ -21,5 +29,8 @@ export default async function SensoresPage() {
     return { ...s, strainName: names.length > 0 ? names.join(', ') : null };
   });
 
-  return <SensoresView salas={items} />;
+  const selected = items.find((s) => s.id === salaParam) ?? items[0] ?? null;
+  const series = selected?.sensor_id ? await fetchSalaSeries(selected.sensor_id, range) : null;
+
+  return <SensoresView salas={items} selectedId={selected?.id ?? null} range={range} series={series} />;
 }

@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/badge';
 import { Sparkline, BigChart } from '@/components/sensor-charts';
 import { ETAPA } from '@/lib/status-meta';
-import { genDummySeries, RANGE_CONFIG, type SeriesPoint } from '@/lib/dummy-sensor-data';
 
 const DOT_COLOR: Record<string, string> = { green: 'bg-accent', purple: 'bg-purple', amber: 'bg-amber' };
-const RANGES = Object.keys(RANGE_CONFIG);
+const RANGES = ['1h', '6h', '24h', '36h', '7d', '30d'];
 
 type Sala = {
   id: string;
@@ -24,6 +22,7 @@ type Sala = {
   strainName: string | null;
 };
 
+type SeriesPoint = { time: Date; value: number };
 type SalaSeries = { temp: SeriesPoint[]; hum: SeriesPoint[] };
 
 function stats(points: SeriesPoint[]) {
@@ -37,37 +36,37 @@ function stats(points: SeriesPoint[]) {
   };
 }
 
-export function SensoresView({ salas }: { salas: Sala[] }) {
-  const searchParams = useSearchParams();
-  const [metric, setMetric] = useState<'temp' | 'hum'>('temp');
-  const [range, setRange] = useState('24h');
-  const [seriesBySala, setSeriesBySala] = useState<Record<string, SalaSeries>>({});
+function fmtTime(d: Date, range: string) {
+  return range === '7d' || range === '30d'
+    ? d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+    : d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
 
-  const selectedId = searchParams.get('sala') ?? salas[0]?.id;
+export function SensoresView({
+  salas,
+  selectedId,
+  range,
+  series,
+}: {
+  salas: Sala[];
+  selectedId: string | null;
+  range: string;
+  series: SalaSeries | null;
+}) {
+  const [metric, setMetric] = useState<'temp' | 'hum'>('temp');
+
   const sala = salas.find((s) => s.id === selectedId) ?? salas[0];
 
-  useEffect(() => {
-    // Se genera solo en el cliente (post-mount) — evita mismatch de
-    // hidratación entre el render del server y valores "random".
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSeriesBySala((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const s of salas) {
-        if (!next[s.id]) {
-          next[s.id] = {
-            temp: genDummySeries(s.temp_min ?? 20, s.temp_max ?? 26, 48, 60 * 60 * 1000),
-            hum: genDummySeries(s.hum_min ?? 45, s.hum_max ?? 65, 48, 60 * 60 * 1000),
-          };
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [salas]);
-
   if (!sala) {
-    return <p className="text-text-mute text-sm py-10 text-center">Sin salas cargadas todavía.</p>;
+    return (
+      <div>
+        <h1 className="font-display text-2xl font-bold text-text">Sensores</h1>
+        <p className="text-text-soft mb-1">Seguimiento en vivo por sala</p>
+        <p className="text-text-mute text-sm py-10 text-center">
+          Ninguna sala tiene un sensor físico conectado todavía (se configura desde Salas & Cultivo).
+        </p>
+      </div>
+    );
   }
 
   const isTemp = metric === 'temp';
@@ -76,22 +75,18 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
   const rangeMax = isTemp ? sala.temp_max : sala.hum_max;
   const etapaMeta = ETAPA[sala.etapa as keyof typeof ETAPA];
 
-  const salaSeries = seriesBySala[sala.id] ?? null;
-  const { count } = RANGE_CONFIG[range];
-  const tempSlice = salaSeries ? salaSeries.temp.slice(-count) : [];
-  const humSlice = salaSeries ? salaSeries.hum.slice(-count) : [];
+  const tempSlice = series?.temp ?? [];
+  const humSlice = series?.hum ?? [];
   const activeSlice = isTemp ? tempSlice : humSlice;
+  const hasData = activeSlice.length > 0;
   const activeStats = stats(activeSlice);
-  const alert = activeSlice.length > 0 && rangeMin != null && rangeMax != null && (activeStats.last < rangeMin || activeStats.last > rangeMax);
-  const times = activeSlice.map((p) => `${p.time.getHours()}:00`);
+  const alert = hasData && rangeMin != null && rangeMax != null && (activeStats.last < rangeMin || activeStats.last > rangeMax);
+  const times = activeSlice.map((p) => fmtTime(p.time, range));
 
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-text">Sensores</h1>
-      <p className="text-text-soft mb-1">Seguimiento en vivo por sala</p>
-      <p className="text-amber-tx text-xs font-medium mb-4">
-        Datos de ejemplo (dummy) — todavía no está conectada la integración con InfluxDB.
-      </p>
+      <p className="text-text-soft mb-4">Seguimiento en vivo por sala</p>
 
       <div className="flex gap-1 mb-4 flex-wrap">
         {salas.map((s) => {
@@ -100,7 +95,7 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
           return (
             <Link
               key={s.id}
-              href={`/panel/sensores?sala=${s.id}`}
+              href={`/panel/sensores?sala=${s.id}&range=${range}`}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm border ${
                 active ? 'border-accent text-accent font-semibold' : 'border-line-2 text-text-soft hover:border-accent'
               }`}
@@ -113,10 +108,11 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
         })}
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <h2 className="font-display font-bold text-text">{sala.name}</h2>
         <Badge label={etapaMeta.label} color={etapaMeta.color} />
         <span className="text-xs text-text-mute">Día {sala.etapa_dias}</span>
+        <span className="text-xs text-text-mute">· sensor <code className="text-text-soft">{sala.sensor_id}</code></span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -127,7 +123,7 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium text-text-soft">Temperatura</span>
             <span className="font-display text-lg font-bold text-text">
-              {salaSeries ? stats(tempSlice).last.toFixed(1) : '—'}°C
+              {tempSlice.length > 0 ? stats(tempSlice).last.toFixed(1) : '—'}°C
             </span>
           </div>
           <Sparkline values={tempSlice.map((p) => p.value)} color="#d98a3f" />
@@ -143,7 +139,7 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium text-text-soft">Humedad</span>
             <span className="font-display text-lg font-bold text-text">
-              {salaSeries ? Math.round(stats(humSlice).last) : '—'}%
+              {humSlice.length > 0 ? Math.round(stats(humSlice).last) : '—'}%
             </span>
           </div>
           <Sparkline values={humSlice.map((p) => p.value)} color="#60a5fa" fixedMin={0} fixedMax={100} />
@@ -161,69 +157,63 @@ export function SensoresView({ salas }: { salas: Sala[] }) {
               {isTemp ? 'Temperatura' : 'Humedad'} · {sala.name}
             </p>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {RANGES.map((r) => (
-              <button
+              <Link
                 key={r}
-                onClick={() => setRange(r)}
+                href={`/panel/sensores?sala=${sala.id}&range=${r}`}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
                   range === r ? 'bg-accent text-white' : 'text-text-soft hover:bg-surface-2'
                 }`}
               >
                 {r}
-              </button>
+              </Link>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-3 mb-4 text-sm">
-          <div>
-            <p className="text-text-mute text-xs">Mín</p>
-            <p className="font-semibold text-text">{salaSeries ? activeStats.min.toFixed(1) : '—'}</p>
-          </div>
-          <div>
-            <p className="text-text-mute text-xs">Prom</p>
-            <p className="font-semibold text-text">{salaSeries ? activeStats.avg.toFixed(1) : '—'}</p>
-          </div>
-          <div>
-            <p className="text-text-mute text-xs">Máx</p>
-            <p className="font-semibold text-text">{salaSeries ? activeStats.max.toFixed(1) : '—'}</p>
-          </div>
-          <div>
-            <p className="text-text-mute text-xs">Rango ideal</p>
-            <p className="font-semibold text-accent">
-              {rangeMin ?? '—'}–{rangeMax ?? '—'} {isTemp ? '°C' : '%'}
-            </p>
-          </div>
-          <div>
-            <p className="text-text-mute text-xs">Estado</p>
-            {salaSeries ? (
-              <Badge label={alert ? 'Alerta' : 'Óptimo'} color={alert ? 'amber' : 'green'} />
-            ) : (
-              <p className="font-semibold text-text-mute">—</p>
-            )}
-          </div>
-        </div>
-
-        <BigChart
-          values={activeSlice.map((p) => p.value)}
-          times={times}
-          color={color}
-          fixedMin={isTemp ? undefined : 0}
-          fixedMax={isTemp ? undefined : 100}
-        />
-      </div>
-
-      <p className="text-text-mute text-xs mt-3">
-        {sala.sensor_id ? (
+        {hasData ? (
           <>
-            Sensor <code className="text-text">{sala.sensor_id}</code> configurado — falta conectar la integración con
-            InfluxDB para reemplazar estos valores de ejemplo por lecturas reales.
+            <div className="grid grid-cols-5 gap-3 mb-4 text-sm">
+              <div>
+                <p className="text-text-mute text-xs">Mín</p>
+                <p className="font-semibold text-text">{activeStats.min.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-text-mute text-xs">Prom</p>
+                <p className="font-semibold text-text">{activeStats.avg.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-text-mute text-xs">Máx</p>
+                <p className="font-semibold text-text">{activeStats.max.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-text-mute text-xs">Rango ideal</p>
+                <p className="font-semibold text-accent">
+                  {rangeMin ?? '—'}–{rangeMax ?? '—'} {isTemp ? '°C' : '%'}
+                </p>
+              </div>
+              <div>
+                <p className="text-text-mute text-xs">Estado</p>
+                <Badge label={alert ? 'Alerta' : 'Óptimo'} color={alert ? 'amber' : 'green'} />
+              </div>
+            </div>
+
+            <BigChart
+              values={activeSlice.map((p) => p.value)}
+              times={times}
+              color={color}
+              fixedMin={isTemp ? undefined : 0}
+              fixedMax={isTemp ? undefined : 100}
+            />
           </>
         ) : (
-          'Esta sala no tiene un sensor físico asignado (configurable desde Salas & Cultivo).'
+          <p className="text-text-mute text-sm py-10 text-center">
+            Sin lecturas del sensor <code className="text-text-soft">{sala.sensor_id}</code> en este rango — puede ser que
+            esté desconectado o que InfluxDB no responda ahora mismo.
+          </p>
         )}
-      </p>
+      </div>
     </div>
   );
 }
