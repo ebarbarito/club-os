@@ -8,6 +8,7 @@ export default async function SensoresPage() {
     .select(
       'id, name, etapa, etapa_dias, sensor_id, temp_min, temp_max, hum_min, hum_max, sala_strains(strain:strains(name))',
     )
+    .not('sensor_id', 'is', null)
     .order('name');
 
   const items = (salas ?? []).map((s) => {
