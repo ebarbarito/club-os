@@ -13,7 +13,7 @@ export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('tenants')
-    .select('id, slug, name, logo_url, theme')
+    .select('id, slug, name, logo_url, theme, public_site_enabled')
     .eq('slug', slug)
     .maybeSingle();
 

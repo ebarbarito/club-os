@@ -31,11 +31,10 @@ Repo hermano: [`Sensores`](../Sensores) — firmware IoT + InfluxDB Cloud
 Vercel, proyecto `club-os` (linkeado al repo de GitHub — cada push a `main`
 dispara un deploy). Producción: https://club-os-omega.vercel.app
 
-Mientras no haya un dominio propio con DNS wildcard, el deploy sirve un
-solo club (`CLUB_OS_DEFAULT_TENANT=greenlevel`) en esa URL default. Cuando
-se compre un dominio: configurar wildcard `*.tuclub.app` en el proyecto de
-Vercel, setear `CLUB_OS_ROOT_DOMAIN` y sacar `CLUB_OS_DEFAULT_TENANT` (o
-dejarlo como fallback para el propio dominio raíz sin subdominio).
+La URL default (`club-os-omega.vercel.app` y cualquier host sin dominio
+propio) sigue sirviendo un solo club (`CLUB_OS_DEFAULT_TENANT=greenlevel`)
+como fallback. Dominio propio con wildcard: `*.miclub.site`, comprado y
+configurado en el proyecto de Vercel; `CLUB_OS_ROOT_DOMAIN=miclub.site`.
 
 Env vars ya cargadas en Vercel (production/preview/development) — ver
 `.env.example` para la lista. Redeploy manual: `npx vercel --prod`.

@@ -10,7 +10,7 @@ modelo de negocio: `design_handoff_club_os` (fuera de este repo).
 |---|---|---|
 | Alcance | Multi-tenant (varios clubes) | Producto vendible a más de un club, no solo uso propio |
 | Alta de tenant | Manual, script `npm run tenant:create` con `service_role` | Pocos clubes al inicio; UI de super-admin no rinde todavía |
-| Dominio | Subdominio `{slug}.tuclub.app` (wildcard) | Cero fricción de DNS al dar de alta un club nuevo |
+| Dominio | Subdominio `{slug}.miclub.site` (wildcard) | Cero fricción de DNS al dar de alta un club nuevo |
 | DB de negocio | Postgres compartida (Supabase) + `tenant_id` en cada tabla + RLS | Evita migraciones/conexiones ×N de una DB por tenant |
 | Backend services | Supabase (Postgres + Auth + Storage) | Auth multi-tenant y storage con RLS ya integrados, un solo proveedor |
 | Framework | Next.js (App Router) en Vercel, repo separado de `Sensores` | Sensores es IoT genérico; Club OS es el producto de negocio — solo se integran vía API/Influx |
@@ -24,7 +24,7 @@ modelo de negocio: `design_handoff_club_os` (fuera de este repo).
 ## Cómo fluye una request
 
 ```
-{slug}.tuclub.app
+{slug}.miclub.site
       │
       ▼
 proxy.ts ── resuelve slug del host → header x-club-os-tenant-slug

@@ -11,4 +11,5 @@ export type Tenant = {
   name: string;
   logo_url: string | null;
   theme: TenantTheme;
+  public_site_enabled: boolean;
 };
