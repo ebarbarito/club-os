@@ -2,27 +2,41 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { getSessionProfile } from '@/lib/auth/get-session-profile';
 
-export async function adjustStock(formData: FormData) {
-  const strainId = String(formData.get('strain_id'));
-  const mode = String(formData.get('mode')); // 'add' | 'remove' | 'set'
-  const value = Number(formData.get('value'));
+async function requireAdminProfile() {
+  const profile = await getSessionProfile();
+  if (!profile) throw new Error('No autenticado');
+  if (profile.role !== 'admin') throw new Error('Solo un administrador puede operar el stock general');
+  return profile;
+}
 
+export async function sendStock(formData: FormData) {
+  await requireAdminProfile();
   const supabase = await createClient();
-  const { data: current, error: readError } = await supabase
-    .from('stock')
-    .select('grams')
-    .eq('strain_id', strainId)
-    .single();
-  if (readError) return { error: readError.message };
 
-  const newGrams =
-    mode === 'set' ? value : mode === 'add' ? current.grams + value : Math.max(0, current.grams - value);
+  const { error } = await supabase.rpc('send_stock', {
+    p_strain_id: String(formData.get('strain_id')),
+    p_quantity: Number(formData.get('quantity')),
+    p_type: String(formData.get('type')),
+    p_note: (formData.get('note') as string) || null,
+  });
+  if (error) return { error: error.message };
 
-  const { error } = await supabase
-    .from('stock')
-    .update({ grams: newGrams, updated_at: new Date().toISOString() })
-    .eq('strain_id', strainId);
+  revalidatePath('/panel/stock');
+  return {};
+}
+
+export async function adjustGeneralStock(formData: FormData) {
+  await requireAdminProfile();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc('adjust_stock_general', {
+    p_strain_id: String(formData.get('strain_id')),
+    p_mode: String(formData.get('mode')),
+    p_value: Number(formData.get('value')),
+    p_note: (formData.get('note') as string) || null,
+  });
   if (error) return { error: error.message };
 
   revalidatePath('/panel/stock');
