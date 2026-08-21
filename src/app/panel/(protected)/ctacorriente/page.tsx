@@ -23,18 +23,20 @@ export default async function CtaCorrientePage({
 
   let comprobantes: {
     id: string;
+    number: number;
     created_at: string;
     amount: number;
     adeudado: number;
     items: { description: string; quantity: number; unit_price: number; bonif1_pct: number; bonif2_pct: number; total: number }[];
-    payments: { amount_local: number; account_name: string }[];
+    payments: { receipt_number: number; created_at: string; amount_local: number; account_name: string }[];
   }[] = [];
+  const selectedMember = (members ?? []).find((m) => m.id === memberId);
 
   if (memberId) {
     const { data: dispensas } = await supabase
       .from('dispensas')
       .select(
-        'id, created_at, amount, items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total), payments:dispensa_payments(amount_local, account:payment_accounts(name))',
+        'id, number, created_at, amount, items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total), payments:dispensa_payments(receipt_number, created_at, amount_local, account:payment_accounts(name))',
       )
       .eq('member_id', memberId)
       .is('voided_at', null)
@@ -42,12 +44,14 @@ export default async function CtaCorrientePage({
 
     comprobantes = (dispensas ?? [])
       .map((d) => {
-        const payments = (d.payments ?? []).map((p: { amount_local: number; account: { name: string } | { name: string }[] | null }) => {
-          const account = Array.isArray(p.account) ? p.account[0] : p.account;
-          return { amount_local: p.amount_local, account_name: account?.name ?? '—' };
-        });
+        const payments = (d.payments ?? []).map(
+          (p: { receipt_number: number; created_at: string; amount_local: number; account: { name: string } | { name: string }[] | null }) => {
+            const account = Array.isArray(p.account) ? p.account[0] : p.account;
+            return { receipt_number: p.receipt_number, created_at: p.created_at, amount_local: p.amount_local, account_name: account?.name ?? '—' };
+          },
+        );
         const paid = payments.reduce((s, p) => s + p.amount_local, 0);
-        return { id: d.id, created_at: d.created_at, amount: d.amount, adeudado: d.amount - paid, items: d.items ?? [], payments };
+        return { id: d.id, number: d.number, created_at: d.created_at, amount: d.amount, adeudado: d.amount - paid, items: d.items ?? [], payments };
       })
       .filter((d) => d.adeudado > 0.01);
   }
@@ -79,11 +83,18 @@ export default async function CtaCorrientePage({
                   <td className="px-4 py-2.5 text-text-soft">{fmtDate(c.created_at)}</td>
                   <td className="px-4 py-2.5">
                     <ModalTrigger
-                      label={`#${c.id.slice(0, 8)}`}
+                      label={`N° ${c.number}`}
                       className="text-accent text-sm font-medium hover:underline"
                       title="Detalle del comprobante"
                     >
-                      <DispensaDetail createdAt={c.created_at} items={c.items} payments={c.payments} amount={c.amount} />
+                      <DispensaDetail
+                        number={c.number}
+                        memberName={selectedMember?.name ?? '—'}
+                        createdAt={c.created_at}
+                        items={c.items}
+                        payments={c.payments}
+                        amount={c.amount}
+                      />
                     </ModalTrigger>
                   </td>
                   <td className="px-4 py-2.5 text-text-soft">{money(c.amount)}</td>

@@ -8,6 +8,7 @@ import { RegisterDispensaForm } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
 import { ConfirmDeliveryForm } from './confirm-delivery-form';
 import { VoidDispensaForm } from './void-dispensa-form';
+import { DispensaDetail } from '../ctacorriente/dispensa-detail';
 
 export default async function DispensaPage({
   searchParams,
@@ -28,7 +29,7 @@ export default async function DispensaPage({
       supabase
         .from('dispensas')
         .select(
-          '*, member:members(name, dni), by:profiles(name), items:dispensa_items(quantity, total, strain:strains(name, item_type)), payments:dispensa_payments(amount_local, account:payment_accounts(name))',
+          '*, member:members(name, dni), by:profiles!dispensas_registered_by_fkey(name), items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total, strain:strains(name, item_type)), payments:dispensa_payments(receipt_number, created_at, amount_local, account:payment_accounts(name))',
         )
         .order('created_at', { ascending: false })
         .limit(50),
@@ -152,6 +153,7 @@ export default async function DispensaPage({
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
+                <th className="px-4 py-2.5 font-medium">N°</th>
                 <th className="px-4 py-2.5 font-medium">Socio</th>
                 <th className="px-4 py-2.5 font-medium">Artículos</th>
                 <th className="px-4 py-2.5 font-medium">Sugerido</th>
@@ -167,18 +169,48 @@ export default async function DispensaPage({
               {(dispensas ?? []).map((d) => {
                 const member = Array.isArray(d.member) ? d.member[0] : d.member;
                 const by = Array.isArray(d.by) ? d.by[0] : d.by;
-                const paid = (d.payments ?? []).reduce((s: number, p: { amount_local: number }) => s + p.amount_local, 0);
+                const items = (d.items ?? []) as {
+                  description: string;
+                  quantity: number;
+                  unit_price: number;
+                  bonif1_pct: number;
+                  bonif2_pct: number;
+                  total: number;
+                  strain: { name: string; item_type: string } | { name: string; item_type: string }[] | null;
+                }[];
+                const payments = (d.payments ?? []) as {
+                  receipt_number: number;
+                  created_at: string;
+                  amount_local: number;
+                  account: { name: string } | { name: string }[] | null;
+                }[];
+                const paid = payments.reduce((s, p) => s + p.amount_local, 0);
                 const diff = d.suggested_amount != null ? d.amount - d.suggested_amount : null;
                 const voided = !!d.voided_at;
                 return (
                   <tr key={d.id} className={`border-t border-line ${voided ? 'opacity-50' : ''}`}>
+                    <td className="px-4 py-2.5 text-text-soft">
+                      <ModalTrigger label={`N° ${d.number}`} className="text-accent font-medium hover:underline" title="Detalle del comprobante">
+                        <DispensaDetail
+                          number={d.number}
+                          memberName={member?.name ?? '—'}
+                          createdAt={d.created_at}
+                          items={items}
+                          payments={payments.map((p) => {
+                            const account = Array.isArray(p.account) ? p.account[0] : p.account;
+                            return { receipt_number: p.receipt_number, created_at: p.created_at, amount_local: p.amount_local, account_name: account?.name ?? '—' };
+                          })}
+                          amount={d.amount}
+                        />
+                      </ModalTrigger>
+                    </td>
                     <td className="px-4 py-2.5 font-medium text-text">{member?.name ?? '—'}</td>
                     <td className="px-4 py-2.5 text-text-soft">
-                      {(d.items ?? []).map((it: { quantity: number; strain: { name: string; item_type: string } | { name: string; item_type: string }[] | null }, i: number) => {
+                      {items.map((it, i) => {
                         const strain = Array.isArray(it.strain) ? it.strain[0] : it.strain;
                         return (
                           <div key={i}>
-                            {strain?.name} · {it.quantity} {strain?.item_type === 'genetica' ? 'g' : 'u.'}
+                            {it.description} · {it.quantity} {strain?.item_type === 'genetica' ? 'g' : 'u.'}
                           </div>
                         );
                       })}
@@ -189,7 +221,7 @@ export default async function DispensaPage({
                       {diff == null ? '—' : diff === 0 ? 'Exacto' : `${diff > 0 ? '+' : ''}${money(diff)}`}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft">
-                      {(d.payments ?? []).map((p: { amount_local: number; account: { name: string } | { name: string }[] | null }, i: number) => {
+                      {payments.map((p, i) => {
                         const account = Array.isArray(p.account) ? p.account[0] : p.account;
                         return (
                           <div key={i}>
@@ -218,7 +250,7 @@ export default async function DispensaPage({
               })}
               {(dispensas ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-text-mute">
+                  <td colSpan={10} className="px-4 py-10 text-center text-text-mute">
                     Sin dispensas registradas todavía.
                   </td>
                 </tr>

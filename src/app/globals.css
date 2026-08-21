@@ -63,3 +63,23 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
 }
+
+/* Imprimir un comprobante: oculta todo menos el contenido marcado con
+   .print-area (el resto de la página, el fondo del modal, los botones). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    padding: 1.5rem;
+  }
+  .print-hide {
+    display: none !important;
+  }
+}

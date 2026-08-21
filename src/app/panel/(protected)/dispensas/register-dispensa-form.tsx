@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
@@ -42,6 +42,7 @@ export function RegisterDispensaForm({
     { strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' },
   ]);
   const [payments, setPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
+  const itemRefs = useRef<Array<HTMLSelectElement | null>>([]);
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -53,6 +54,7 @@ export function RegisterDispensaForm({
 
   const realTotal = rows.reduce((sum, r) => sum + lineTotal(r), 0);
   const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0);
+  const saldo = realTotal - paidTotal;
 
   function updateRow(i: number, patch: Partial<ItemRow>) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -81,11 +83,8 @@ export function RegisterDispensaForm({
       setError('Cargá al menos un artículo');
       return;
     }
+    // Pago en $0 es válido: el importe entero pasa a cuenta corriente.
     const validPayments = payments.filter((p) => Number(p.amount) > 0);
-    if (validPayments.length === 0) {
-      setError('Cargá al menos un medio de pago');
-      return;
-    }
 
     const formData = new FormData();
     formData.set('member_id', memberId);
@@ -136,7 +135,13 @@ export function RegisterDispensaForm({
     <div className="space-y-4">
       <div>
         <label className={labelCls}>Socio (válido)</label>
-        <MemberSearch members={members} value={memberId} onChange={setMemberId} />
+        <MemberSearch
+          members={members}
+          value={memberId}
+          onChange={setMemberId}
+          onSelected={() => itemRefs.current[0]?.focus()}
+          autoFocus
+        />
       </div>
 
       <div>
@@ -156,7 +161,14 @@ export function RegisterDispensaForm({
               <div key={i} className={`p-3 space-y-2 sm:space-y-0 sm:grid ${ITEM_GRID_CLS} sm:gap-2 sm:items-center`}>
                 <div>
                   <label className={`${labelCls} sm:hidden`}>Artículo</label>
-                  <select value={row.strainId} onChange={(e) => selectItem(i, e.target.value)} className={inputCls}>
+                  <select
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
+                    value={row.strainId}
+                    onChange={(e) => selectItem(i, e.target.value)}
+                    className={inputCls}
+                  >
                     <option value="">Elegir artículo…</option>
                     {items.map((it) => (
                       <option key={it.id} value={it.id}>
@@ -242,30 +254,26 @@ export function RegisterDispensaForm({
         </button>
       </div>
 
-      <div className="rounded-lg bg-surface-2 p-3 text-sm grid sm:grid-cols-2 gap-3">
+      <div className="rounded-lg bg-surface-2 p-3 text-sm flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <p className="text-text-mute text-xs" title="Cantidad × precio de catálogo, sin aplicar bonificaciones">
-            Total sugerido (precio de catálogo)
-          </p>
-          <p className="text-text font-medium">{money(suggestedTotal)}</p>
-        </div>
-        <div>
-          <p className="text-text-mute text-xs" title="Lo que efectivamente se cobra, ya con las bonificaciones aplicadas">
-            Total dispensa (a cobrar)
-          </p>
+          <p className="text-text-mute text-xs">Total dispensa</p>
           <p className="text-text font-bold text-base">{money(realTotal)}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-text-mute text-xs">Total cobrado</p>
+            <p className="text-text font-medium">{money(paidTotal)}</p>
+          </div>
+          <div>
+            <p className="text-text-mute text-xs">Saldo (a cta cte)</p>
+            <p className={`font-bold text-base ${saldo > 0.01 ? 'text-red' : 'text-text-mute'}`}>{money(Math.max(saldo, 0))}</p>
+          </div>
         </div>
       </div>
 
       <div>
         <label className={labelCls}>Forma de pago</label>
         <PaymentSplitEditor accounts={accounts} lines={payments} onChange={setPayments} />
-        {Math.abs(paidTotal - realTotal) > 0.01 && (
-          <p className="text-amber-tx text-xs mt-1">
-            Lo cargado en pagos ({money(paidTotal)}) no coincide con el total de la dispensa — la diferencia queda en
-            cuenta corriente del socio.
-          </p>
-        )}
       </div>
 
       {error && <p className="text-red text-sm">{error}</p>}
