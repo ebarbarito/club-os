@@ -66,7 +66,9 @@ export function RegisterDispensaForm({
   }
 
   function addRow() {
+    const newIndex = rows.length;
     setRows((prev) => [...prev, { strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' }]);
+    requestAnimationFrame(() => itemRefs.current[newIndex]?.focus());
   }
   function removeRow(i: number) {
     setRows((prev) => prev.filter((_, idx) => idx !== i));

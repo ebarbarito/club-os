@@ -68,11 +68,9 @@ export function CloseShiftForm({ expected, kind }: { expected: number; kind: 'di
         </div>
       </div>
 
-      {kind === 'diaria' && (
-        <p className="text-text-mute text-xs">
-          Al cerrar se abre automáticamente el turno siguiente con {money(total)} como saldo de apertura.
-        </p>
-      )}
+      <p className="text-text-mute text-xs">
+        Al cerrar se abre automáticamente el turno siguiente con {money(total)} como saldo de apertura.
+      </p>
 
       {error && <p className="text-red text-sm">{error}</p>}
 

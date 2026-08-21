@@ -162,27 +162,14 @@ export async function closeCajaDiaria(formData: FormData) {
   return {};
 }
 
-// Caja general no se reabre sola: es la caja de respaldo del admin, se
-// abre/cierra a mano cuando corresponda.
+// Igual que la diaria: al cerrar se reabre sola con lo contado como
+// apertura del turno siguiente (ver close_caja_general en las migraciones).
 export async function closeCajaGeneral(formData: FormData) {
   await requireAdminProfile();
   const supabase = await createClient();
 
-  const { data: shift } = await supabase
-    .from('caja_shifts')
-    .select('id, opening_cash')
-    .eq('kind', 'general')
-    .is('closed_at', null)
-    .maybeSingle();
-  if (!shift) return { error: 'No hay un turno de caja general abierto' };
-
-  const expected = await expectedCash(supabase, shift.id, shift.opening_cash);
   const counted = Number(formData.get('counted_cash') ?? 0);
-
-  const { error } = await supabase
-    .from('caja_shifts')
-    .update({ closed_at: new Date().toISOString(), counted_cash: counted, difference: counted - expected })
-    .eq('id', shift.id);
+  const { error } = await supabase.rpc('close_caja_general', { p_counted_cash: counted });
   if (error) return { error: error.message };
 
   revalidatePath('/panel/caja');
