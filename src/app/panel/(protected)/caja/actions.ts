@@ -14,9 +14,11 @@ async function requireAdminProfile() {
 export async function openShift(formData: FormData) {
   const profile = await requireAdminProfile();
   const supabase = await createClient();
+  const kind = String(formData.get('kind') ?? 'diaria');
 
   const { error } = await supabase.from('caja_shifts').insert({
     tenant_id: profile.tenantId,
+    kind,
     opened_by: profile.userId,
     opening_cash: Number(formData.get('opening_cash') ?? 0),
   });
@@ -26,16 +28,39 @@ export async function openShift(formData: FormData) {
   return {};
 }
 
+// Cuánto efectivo queda disponible ahora mismo en un turno (apertura +
+// ingresos - egresos de la cuenta marcada is_cash). Se usa para no dejar
+// nunca la caja diaria en negativo.
+async function expectedCash(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  shiftId: string,
+  openingCash: number,
+): Promise<number> {
+  const { data: cashAccount } = await supabase.from('payment_accounts').select('id').eq('is_cash', true).maybeSingle();
+  if (!cashAccount) return openingCash;
+
+  const { data: movs } = await supabase
+    .from('ledger')
+    .select('type, amount_local')
+    .eq('shift_id', shiftId)
+    .eq('account_id', cashAccount.id);
+
+  const net = (movs ?? []).reduce((s, m) => s + (m.type === 'ingreso' ? m.amount_local : -m.amount_local), 0);
+  return openingCash + net;
+}
+
 export async function addMovement(formData: FormData) {
   const profile = await requireAdminProfile();
   const supabase = await createClient();
+  const kind = String(formData.get('kind') ?? 'diaria');
 
   const { data: shift } = await supabase
     .from('caja_shifts')
-    .select('id')
+    .select('id, kind, opening_cash')
+    .eq('kind', kind)
     .is('closed_at', null)
     .maybeSingle();
-  if (!shift) return { error: 'No hay un turno de caja abierto' };
+  if (!shift) return { error: `No hay un turno de caja ${kind} abierto` };
 
   const type = String(formData.get('type'));
   const category = String(formData.get('category') ?? 'Otro');
@@ -46,6 +71,21 @@ export async function addMovement(formData: FormData) {
     exchange_rate: number;
   }[];
   if (payments.length === 0) return { error: 'Cargá al menos una cuenta' };
+
+  // Caja diaria nunca queda en efectivo negativo — se valida antes de
+  // insertar nada.
+  if (kind === 'diaria' && type === 'egreso') {
+    const { data: cashAccount } = await supabase.from('payment_accounts').select('id').eq('is_cash', true).maybeSingle();
+    const cashEgreso = payments
+      .filter((p) => p.account_id === cashAccount?.id)
+      .reduce((s, p) => s + p.amount * p.exchange_rate, 0);
+    if (cashEgreso > 0) {
+      const current = await expectedCash(supabase, shift.id, shift.opening_cash);
+      if (cashEgreso > current + 0.01) {
+        return { error: `El efectivo en caja (${current}) no alcanza para este egreso` };
+      }
+    }
+  }
 
   const { error } = await supabase.from('ledger').insert(
     payments.map((p) => ({
@@ -80,9 +120,13 @@ export async function editMovement(formData: FormData) {
   if (current.category === 'Dispensa' || current.category === 'Cuenta corriente') {
     return { error: 'Este movimiento viene de una dispensa — se edita/anula desde ahí, no desde Caja' };
   }
+  if (current.category === 'Cierre de caja') {
+    return { error: 'Este movimiento es un depósito automático de un cierre de caja diaria, no se edita' };
+  }
 
   const amount = Number(formData.get('amount') ?? 0);
   const exchangeRate = Number(formData.get('exchange_rate') ?? 1);
+  const accountId = String(formData.get('account_id'));
 
   const { error } = await supabase
     .from('ledger')
@@ -92,7 +136,7 @@ export async function editMovement(formData: FormData) {
       amount,
       exchange_rate: exchangeRate,
       amount_local: amount * exchangeRate,
-      account_id: String(formData.get('account_id')),
+      account_id: accountId,
     })
     .eq('id', id)
     .eq('tenant_id', profile.tenantId);
@@ -103,29 +147,36 @@ export async function editMovement(formData: FormData) {
   return {};
 }
 
-export async function closeShift(formData: FormData) {
+// Cierra la caja diaria via RPC (arqueo + reapertura automatica con lo
+// contado + volcado a caja general si hay una abierta) — ver
+// close_caja_diaria en supabase/migrations.
+export async function closeCajaDiaria(formData: FormData) {
+  await requireAdminProfile();
+  const supabase = await createClient();
+
+  const counted = Number(formData.get('counted_cash') ?? 0);
+  const { error } = await supabase.rpc('close_caja_diaria', { p_counted_cash: counted });
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/caja');
+  return {};
+}
+
+// Caja general no se reabre sola: es la caja de respaldo del admin, se
+// abre/cierra a mano cuando corresponda.
+export async function closeCajaGeneral(formData: FormData) {
   await requireAdminProfile();
   const supabase = await createClient();
 
   const { data: shift } = await supabase
     .from('caja_shifts')
     .select('id, opening_cash')
+    .eq('kind', 'general')
     .is('closed_at', null)
     .maybeSingle();
-  if (!shift) return { error: 'No hay un turno de caja abierto' };
+  if (!shift) return { error: 'No hay un turno de caja general abierto' };
 
-  const { data: movs } = await supabase
-    .from('ledger')
-    .select('type, amount_local, account:payment_accounts(is_cash)')
-    .eq('shift_id', shift.id);
-
-  const cashMovs = (movs ?? []).filter((m) => {
-    const account = Array.isArray(m.account) ? m.account[0] : m.account;
-    return account?.is_cash;
-  });
-  const ingEfectivo = cashMovs.filter((m) => m.type === 'ingreso').reduce((s, m) => s + m.amount_local, 0);
-  const egEfectivo = cashMovs.filter((m) => m.type === 'egreso').reduce((s, m) => s + m.amount_local, 0);
-  const expected = shift.opening_cash + ingEfectivo - egEfectivo;
+  const expected = await expectedCash(supabase, shift.id, shift.opening_cash);
   const counted = Number(formData.get('counted_cash') ?? 0);
 
   const { error } = await supabase

@@ -8,13 +8,14 @@ import { openShift } from './actions';
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
-export function OpenShiftForm() {
+export function OpenShiftForm({ kind }: { kind: 'diaria' | 'general' }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   function submit(formData: FormData) {
+    formData.set('kind', kind);
     startTransition(async () => {
       const res = await openShift(formData);
       if (res?.error) {

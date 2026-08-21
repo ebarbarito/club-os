@@ -11,7 +11,7 @@ const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
 const CONCEPTS = ['Alquiler', 'Ferretería', 'Eventos', 'Almacén', 'Insumos', 'Servicios', 'Membresía', 'Operativo', 'Otro'];
 
-export function MovementForm({ accounts }: { accounts: PaymentAccount[] }) {
+export function MovementForm({ accounts, kind }: { accounts: PaymentAccount[]; kind: 'diaria' | 'general' }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
@@ -27,6 +27,7 @@ export function MovementForm({ accounts }: { accounts: PaymentAccount[] }) {
       return;
     }
     const finalConcept = concept === 'Otro' ? customConcept || 'Otro' : concept;
+    formData.set('kind', kind);
     formData.set('category', finalConcept);
     formData.set('concept', finalConcept);
     formData.set(

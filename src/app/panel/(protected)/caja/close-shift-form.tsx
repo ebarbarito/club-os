@@ -3,12 +3,12 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
-import { closeShift } from './actions';
+import { closeCajaDiaria, closeCajaGeneral } from './actions';
 import { money } from '@/lib/format';
 
 const DENOMINATIONS = [20000, 10000, 2000, 1000, 500, 200, 100, 50];
 
-export function CloseShiftForm({ expected }: { expected: number }) {
+export function CloseShiftForm({ expected, kind }: { expected: number; kind: 'diaria' | 'general' }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
@@ -22,7 +22,7 @@ export function CloseShiftForm({ expected }: { expected: number }) {
     startTransition(async () => {
       const formData = new FormData();
       formData.set('counted_cash', String(total));
-      const res = await closeShift(formData);
+      const res = kind === 'diaria' ? await closeCajaDiaria(formData) : await closeCajaGeneral(formData);
       if (res?.error) {
         setError(res.error);
         return;
@@ -67,6 +67,12 @@ export function CloseShiftForm({ expected }: { expected: number }) {
           </span>
         </div>
       </div>
+
+      {kind === 'diaria' && (
+        <p className="text-text-mute text-xs">
+          Al cerrar se abre automáticamente el turno siguiente con {money(total)} como saldo de apertura.
+        </p>
+      )}
 
       {error && <p className="text-red text-sm">{error}</p>}
 
