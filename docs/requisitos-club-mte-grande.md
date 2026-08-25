@@ -11,7 +11,7 @@ para poder rastrear qué se pidió cuándo.
 |---|---|
 | Spec original (Dispensa, Cta Cte, Caja) | ✅ Implementado |
 | Modificaciones (19/8/26) | ✅ Implementado (Fase 1: Dispensa/Cta Cte + bug fix · Fase 2: Stock + Caja diaria/general) |
-| Modificaciones (25/08/2026) | ⏳ Pendiente — ver fases propuestas en la conversación |
+| Modificaciones (25/08/2026) | ✅ Implementado (Fase A: recibo único · Fase B: dólares + "dejar para la siguiente" en el cierre · Fase C: envío general→diaria) |
 
 ---
 
