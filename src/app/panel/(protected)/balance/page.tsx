@@ -20,14 +20,14 @@ export default async function BalancePage({
   const supabase = await createClient();
   const { start, end } = monthRange(activeMonth);
 
-  // "Cierre de caja" son los depósitos automáticos de un cierre de caja
-  // diaria hacia caja general — la misma plata que ya se contó como
-  // ingreso real (Dispensa, Cuenta corriente, etc.) cuando se generó, no
-  // un ingreso nuevo. Contarla acá también la duplicaría.
+  // "Cierre de caja" y "Envío a caja diaria" son traspasos internos entre
+  // las dos cajas — la misma plata que ya se contó como ingreso real
+  // (Dispensa, Cuenta corriente, etc.) cuando se generó. Contarlos acá
+  // también los duplicaría.
   const { data: movements } = await supabase
     .from('ledger')
     .select('*, account:payment_accounts(name)')
-    .neq('category', 'Cierre de caja')
+    .not('category', 'in', '("Cierre de caja","Envío a caja diaria")')
     .gte('created_at', start)
     .lt('created_at', end)
     .order('created_at', { ascending: false });
@@ -49,7 +49,7 @@ export default async function BalancePage({
       const { data } = await supabase
         .from('ledger')
         .select('type, amount_local')
-        .neq('category', 'Cierre de caja')
+        .not('category', 'in', '("Cierre de caja","Envío a caja diaria")')
         .gte('created_at', range.start)
         .lt('created_at', range.end);
       const ing = (data ?? []).filter((r) => r.type === 'ingreso').reduce((s, r) => s + r.amount_local, 0);

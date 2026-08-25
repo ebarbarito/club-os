@@ -87,6 +87,17 @@ export async function addMovement(formData: FormData) {
     }
   }
 
+  // Un solo recibo por operación: todas las cuentas de este movimiento
+  // comparten el mismo receipt_number, aunque generen varias filas de ledger.
+  const { data: lastReceipt } = await supabase
+    .from('ledger')
+    .select('receipt_number')
+    .eq('tenant_id', profile.tenantId)
+    .order('receipt_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const receiptNumber = (lastReceipt?.receipt_number ?? 0) + 1;
+
   const { error } = await supabase.from('ledger').insert(
     payments.map((p) => ({
       tenant_id: profile.tenantId,
@@ -98,6 +109,7 @@ export async function addMovement(formData: FormData) {
       exchange_rate: p.exchange_rate,
       amount_local: p.amount * p.exchange_rate,
       account_id: p.account_id,
+      receipt_number: receiptNumber,
     })),
   );
   if (error) return { error: error.message };
@@ -154,8 +166,27 @@ export async function closeCajaDiaria(formData: FormData) {
   await requireAdminProfile();
   const supabase = await createClient();
 
-  const counted = Number(formData.get('counted_cash') ?? 0);
-  const { error } = await supabase.rpc('close_caja_diaria', { p_counted_cash: counted });
+  const { error } = await supabase.rpc('close_caja_diaria', {
+    p_counted_cash: Number(formData.get('counted_cash') ?? 0),
+    p_counted_usd: Number(formData.get('counted_usd') ?? 0),
+    p_leave_cash: Number(formData.get('leave_cash') ?? 0),
+    p_leave_usd: Number(formData.get('leave_usd') ?? 0),
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/caja');
+  return {};
+}
+
+// Envío manual de caja general -> caja diaria (ver transfer_general_to_diaria).
+export async function transferGeneralToDiaria(formData: FormData) {
+  await requireAdminProfile();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc('transfer_general_to_diaria', {
+    p_cash_amount: Number(formData.get('cash_amount') ?? 0),
+    p_usd_amount: Number(formData.get('usd_amount') ?? 0),
+  });
   if (error) return { error: error.message };
 
   revalidatePath('/panel/caja');

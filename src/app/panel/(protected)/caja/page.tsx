@@ -10,6 +10,8 @@ import { MovementForm } from './movement-form';
 import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
 import { ShiftSummary } from './shift-summary';
+import { TransferToDiariaForm } from './transfer-to-diaria-form';
+import { groupByReceipt } from './group-by-receipt';
 
 type Account = { id: string; name: string; is_cash: boolean; currency: string; exchange_rate: number };
 type LedgerRow = {
@@ -23,6 +25,7 @@ type LedgerRow = {
   account_id: string;
   created_at: string;
   source_shift_id: string | null;
+  receipt_number: number | null;
   account: Account | Account[] | null;
   dispensa: { member: { member_number: number; name: string } | { member_number: number; name: string }[] | null } | { member: { member_number: number; name: string } | { member_number: number; name: string }[] | null }[] | null;
 };
@@ -80,8 +83,8 @@ export default async function CajaPage({
 
   const diariaCash = diariaShift ? diariaShift.opening_cash + netAmount(diariaMovements, cashAccount?.id, 'amount_local') : 0;
   const generalCash = generalShift ? generalShift.opening_cash + netAmount(generalMovements, cashAccount?.id, 'amount_local') : 0;
-  const diariaUsd = netAmount(diariaMovements, usdAccount?.id, 'amount');
-  const generalUsd = netAmount(generalMovements, usdAccount?.id, 'amount');
+  const diariaUsd = diariaShift ? diariaShift.opening_usd + netAmount(diariaMovements, usdAccount?.id, 'amount') : 0;
+  const generalUsd = generalShift ? generalShift.opening_usd + netAmount(generalMovements, usdAccount?.id, 'amount') : 0;
 
   const TABS = [
     { key: 'diaria', label: 'Caja diaria' },
@@ -108,7 +111,15 @@ export default async function CajaPage({
       </div>
 
       {activeTab === 'diaria' ? (
-        <DiariaTab shift={diariaShift} movements={diariaMovements} accounts={accounts} cashAccount={cashAccount} usdAccount={usdAccount} expectedCash={diariaCash} />
+        <DiariaTab
+          shift={diariaShift}
+          movements={diariaMovements}
+          accounts={accounts}
+          cashAccount={cashAccount}
+          usdAccount={usdAccount}
+          expectedCash={diariaCash}
+          expectedUsd={diariaUsd}
+        />
       ) : (
         <GeneralTab
           shift={generalShift}
@@ -134,14 +145,19 @@ function DiariaTab({
   cashAccount,
   usdAccount,
   expectedCash,
+  expectedUsd,
 }: {
-  shift: { id: string; opening_cash: number } | null;
+  shift: { id: string; opening_cash: number; opening_usd: number } | null;
   movements: LedgerRow[];
   accounts: Account[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
   expectedCash: number;
+  expectedUsd: number;
 }) {
+  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria']);
+  const groups = groupByReceipt(movements);
+
   return (
     <div>
       {!shift ? (
@@ -156,12 +172,12 @@ function DiariaTab({
           <div className="rounded-xl border border-line bg-surface p-5 mb-4">
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
-                <p className="text-text-mute">Apertura</p>
-                <p className="font-display font-bold text-text">{money(shift.opening_cash)}</p>
-              </div>
-              <div>
                 <p className="text-text-mute">Efectivo en caja</p>
                 <p className="font-display font-bold text-text">{money(expectedCash)}</p>
+              </div>
+              <div>
+                <p className="text-text-mute">Dólares en caja</p>
+                <p className="font-display font-bold text-text">US$ {expectedUsd.toLocaleString('es-AR')}</p>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -177,7 +193,7 @@ function DiariaTab({
                 className="ml-auto rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5"
                 title="Arqueo de cierre"
               >
-                <CloseShiftForm expected={expectedCash} kind="diaria" />
+                <CloseShiftForm expected={expectedCash} expectedUsd={expectedUsd} kind="diaria" />
               </ModalTrigger>
             </div>
           </div>
@@ -197,30 +213,32 @@ function DiariaTab({
                 </tr>
               </thead>
               <tbody>
-                {movements.map((m) => {
-                  const account = one(m.account);
-                  const dispensa = one(m.dispensa);
+                {groups.map((g) => {
+                  const first = g.rows[0];
+                  const dispensa = one(first.dispensa);
                   const member = dispensa ? one(dispensa.member) : null;
-                  const signedLocal = m.type === 'ingreso' ? m.amount_local : -m.amount_local;
-                  const signedRaw = m.type === 'ingreso' ? m.amount : -m.amount;
-                  const isCash = account?.id === cashAccount?.id;
-                  const isUsd = account?.id === usdAccount?.id;
-                  const editable = m.category !== 'Dispensa' && m.category !== 'Cuenta corriente' && m.category !== 'Cierre de caja';
+                  const cashVal = cashAccount ? g.byAccountLocal.get(cashAccount.id) : undefined;
+                  const usdVal = usdAccount ? g.byAccountAmount.get(usdAccount.id) : undefined;
+                  const cuentasVal = [...g.byAccountLocal.entries()]
+                    .filter(([accId]) => accId !== cashAccount?.id && accId !== usdAccount?.id)
+                    .reduce((s, [, v]) => s + v, 0);
+                  const totalLocal = [...g.byAccountLocal.values()].reduce((s, v) => s + v, 0);
+                  const editable = g.rows.length === 1 && !NO_EDIT_CATEGORIES.has(first.category);
                   return (
-                    <tr key={m.id} className="border-t border-line">
-                      <td className="px-4 py-2.5 text-text">{m.concept}</td>
+                    <tr key={g.key} className="border-t border-line">
+                      <td className="px-4 py-2.5 text-text">{first.concept}</td>
                       <td className="px-4 py-2.5 text-text-soft">{member ? `#${member.member_number} ${member.name}` : '—'}</td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${isCash ? (signedLocal >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
-                        {isCash ? money(signedLocal) : '—'}
+                      <td className={`px-4 py-2.5 text-right font-medium ${cashVal ? (cashVal >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
+                        {cashVal ? money(cashVal) : '—'}
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${isUsd ? (signedRaw >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
-                        {isUsd ? `US$ ${signedRaw.toLocaleString('es-AR')}` : '—'}
+                      <td className={`px-4 py-2.5 text-right font-medium ${usdVal ? (usdVal >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
+                        {usdVal ? `US$ ${usdVal.toLocaleString('es-AR')}` : '—'}
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${!isCash && !isUsd ? (signedLocal >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
-                        {!isCash && !isUsd ? money(signedLocal) : '—'}
+                      <td className={`px-4 py-2.5 text-right font-medium ${cuentasVal ? (cuentasVal >= 0 ? 'text-accent' : 'text-red') : 'text-text-mute'}`}>
+                        {cuentasVal ? money(cuentasVal) : '—'}
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-semibold ${signedLocal >= 0 ? 'text-accent' : 'text-red'}`}>{money(signedLocal)}</td>
-                      <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(m.created_at)}</td>
+                      <td className={`px-4 py-2.5 text-right font-semibold ${totalLocal >= 0 ? 'text-accent' : 'text-red'}`}>{money(totalLocal)}</td>
+                      <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(first.created_at)}</td>
                       <td className="px-4 py-2.5 text-right">
                         {editable && (
                           <ModalTrigger
@@ -228,14 +246,14 @@ function DiariaTab({
                             className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                             title="Editar movimiento"
                           >
-                            <EditMovementForm movement={m} accounts={accounts} />
+                            <EditMovementForm movement={first} accounts={accounts} />
                           </ModalTrigger>
                         )}
                       </td>
                     </tr>
                   );
                 })}
-                {movements.length === 0 && (
+                {groups.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-text-mute">
                       Sin movimientos en este turno.
@@ -274,25 +292,26 @@ function GeneralTab({
   diariaUsd: number;
   generalUsd: number;
 }) {
-  // Agrupa los depositos de un mismo cierre de caja diaria (una fila de
-  // ledger por cuenta) en un solo renglon con una columna por cuenta;
-  // los movimientos manuales de caja general quedan uno por fila, como
-  // siempre.
+  // Agrupa en un solo renglon: los depositos de un mismo cierre de caja
+  // diaria (por source_shift_id), y cualquier otra operacion dividida en
+  // varias cuentas (por receipt_number) — un movimiento manual sin split
+  // ni recibo asociado queda solo, en su propio grupo.
   type GroupedRow = {
     key: string;
     concept: string;
     created_at: string;
     sourceShiftId: string | null;
     byAccount: Map<string, number>;
-    raw: LedgerRow;
+    rows: LedgerRow[];
   };
   const grouped = new Map<string, GroupedRow>();
   for (const m of movements) {
-    const key = m.source_shift_id ?? m.id;
+    const key = m.source_shift_id ?? (m.receipt_number != null ? `r${m.receipt_number}` : m.id);
     const signed = m.type === 'ingreso' ? m.amount_local : -m.amount_local;
     const existing = grouped.get(key);
     if (existing) {
       existing.byAccount.set(m.account_id, (existing.byAccount.get(m.account_id) ?? 0) + signed);
+      existing.rows.push(m);
     } else {
       grouped.set(key, {
         key,
@@ -300,11 +319,12 @@ function GeneralTab({
         created_at: m.created_at,
         sourceShiftId: m.source_shift_id,
         byAccount: new Map([[m.account_id, signed]]),
-        raw: m,
+        rows: [m],
       });
     }
   }
   const rows = [...grouped.values()].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria']);
 
   return (
     <div>
@@ -338,6 +358,13 @@ function GeneralTab({
                 title="Registrar movimiento"
               >
                 <MovementForm accounts={accounts} kind="general" />
+              </ModalTrigger>
+              <ModalTrigger
+                label="Enviar a caja diaria"
+                className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                title="Enviar a caja diaria"
+              >
+                <TransferToDiariaForm availableCash={expectedCash} availableUsd={generalUsd} />
               </ModalTrigger>
               <ModalTrigger
                 label="Cerrar caja (arqueo)"
@@ -402,13 +429,13 @@ function GeneralTab({
                     );
                   })}
                   <td className="px-4 py-2.5 text-right">
-                    {!r.sourceShiftId && r.raw.category !== 'Dispensa' && r.raw.category !== 'Cuenta corriente' && (
+                    {!r.sourceShiftId && r.rows.length === 1 && !NO_EDIT_CATEGORIES.has(r.rows[0].category) && (
                       <ModalTrigger
                         label="Editar"
                         className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                         title="Editar movimiento"
                       >
-                        <EditMovementForm movement={r.raw} accounts={accounts} />
+                        <EditMovementForm movement={r.rows[0]} accounts={accounts} />
                       </ModalTrigger>
                     )}
                   </td>
