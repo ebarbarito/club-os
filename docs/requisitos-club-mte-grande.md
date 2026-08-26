@@ -12,6 +12,7 @@ para poder rastrear qué se pidió cuándo.
 | Spec original (Dispensa, Cta Cte, Caja) | ✅ Implementado |
 | Modificaciones (19/8/26) | ✅ Implementado (Fase 1: Dispensa/Cta Cte + bug fix · Fase 2: Stock + Caja diaria/general) |
 | Modificaciones (25/08/2026) | ✅ Implementado (Fase A: recibo único · Fase B: dólares + "dejar para la siguiente" en el cierre · Fase C: envío general→diaria) |
+| Modificaciones (26/08) | ✅ Implementado (sesión que se cortaba sola, bug de dólares en Caja general, arqueo unificado + confirmación de impresión, roles por usuario) |
 
 ---
 
@@ -83,3 +84,18 @@ para poder rastrear qué se pidió cuándo.
 - El casillero de dólares muestra la cantidad de dólares, no la conversión a pesos.
 - Movimientos: nuevo concepto **"Envío a caja diaria"** — genera un egreso en caja general y un ingreso en caja diaria.
 - Ambas cajas deben llevar parciales y subtotales de pesos y dólares por separado.
+
+---
+
+## Modificaciones 26/08
+
+**Caja diaria:**
+- A veces se cierra sola la pestaña (bug reportado — causa raíz: el middleware no persistía el refresh de sesión de Supabase en las cookies).
+- El arqueo debe poder imprimirse una vez que se acepta el cierre, con una pregunta "¿Desea imprimir el arqueo?".
+
+**Caja general:**
+- Copiar el mismo formato de arqueo que Caja diaria.
+- Bug: los montos en dólares traen mal — muestra la cantidad convertida a pesos (100 USD a cotización 1530 aparecía como "153.000 dólares") en vez de la cantidad de dólares.
+
+**Roles:**
+- Limitar accesos según el usuario. Administradores: acceso total. Dispensador: Dispensa, Cta Cte, Catálogo, Stock (solo stock dispensa), Caja (solo caja diaria).
