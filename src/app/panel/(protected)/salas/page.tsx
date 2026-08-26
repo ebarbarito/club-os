@@ -1,5 +1,7 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { ROLES } from '@/lib/roles';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { ETAPA } from '@/lib/status-meta';
@@ -9,6 +11,9 @@ import { CloseCicloForm } from './close-ciclo-form';
 
 export default async function SalasPage() {
   const profile = await getSessionProfile();
+  if (!profile) redirect('/panel/login');
+  if (profile.role !== 'admin' && profile.role !== 'cultivo') redirect(`/panel/${ROLES[profile.role].home}`);
+
   const supabase = await createClient();
 
   const [{ data: salas }, { data: strainRows }] = await Promise.all([

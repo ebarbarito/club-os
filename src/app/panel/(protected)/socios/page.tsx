@@ -1,5 +1,8 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { ROLES } from '@/lib/roles';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { MEMBER_STATUS } from '@/lib/status-meta';
@@ -30,6 +33,10 @@ export default async function SociosPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  const profile = await getSessionProfile();
+  if (!profile) redirect('/panel/login');
+  if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
+
   const { status } = await searchParams;
   const activeTab = status ?? 'todos';
 

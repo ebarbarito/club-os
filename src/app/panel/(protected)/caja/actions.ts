@@ -7,14 +7,23 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 async function requireAdminProfile() {
   const profile = await getSessionProfile();
   if (!profile) throw new Error('No autenticado');
-  if (profile.role !== 'admin') throw new Error('Solo un administrador puede operar la caja');
+  if (profile.role !== 'admin') throw new Error('Solo un administrador puede operar la caja general');
   return profile;
 }
 
+// Caja diaria: admin y dispensador. Caja general: solo admin.
+async function requireCajaAccess(kind: string) {
+  const profile = await getSessionProfile();
+  if (!profile) throw new Error('No autenticado');
+  if (profile.role === 'admin') return profile;
+  if (profile.role === 'dispensador' && kind === 'diaria') return profile;
+  throw new Error('No tenés acceso a esta caja');
+}
+
 export async function openShift(formData: FormData) {
-  const profile = await requireAdminProfile();
-  const supabase = await createClient();
   const kind = String(formData.get('kind') ?? 'diaria');
+  const profile = await requireCajaAccess(kind);
+  const supabase = await createClient();
 
   const { error } = await supabase.from('caja_shifts').insert({
     tenant_id: profile.tenantId,
@@ -50,9 +59,9 @@ async function expectedCash(
 }
 
 export async function addMovement(formData: FormData) {
-  const profile = await requireAdminProfile();
-  const supabase = await createClient();
   const kind = String(formData.get('kind') ?? 'diaria');
+  const profile = await requireCajaAccess(kind);
+  const supabase = await createClient();
 
   const { data: shift } = await supabase
     .from('caja_shifts')
@@ -123,17 +132,24 @@ export async function addMovement(formData: FormData) {
 // o 'Cuenta corriente') — ese registro tiene que quedar en sync con
 // dispensa_payments/dispensas. Solo se editan movimientos manuales.
 export async function editMovement(formData: FormData) {
-  const profile = await requireAdminProfile();
   const supabase = await createClient();
 
   const id = String(formData.get('id'));
-  const { data: current } = await supabase.from('ledger').select('category').eq('id', id).maybeSingle();
+  const { data: current } = await supabase
+    .from('ledger')
+    .select('category, shift:caja_shifts(kind)')
+    .eq('id', id)
+    .maybeSingle();
   if (!current) return { error: 'Movimiento no encontrado' };
+
+  const shift = Array.isArray(current.shift) ? current.shift[0] : current.shift;
+  const profile = await requireCajaAccess(shift?.kind ?? 'diaria');
+
   if (current.category === 'Dispensa' || current.category === 'Cuenta corriente') {
     return { error: 'Este movimiento viene de una dispensa — se edita/anula desde ahí, no desde Caja' };
   }
-  if (current.category === 'Cierre de caja') {
-    return { error: 'Este movimiento es un depósito automático de un cierre de caja diaria, no se edita' };
+  if (current.category === 'Cierre de caja' || current.category === 'Envío a caja diaria') {
+    return { error: 'Este movimiento es automático, no se edita' };
   }
 
   const amount = Number(formData.get('amount') ?? 0);
@@ -161,12 +177,13 @@ export async function editMovement(formData: FormData) {
 
 // Cierra la caja diaria via RPC (arqueo + reapertura automatica con lo
 // contado + volcado a caja general si hay una abierta) — ver
-// close_caja_diaria en supabase/migrations.
+// close_caja_diaria en supabase/migrations. Devuelve el id del turno
+// recien cerrado para poder ofrecer imprimir el arqueo.
 export async function closeCajaDiaria(formData: FormData) {
-  await requireAdminProfile();
+  await requireCajaAccess('diaria');
   const supabase = await createClient();
 
-  const { error } = await supabase.rpc('close_caja_diaria', {
+  const { data: shiftId, error } = await supabase.rpc('close_caja_diaria', {
     p_counted_cash: Number(formData.get('counted_cash') ?? 0),
     p_counted_usd: Number(formData.get('counted_usd') ?? 0),
     p_leave_cash: Number(formData.get('leave_cash') ?? 0),
@@ -175,7 +192,7 @@ export async function closeCajaDiaria(formData: FormData) {
   if (error) return { error: error.message };
 
   revalidatePath('/panel/caja');
-  return {};
+  return { shiftId: shiftId as string };
 }
 
 // Envío manual de caja general -> caja diaria (ver transfer_general_to_diaria).
@@ -193,16 +210,41 @@ export async function transferGeneralToDiaria(formData: FormData) {
   return {};
 }
 
-// Igual que la diaria: al cerrar se reabre sola con lo contado como
-// apertura del turno siguiente (ver close_caja_general en las migraciones).
+// Mismo formato que la diaria (ver close_caja_general). Devuelve el id
+// del turno recien cerrado para poder ofrecer imprimir el arqueo.
 export async function closeCajaGeneral(formData: FormData) {
   await requireAdminProfile();
   const supabase = await createClient();
 
-  const counted = Number(formData.get('counted_cash') ?? 0);
-  const { error } = await supabase.rpc('close_caja_general', { p_counted_cash: counted });
+  const { data: shiftId, error } = await supabase.rpc('close_caja_general', {
+    p_counted_cash: Number(formData.get('counted_cash') ?? 0),
+    p_counted_usd: Number(formData.get('counted_usd') ?? 0),
+    p_leave_cash: Number(formData.get('leave_cash') ?? 0),
+    p_leave_usd: Number(formData.get('leave_usd') ?? 0),
+  });
   if (error) return { error: error.message };
 
   revalidatePath('/panel/caja');
-  return {};
+  return { shiftId: shiftId as string };
+}
+
+// Datos de un turno cerrado para el flujo "¿desea imprimir el arqueo?"
+// del lado del cliente (ShiftSummaryView los recibe como props, sin
+// volver a pasar por un Server Component).
+export async function getClosedShiftSummary(shiftId: string) {
+  const profile = await getSessionProfile();
+  if (!profile) return { error: 'No autenticado' };
+
+  const supabase = await createClient();
+  const [{ data: shift }, { data: movements }] = await Promise.all([
+    supabase.from('caja_shifts').select('*, opened_by_profile:profiles(name)').eq('id', shiftId).maybeSingle(),
+    supabase
+      .from('ledger')
+      .select('id, type, category, concept, amount, amount_local, account_id, receipt_number, created_at, account:payment_accounts(name)')
+      .eq('shift_id', shiftId)
+      .order('created_at'),
+  ]);
+  if (!shift) return { error: 'Turno no encontrado' };
+
+  return { shift, movements: movements ?? [] };
 }

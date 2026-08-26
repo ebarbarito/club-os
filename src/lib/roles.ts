@@ -38,9 +38,9 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
   },
   dispensador: {
     name: 'Dispensador/a',
-    desc: 'Dispensa, socios, stock y salas (sin caja ni balance)',
+    desc: 'Dispensa, cta cte, catálogo, stock dispensa y caja diaria',
     home: 'dispensas',
-    nav: ['resumen', 'dispensas', 'ctacorriente', 'socios', 'stock', 'salas'],
+    nav: ['dispensas', 'ctacorriente', 'catalogo', 'stock', 'caja'],
   },
   cultivo: {
     name: 'Cultivo',

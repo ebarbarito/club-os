@@ -48,10 +48,12 @@ export default async function CajaPage({
 }) {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
-  if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
+  if (profile.role !== 'admin' && profile.role !== 'dispensador') redirect(`/panel/${ROLES[profile.role].home}`);
+  const isAdmin = profile.role === 'admin';
 
   const { tab } = await searchParams;
-  const activeTab = tab === 'general' ? 'general' : 'diaria';
+  // Un dispensador solo tiene Caja diaria, sin importar lo que diga la URL.
+  const activeTab = isAdmin && tab === 'general' ? 'general' : 'diaria';
 
   const supabase = await createClient();
   const { data: accountRows } = await supabase.from('payment_accounts').select('*').eq('active', true).order('name');
@@ -64,7 +66,9 @@ export default async function CajaPage({
 
   const [{ data: diariaShift }, { data: generalShift }] = await Promise.all([
     supabase.from('caja_shifts').select('*').eq('kind', 'diaria').is('closed_at', null).maybeSingle(),
-    supabase.from('caja_shifts').select('*').eq('kind', 'general').is('closed_at', null).maybeSingle(),
+    isAdmin
+      ? supabase.from('caja_shifts').select('*').eq('kind', 'general').is('closed_at', null).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const ledgerSelect =
@@ -96,19 +100,21 @@ export default async function CajaPage({
       <h1 className="font-display text-2xl font-bold text-text">Caja</h1>
       <p className="text-text-soft mb-4">Turnos, movimientos y arqueo</p>
 
-      <div className="flex gap-1 mb-4 border-b border-line">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={t.key === 'diaria' ? '/panel/caja' : '/panel/caja?tab=general'}
-            className={`px-3 py-2 text-sm border-b-2 -mb-px ${
-              activeTab === t.key ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      {isAdmin && (
+        <div className="flex gap-1 mb-4 border-b border-line">
+          {TABS.map((t) => (
+            <Link
+              key={t.key}
+              href={t.key === 'diaria' ? '/panel/caja' : '/panel/caja?tab=general'}
+              className={`px-3 py-2 text-sm border-b-2 -mb-px ${
+                activeTab === t.key ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {activeTab === 'diaria' ? (
         <DiariaTab
@@ -302,15 +308,20 @@ function GeneralTab({
     created_at: string;
     sourceShiftId: string | null;
     byAccount: Map<string, number>;
+    byAccountRaw: Map<string, number>;
     rows: LedgerRow[];
   };
   const grouped = new Map<string, GroupedRow>();
   for (const m of movements) {
     const key = m.source_shift_id ?? (m.receipt_number != null ? `r${m.receipt_number}` : m.id);
     const signed = m.type === 'ingreso' ? m.amount_local : -m.amount_local;
+    // Cantidad "cruda" en la moneda propia de la cuenta — para dolares es
+    // la cantidad de dolares, no el valor convertido a pesos (amount_local).
+    const signedRaw = m.type === 'ingreso' ? m.amount : -m.amount;
     const existing = grouped.get(key);
     if (existing) {
       existing.byAccount.set(m.account_id, (existing.byAccount.get(m.account_id) ?? 0) + signed);
+      existing.byAccountRaw.set(m.account_id, (existing.byAccountRaw.get(m.account_id) ?? 0) + signedRaw);
       existing.rows.push(m);
     } else {
       grouped.set(key, {
@@ -319,6 +330,7 @@ function GeneralTab({
         created_at: m.created_at,
         sourceShiftId: m.source_shift_id,
         byAccount: new Map([[m.account_id, signed]]),
+        byAccountRaw: new Map([[m.account_id, signedRaw]]),
         rows: [m],
       });
     }
@@ -371,7 +383,7 @@ function GeneralTab({
                 className="ml-auto rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5"
                 title="Arqueo de cierre — caja general"
               >
-                <CloseShiftForm expected={expectedCash} kind="general" />
+                <CloseShiftForm expected={expectedCash} expectedUsd={generalUsd} kind="general" />
               </ModalTrigger>
             </>
           ) : (
@@ -401,7 +413,7 @@ function GeneralTab({
           <tbody>
             {rows.map((r) => {
               const cashVal = cashAccount ? r.byAccount.get(cashAccount.id) : undefined;
-              const usdVal = usdAccount ? r.byAccount.get(usdAccount.id) : undefined;
+              const usdVal = usdAccount ? r.byAccountRaw.get(usdAccount.id) : undefined;
               return (
                 <tr key={r.key} className="border-t border-line">
                   <td className="px-4 py-2.5 text-text-soft">{fmtDate(r.created_at)}</td>
