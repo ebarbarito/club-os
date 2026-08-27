@@ -14,8 +14,14 @@ export type PaymentLine = { accountId: string; amount: string; exchangeRate: str
 
 const inputCls = 'rounded-lg border border-line-2 px-2 py-1.5 text-sm outline-none focus:border-accent';
 
+// Efectivo como default: es el medio de pago mas frecuente, evita que el
+// dispensador tenga que cambiarlo en cada operacion.
+export function defaultAccount(accounts: PaymentAccount[]): PaymentAccount | undefined {
+  return accounts.find((a) => a.is_cash) ?? accounts[0];
+}
+
 export function newPaymentLine(accounts: PaymentAccount[]): PaymentLine {
-  const account = accounts[0];
+  const account = defaultAccount(accounts);
   return { accountId: account?.id ?? '', amount: '', exchangeRate: String(account?.exchange_rate ?? 1) };
 }
 

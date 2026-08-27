@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
-import { PaymentSplitEditor, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
+import { PaymentSplitEditor, defaultAccount, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
 import { payDispensa } from './actions';
 
 export function PayDispensaForm({
@@ -20,9 +20,10 @@ export function PayDispensaForm({
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [lines, setLines] = useState<PaymentLine[]>(() => [
-    { accountId: accounts[0]?.id ?? '', amount: String(adeudado), exchangeRate: String(accounts[0]?.exchange_rate ?? 1) },
-  ]);
+  const [lines, setLines] = useState<PaymentLine[]>(() => {
+    const account = defaultAccount(accounts);
+    return [{ accountId: account?.id ?? '', amount: String(adeudado), exchangeRate: String(account?.exchange_rate ?? 1) }];
+  });
 
   function submit() {
     const validLines = lines.filter((l) => Number(l.amount) > 0);

@@ -4,6 +4,7 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { money, fmtDate } from '@/lib/format';
 import { MemberPicker } from './member-picker';
+import { DebtorPicker, type Debtor } from './debtor-picker';
 import { PayDispensaForm } from './pay-dispensa-form';
 import { DispensaDetail } from './dispensa-detail';
 
@@ -18,8 +19,26 @@ export default async function CtaCorrientePage({
   const { member: memberId } = await searchParams;
   const supabase = await createClient();
 
-  const { data: members } = await supabase.from('members').select('id, name, dni, member_number').order('member_number');
-  const { data: accounts } = await supabase.from('payment_accounts').select('*').eq('active', true).order('name');
+  const [{ data: members }, { data: accounts }, { data: allDispensas }] = await Promise.all([
+    supabase.from('members').select('id, name, dni, member_number').order('member_number'),
+    supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
+    supabase
+      .from('dispensas')
+      .select('member_id, amount, payments:dispensa_payments(amount_local), member:members(name, member_number)')
+      .is('voided_at', null),
+  ]);
+
+  const debtorMap = new Map<string, Debtor>();
+  for (const d of allDispensas ?? []) {
+    const member = Array.isArray(d.member) ? d.member[0] : d.member;
+    const paid = (d.payments ?? []).reduce((s, p) => s + p.amount_local, 0);
+    const adeudado = d.amount - paid;
+    if (adeudado <= 0.01) continue;
+    const existing = debtorMap.get(d.member_id);
+    if (existing) existing.adeudado += adeudado;
+    else debtorMap.set(d.member_id, { id: d.member_id, name: member?.name ?? '—', memberNumber: member?.member_number ?? null, adeudado });
+  }
+  const debtors = [...debtorMap.values()].sort((a, b) => (a.memberNumber ?? 0) - (b.memberNumber ?? 0));
 
   let comprobantes: {
     id: string;
@@ -63,7 +82,10 @@ export default async function CtaCorrientePage({
       <h1 className="font-display text-2xl font-bold text-text">Cuenta Corriente</h1>
       <p className="text-text-soft mb-4">Comprobantes adeudados por socio</p>
 
-      <MemberPicker members={members ?? []} value={memberId ?? ''} />
+      <div className="flex flex-wrap gap-2 items-start">
+        <MemberPicker members={members ?? []} value={memberId ?? ''} />
+        <DebtorPicker debtors={debtors} value={memberId ?? ''} />
+      </div>
 
       {memberId && (
         <div className="mt-4 rounded-xl border border-line bg-surface overflow-x-auto">

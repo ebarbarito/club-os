@@ -13,6 +13,7 @@ para poder rastrear qué se pidió cuándo.
 | Modificaciones (19/8/26) | ✅ Implementado (Fase 1: Dispensa/Cta Cte + bug fix · Fase 2: Stock + Caja diaria/general) |
 | Modificaciones (25/08/2026) | ✅ Implementado (Fase A: recibo único · Fase B: dólares + "dejar para la siguiente" en el cierre · Fase C: envío general→diaria) |
 | Modificaciones (26/08) | ✅ Implementado (sesión que se cortaba sola, bug de dólares en Caja general, arqueo unificado + confirmación de impresión, roles por usuario) |
+| Modificaciones (27/08/26) | ✅ Implementado (saldos por cuenta en Caja general, segundo combo de deudores en Cta Cte, modal no se cierra solo, medio de pago default Efectivo) |
 
 ---
 
@@ -99,3 +100,19 @@ para poder rastrear qué se pidió cuándo.
 
 **Roles:**
 - Limitar accesos según el usuario. Administradores: acceso total. Dispensador: Dispensa, Cta Cte, Catálogo, Stock (solo stock dispensa), Caja (solo caja diaria).
+
+---
+
+## Modificaciones 27/08/26
+
+**Caja / Caja general:**
+- Debe mostrar los saldos acumulados por separado de todos los medios de pago — no estaba mostrando el saldo en MP, Bco, etc. (solo en Caja general, no en Caja diaria).
+
+**Cuenta corriente:**
+- Hoy solo tiene el combo para buscar por código o DNI. Debe tener un segundo combo para desplazarse que traiga todos los deudores que existan.
+
+**Arqueo de caja (y modales en general):**
+- Bug: se cierra solo. Ninguna ventana debe cerrarse con un click afuera — solo con la cruz.
+
+**Formas de pago:**
+- En todas las solapas que apliquen formas de pago, que la opción por defecto sea Efectivo.

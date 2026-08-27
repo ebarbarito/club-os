@@ -130,6 +130,7 @@ export default async function CajaPage({
         <GeneralTab
           shift={generalShift}
           movements={generalMovements}
+          diariaMovements={diariaMovements}
           accounts={accounts}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
@@ -278,6 +279,7 @@ function DiariaTab({
 function GeneralTab({
   shift,
   movements,
+  diariaMovements,
   accounts,
   cashAccount,
   usdAccount,
@@ -289,6 +291,7 @@ function GeneralTab({
 }: {
   shift: { id: string; opening_cash: number } | null;
   movements: LedgerRow[];
+  diariaMovements: LedgerRow[];
   accounts: Account[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
@@ -361,6 +364,23 @@ function GeneralTab({
             <p className="text-text-mute text-xs">diaria / general · total US$ {(diariaUsd + generalUsd).toLocaleString('es-AR')}</p>
           </div>
         </div>
+        {otherAccounts.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+            {otherAccounts.map((a) => {
+              const d = netAmount(diariaMovements, a.id, 'amount_local');
+              const g = netAmount(movements, a.id, 'amount_local');
+              return (
+                <div key={a.id}>
+                  <p className="text-text-mute">{a.name}</p>
+                  <p className="font-display font-bold text-text">
+                    {money(d)} <span className="text-text-mute font-normal text-sm">/ {money(g)}</span>
+                  </p>
+                  <p className="text-text-mute text-xs">diaria / general · total {money(d + g)}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           {shift ? (
             <>

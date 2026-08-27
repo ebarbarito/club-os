@@ -34,15 +34,11 @@ export function Modal({
   children: React.ReactNode;
 }) {
   if (!open) return null;
+  // Cierra únicamente con la cruz — un click afuera ya no cierra el modal
+  // (se perdía trabajo cargado por error al tocar fuera de la ventana).
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className={`bg-surface rounded-xl ${SIZE_CLS[size]} w-full my-auto max-h-[90vh] flex flex-col`}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className={`bg-surface rounded-xl ${SIZE_CLS[size]} w-full my-auto max-h-[90vh] flex flex-col`}>
         <div className="flex items-start justify-between px-6 pt-6 pb-4 shrink-0">
           <h2 className="font-display text-lg font-bold text-text">{title}</h2>
           <button type="button" onClick={onClose} className="text-text-mute hover:text-text" aria-label="Cerrar">
