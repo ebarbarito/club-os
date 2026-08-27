@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { TITLES, type ViewId } from '@/lib/roles';
 import type { SessionProfile } from '@/lib/auth/get-session-profile';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 function SidebarContent({
   tenantName,
@@ -53,10 +54,11 @@ function SidebarContent({
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/10 p-4 space-y-2">
         <div className="text-sm font-medium">{profile.name}</div>
-        <div className="text-xs text-white/60 mb-3 capitalize">{profile.role}</div>
-        <button onClick={onLogout} className="text-xs text-white/70 hover:text-white underline">
+        <div className="text-xs text-white/60 mb-1 capitalize">{profile.role}</div>
+        <ThemeToggle />
+        <button onClick={onLogout} className="block text-xs text-white/70 hover:text-white underline">
           Cambiar perfil / salir
         </button>
       </div>

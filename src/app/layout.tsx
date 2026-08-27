@@ -36,7 +36,17 @@ export default async function RootLayout({
       lang="es"
       className={`${archivo.variable} ${hanken.variable} h-full antialiased`}
     >
-      <head>{tenant && <TenantThemeStyle theme={tenant.theme} />}</head>
+      <head>
+        {/* Aplica el tema guardado antes del primer render — evita el flash
+            de fondo claro cuando el usuario eligió modo oscuro. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('club-os-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}",
+          }}
+        />
+        {tenant && <TenantThemeStyle theme={tenant.theme} />}
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

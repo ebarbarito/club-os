@@ -32,11 +32,30 @@ export async function registerDispensa(formData: FormData) {
     p_items: JSON.parse(String(formData.get('items') ?? '[]')),
     p_suggested_amount: Number(formData.get('suggested_amount')),
     p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
+    p_note: String(formData.get('note') ?? '').trim() || null,
   });
   if (error) return { error: error.message };
   revalidatePath('/panel/dispensas');
   revalidatePath('/panel/stock');
   revalidatePath('/panel/caja');
+  return {};
+}
+
+export async function updateDispensa(formData: FormData) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('update_dispensa', {
+    p_dispensa_id: String(formData.get('dispensa_id')),
+    p_member_id: String(formData.get('member_id')),
+    p_items: JSON.parse(String(formData.get('items') ?? '[]')),
+    p_note: String(formData.get('note') ?? '').trim() || null,
+    p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/panel/dispensas');
+  revalidatePath('/panel/stock');
+  revalidatePath('/panel/caja');
+  revalidatePath('/panel/ctacorriente');
+  revalidatePath('/panel/asientos');
   return {};
 }
 
@@ -48,5 +67,6 @@ export async function voidDispensa(dispensaId: string, reason: string) {
   revalidatePath('/panel/stock');
   revalidatePath('/panel/caja');
   revalidatePath('/panel/ctacorriente');
+  revalidatePath('/panel/asientos');
   return {};
 }

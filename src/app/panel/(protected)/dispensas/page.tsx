@@ -3,12 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { ORDER_STATUS, nextOrderStatus } from '@/lib/status-meta';
-import { money, fmtDateTime } from '@/lib/format';
 import { RegisterDispensaForm } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
 import { ConfirmDeliveryForm } from './confirm-delivery-form';
-import { VoidDispensaForm } from './void-dispensa-form';
-import { DispensaDetail } from '../ctacorriente/dispensa-detail';
+import { DispensaRow } from './dispensa-row';
 
 export default async function DispensaPage({
   searchParams,
@@ -29,7 +27,7 @@ export default async function DispensaPage({
       supabase
         .from('dispensas')
         .select(
-          '*, member:members(name, dni), by:profiles!dispensas_registered_by_fkey(name), items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total, strain:strains(name, item_type)), payments:dispensa_payments(receipt_number, created_at, amount_local, account:payment_accounts(name))',
+          '*, member:members(name, dni), by:profiles!dispensas_registered_by_fkey(name), items:dispensa_items(strain_id, description, quantity, unit_price, bonif1_pct, bonif2_pct, total, strain:strains(name, item_type)), payments:dispensa_payments(account_id, receipt_number, created_at, amount, exchange_rate, amount_local, account:payment_accounts(name))',
         )
         .order('created_at', { ascending: false })
         .limit(50),
@@ -169,7 +167,8 @@ export default async function DispensaPage({
               {(dispensas ?? []).map((d) => {
                 const member = Array.isArray(d.member) ? d.member[0] : d.member;
                 const by = Array.isArray(d.by) ? d.by[0] : d.by;
-                const items = (d.items ?? []) as {
+                const rowItems = ((d.items ?? []) as {
+                  strain_id: string | null;
                   description: string;
                   quantity: number;
                   unit_price: number;
@@ -177,75 +176,58 @@ export default async function DispensaPage({
                   bonif2_pct: number;
                   total: number;
                   strain: { name: string; item_type: string } | { name: string; item_type: string }[] | null;
-                }[];
-                const payments = (d.payments ?? []) as {
+                }[]).map((it) => {
+                  const strain = Array.isArray(it.strain) ? it.strain[0] : it.strain;
+                  return {
+                    strainId: it.strain_id ?? undefined,
+                    description: it.description,
+                    quantity: it.quantity,
+                    unit_price: it.unit_price,
+                    bonif1_pct: it.bonif1_pct,
+                    bonif2_pct: it.bonif2_pct,
+                    total: it.total,
+                    itemType: strain?.item_type,
+                  };
+                });
+                const rowPayments = ((d.payments ?? []) as {
+                  account_id: string | null;
                   receipt_number: number;
                   created_at: string;
+                  amount: number;
+                  exchange_rate: number;
                   amount_local: number;
                   account: { name: string } | { name: string }[] | null;
-                }[];
-                const paid = payments.reduce((s, p) => s + p.amount_local, 0);
-                const diff = d.suggested_amount != null ? d.amount - d.suggested_amount : null;
-                const voided = !!d.voided_at;
+                }[]).map((p) => {
+                  const account = Array.isArray(p.account) ? p.account[0] : p.account;
+                  return {
+                    accountId: p.account_id ?? undefined,
+                    receipt_number: p.receipt_number,
+                    created_at: p.created_at,
+                    amount: p.amount,
+                    exchangeRate: p.exchange_rate,
+                    amount_local: p.amount_local,
+                    account_name: account?.name ?? '—',
+                  };
+                });
                 return (
-                  <tr key={d.id} className={`border-t border-line ${voided ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-2.5 text-text-soft">
-                      <ModalTrigger label={`N° ${d.number}`} className="text-accent font-medium hover:underline" title="Detalle del comprobante">
-                        <DispensaDetail
-                          number={d.number}
-                          memberName={member?.name ?? '—'}
-                          createdAt={d.created_at}
-                          items={items}
-                          payments={payments.map((p) => {
-                            const account = Array.isArray(p.account) ? p.account[0] : p.account;
-                            return { receipt_number: p.receipt_number, created_at: p.created_at, amount_local: p.amount_local, account_name: account?.name ?? '—' };
-                          })}
-                          amount={d.amount}
-                        />
-                      </ModalTrigger>
-                    </td>
-                    <td className="px-4 py-2.5 font-medium text-text">{member?.name ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-text-soft">
-                      {items.map((it, i) => {
-                        const strain = Array.isArray(it.strain) ? it.strain[0] : it.strain;
-                        return (
-                          <div key={i}>
-                            {it.description} · {it.quantity} {strain?.item_type === 'genetica' ? 'g' : 'u.'}
-                          </div>
-                        );
-                      })}
-                    </td>
-                    <td className="px-4 py-2.5 text-text-soft">{d.suggested_amount != null ? money(d.suggested_amount) : '—'}</td>
-                    <td className="px-4 py-2.5 text-text font-medium">{money(paid)}</td>
-                    <td className={`px-4 py-2.5 ${diff == null || diff === 0 ? 'text-text-mute' : diff > 0 ? 'text-accent' : 'text-red'}`}>
-                      {diff == null ? '—' : diff === 0 ? 'Exacto' : `${diff > 0 ? '+' : ''}${money(diff)}`}
-                    </td>
-                    <td className="px-4 py-2.5 text-text-soft">
-                      {payments.map((p, i) => {
-                        const account = Array.isArray(p.account) ? p.account[0] : p.account;
-                        return (
-                          <div key={i}>
-                            {account?.name ?? '—'} · {money(p.amount_local)}
-                          </div>
-                        );
-                      })}
-                    </td>
-                    <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(d.created_at)}</td>
-                    <td className="px-4 py-2.5 text-text-soft">{by?.name ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      {voided ? (
-                        <Badge label="Anulada" color="red" />
-                      ) : (
-                        <ModalTrigger
-                          label="Anular"
-                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-red hover:text-red"
-                          title="Anular dispensa"
-                        >
-                          <VoidDispensaForm dispensaId={d.id} />
-                        </ModalTrigger>
-                      )}
-                    </td>
-                  </tr>
+                  <DispensaRow
+                    key={d.id}
+                    id={d.id}
+                    number={d.number}
+                    createdAt={d.created_at}
+                    amount={d.amount}
+                    suggestedAmount={d.suggested_amount}
+                    note={d.note}
+                    voided={!!d.voided_at}
+                    memberId={d.member_id}
+                    memberName={member?.name ?? '—'}
+                    byName={by?.name ?? '—'}
+                    items={rowItems}
+                    payments={rowPayments}
+                    members={validMembers ?? []}
+                    catalogItems={items}
+                    accounts={accounts}
+                  />
                 );
               })}
               {(dispensas ?? []).length === 0 && (

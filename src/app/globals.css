@@ -29,6 +29,30 @@
   --color-gold: #c9a14a;
 }
 
+/* Modo oscuro: solo se pisan los tokens neutros (fondo/superficie/texto/
+   líneas) y los fondos pálidos de badges — accent/gold/green-900 quedan
+   con el color del tenant (los pisa TenantThemeStyle en :root, y este
+   selector con atributo es más específico así que igual gana si hiciera
+   falta pisarlos, pero acá no los tocamos para no romper la marca). */
+:root[data-theme="dark"] {
+  --color-bg: #15181a;
+  --color-surface: #1e2225;
+  --color-surface-2: #262b2f;
+  --color-surface-3: #2f353a;
+  --color-text: #eef1f0;
+  --color-text-soft: #a9b2ae;
+  --color-text-mute: #78827e;
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-2: rgba(255, 255, 255, 0.16);
+  --color-amber-bg: #3a3220;
+  --color-amber-tx: #e0c069;
+  --color-red-bg: #3a2420;
+  --color-blue-bg: #1e2f38;
+  --color-blue: #7fb8cf;
+  --color-purple-bg: #2b2440;
+  --color-purple: #b39ce8;
+}
+
 /* Mapea los tokens a utilities de Tailwind v4 (bg-accent, text-green-900, etc). */
 @theme inline {
   --color-background: var(--color-bg);

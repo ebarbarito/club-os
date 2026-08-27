@@ -6,14 +6,14 @@ import { useModalClose } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
 import { MemberSearch, type SearchableMember } from '@/components/member-search';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
-import { registerDispensa } from './actions';
+import { registerDispensa, updateDispensa } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const ITEM_GRID_CLS = 'sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_5rem_5rem_7rem_1.5rem]';
 
-type CatalogItem = { id: string; code: string | null; name: string; item_type: 'genetica' | 'accesorio'; price_per_gram: number; grams: number };
-type ItemRow = { strainId: string; description: string; quantity: string; unitPrice: string; bonif1: string; bonif2: string };
+export type CatalogItem = { id: string; code: string | null; name: string; item_type: 'genetica' | 'accesorio'; price_per_gram: number; grams: number };
+export type ItemRow = { strainId: string; description: string; quantity: string; unitPrice: string; bonif1: string; bonif2: string };
 
 function lineTotal(row: ItemRow): number {
   const qty = Number(row.quantity) || 0;
@@ -27,21 +27,34 @@ export function RegisterDispensaForm({
   members,
   items,
   accounts,
+  mode = 'create',
+  dispensaId,
+  initialMemberId,
+  initialNote,
+  initialRows,
+  initialPayments,
 }: {
   members: SearchableMember[];
   items: CatalogItem[];
   accounts: PaymentAccount[];
+  mode?: 'create' | 'edit';
+  dispensaId?: string;
+  initialMemberId?: string;
+  initialNote?: string;
+  initialRows?: ItemRow[];
+  initialPayments?: PaymentLine[];
 }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [memberId, setMemberId] = useState('');
-  const [rows, setRows] = useState<ItemRow[]>([
-    { strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' },
-  ]);
-  const [payments, setPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
+  const [memberId, setMemberId] = useState(initialMemberId ?? '');
+  const [note, setNote] = useState(initialNote ?? '');
+  const [rows, setRows] = useState<ItemRow[]>(
+    initialRows ?? [{ strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' }],
+  );
+  const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
   const itemRefs = useRef<Array<HTMLSelectElement | null>>([]);
 
   const suggestedTotal = useMemo(() => {
@@ -89,8 +102,10 @@ export function RegisterDispensaForm({
     const validPayments = payments.filter((p) => Number(p.amount) > 0);
 
     const formData = new FormData();
+    if (mode === 'edit' && dispensaId) formData.set('dispensa_id', dispensaId);
     formData.set('member_id', memberId);
     formData.set('suggested_amount', String(suggestedTotal));
+    formData.set('note', note);
     formData.set(
       'items',
       JSON.stringify(
@@ -116,7 +131,7 @@ export function RegisterDispensaForm({
     );
 
     startTransition(async () => {
-      const res = await registerDispensa(formData);
+      const res = mode === 'edit' ? await updateDispensa(formData) : await registerDispensa(formData);
       if (res?.error) {
         setError(res.error);
         return;
@@ -278,6 +293,17 @@ export function RegisterDispensaForm({
         <PaymentSplitEditor accounts={accounts} lines={payments} onChange={setPayments} />
       </div>
 
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Observaciones sobre esta dispensa…"
+          className={inputCls}
+        />
+      </div>
+
       {error && <p className="text-red text-sm">{error}</p>}
 
       <button
@@ -286,7 +312,7 @@ export function RegisterDispensaForm({
         onClick={submit}
         className="w-full rounded-lg bg-accent text-white font-semibold text-sm py-2 disabled:opacity-60"
       >
-        {pending ? 'Registrando…' : 'Registrar dispensa'}
+        {pending ? (mode === 'edit' ? 'Guardando…' : 'Registrando…') : mode === 'edit' ? 'Guardar cambios' : 'Registrar dispensa'}
       </button>
     </div>
   );
