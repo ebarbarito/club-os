@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { money } from '@/lib/format';
 
-export type SearchableMember = { id: string; name: string; dni: string; member_number: number };
+export type SearchableMember = { id: string; name: string; dni: string; member_number: number; adeudado?: number };
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 
@@ -75,6 +76,7 @@ export function MemberSearch({
             #{selected.member_number} · {selected.name}
           </span>
           <span className="text-text-mute"> · DNI {selected.dni}</span>
+          {typeof selected.adeudado === 'number' && <span className="text-red font-medium"> · {money(selected.adeudado)}</span>}
         </div>
         <button
           type="button"
@@ -116,6 +118,7 @@ export function MemberSearch({
                 #{m.member_number} · {m.name}
               </span>
               <span className="text-text-mute"> · DNI {m.dni}</span>
+              {typeof m.adeudado === 'number' && <span className="text-red font-medium"> · {money(m.adeudado)}</span>}
             </button>
           ))}
           {filtered.length === 0 && <p className="px-3 py-2 text-sm text-text-mute">Sin resultados.</p>}

@@ -13,12 +13,13 @@ type Debtor = { id: string; name: string; dni: string; memberNumber: number | nu
 export default async function CtaCorrientePage({
   searchParams,
 }: {
-  searchParams: Promise<{ member?: string }>;
+  searchParams: Promise<{ member?: string; tab?: string }>;
 }) {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
 
-  const { member: memberId } = await searchParams;
+  const { member: memberId, tab } = await searchParams;
+  const activeTab = tab === 'resumen' ? 'resumen' : 'buscar';
   const supabase = await createClient();
 
   const [{ data: accounts }, { data: allDispensas }] = await Promise.all([
@@ -48,7 +49,13 @@ export default async function CtaCorrientePage({
   }
   // Combo de búsqueda y resumen: mismo universo, solo socios con deuda.
   const debtors = [...debtorMap.values()].sort((a, b) => b.adeudado - a.adeudado);
-  const searchableDebtors = debtors.map((d) => ({ id: d.id, name: d.name, dni: d.dni, member_number: d.memberNumber ?? 0 }));
+  const searchableDebtors = debtors.map((d) => ({
+    id: d.id,
+    name: d.name,
+    dni: d.dni,
+    member_number: d.memberNumber ?? 0,
+    adeudado: d.adeudado,
+  }));
   const totalGeneral = debtors.reduce((s, d) => s + d.adeudado, 0);
   const selectedMember = debtors.find((d) => d.id === memberId);
 
@@ -93,38 +100,55 @@ export default async function CtaCorrientePage({
       <h1 className="font-display text-2xl font-bold text-text">Cuenta Corriente</h1>
       <p className="text-text-soft mb-4">Comprobantes adeudados por socio</p>
 
-      <MemberPicker members={searchableDebtors} value={memberId ?? ''} />
-
-      <div className="mt-4 rounded-xl border border-line bg-surface overflow-hidden">
-        <div className="bg-surface-2 text-text-soft text-xs font-medium px-4 py-2.5 flex justify-between">
-          <span>Socio</span>
-          <span>Adeudado</span>
-        </div>
-        <div className="divide-y divide-line">
-          {debtors.map((d) => (
-            <Link
-              key={d.id}
-              href={`/panel/ctacorriente?member=${d.id}`}
-              className={`flex justify-between items-center px-4 py-2.5 text-sm hover:bg-surface-2 ${d.id === memberId ? 'bg-surface-2' : ''}`}
-            >
-              <span className="text-text font-medium">
-                {d.memberNumber != null ? `N° ${d.memberNumber} — ` : ''}
-                {d.name}
-              </span>
-              <span className="text-red font-semibold">{money(d.adeudado)}</span>
-            </Link>
-          ))}
-          {debtors.length === 0 && <p className="px-4 py-6 text-center text-text-mute text-sm">No hay deudores.</p>}
-        </div>
-        {debtors.length > 0 && (
-          <div className="px-4 py-3 border-t border-line flex justify-between font-semibold text-text bg-surface-2">
-            <span>Total adeudado</span>
-            <span>{money(totalGeneral)}</span>
-          </div>
-        )}
+      <div className="flex gap-1 mb-4 border-b border-line">
+        <Link
+          href="/panel/ctacorriente"
+          className={`px-3 py-2 text-sm border-b-2 -mb-px ${activeTab === 'buscar' ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'}`}
+        >
+          Buscar socio
+        </Link>
+        <Link
+          href="/panel/ctacorriente?tab=resumen"
+          className={`px-3 py-2 text-sm border-b-2 -mb-px ${activeTab === 'resumen' ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'}`}
+        >
+          Resumen de deudores
+        </Link>
       </div>
 
-      {memberId && (
+      {activeTab === 'resumen' ? (
+        <div className="rounded-xl border border-line bg-surface overflow-hidden">
+          <div className="bg-surface-2 text-text-soft text-xs font-medium px-4 py-2.5 flex justify-between">
+            <span>Socio</span>
+            <span>Adeudado</span>
+          </div>
+          <div className="divide-y divide-line">
+            {debtors.map((d) => (
+              <Link
+                key={d.id}
+                href={`/panel/ctacorriente?member=${d.id}`}
+                className="flex justify-between items-center px-4 py-2.5 text-sm hover:bg-surface-2"
+              >
+                <span className="text-text font-medium">
+                  {d.memberNumber != null ? `N° ${d.memberNumber} — ` : ''}
+                  {d.name}
+                </span>
+                <span className="text-red font-semibold">{money(d.adeudado)}</span>
+              </Link>
+            ))}
+            {debtors.length === 0 && <p className="px-4 py-6 text-center text-text-mute text-sm">No hay deudores.</p>}
+          </div>
+          {debtors.length > 0 && (
+            <div className="px-4 py-3 border-t border-line flex justify-between font-semibold text-text bg-surface-2">
+              <span>Total adeudado</span>
+              <span>{money(totalGeneral)}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <MemberPicker members={searchableDebtors} value={memberId ?? ''} />
+      )}
+
+      {activeTab === 'buscar' && memberId && (
         <div className="mt-4 rounded-xl border border-line bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">

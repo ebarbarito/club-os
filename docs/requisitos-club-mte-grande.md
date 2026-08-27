@@ -110,7 +110,7 @@ para poder rastrear qué se pidió cuándo.
 
 **Cuenta corriente:**
 - Hoy solo tiene el combo para buscar por código o DNI. Debe tener un segundo combo para desplazarse que traiga todos los deudores que existan.
-  - *Revisado el 27/08/26:* se descarta el segundo combo — en su lugar, el combo de búsqueda existente pasa a listar solo socios con deuda, y se agrega un resumen de deudores (socio + monto, con total general) donde un click lleva al detalle.
+  - *Revisado el 27/08/26:* se descarta el segundo combo — en su lugar, el combo de búsqueda existente pasa a listar solo socios con deuda, mostrando cuánto debe cada uno. El resumen de deudores (socio + monto, con total general) pasa a ser su propia solapa; un click en cualquiera lleva al detalle.
 
 **Arqueo de caja (y modales en general):**
 - Bug: se cierra solo. Ninguna ventana debe cerrarse con un click afuera — solo con la cruz.
