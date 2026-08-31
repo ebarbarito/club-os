@@ -5,6 +5,7 @@
    src/lib/tenant/theme.tsx), que setea estas mismas variables inline
    según tenants.theme (JSON en DB): primary, accent, dark, bg. */
 :root {
+  color-scheme: light;
   --color-green-900: #0a261b;
   --color-accent: #1c5c41;
   --color-accent-deep: #13392a;
@@ -35,6 +36,10 @@
    selector con atributo es más específico así que igual gana si hiciera
    falta pisarlos, pero acá no los tocamos para no romper la marca). */
 :root[data-theme="dark"] {
+  /* Sin esto, el navegador sigue dibujando el popup nativo del <select>
+     (y scrollbars) con chrome claro aunque el resto de la página esté en
+     modo oscuro — las opciones quedan claras sobre claro, ilegibles. */
+  color-scheme: dark;
   --color-bg: #15181a;
   --color-surface: #1e2225;
   --color-surface-2: #262b2f;

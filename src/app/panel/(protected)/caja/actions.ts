@@ -96,17 +96,9 @@ export async function addMovement(formData: FormData) {
     }
   }
 
-  // Un solo recibo por operación: todas las cuentas de este movimiento
-  // comparten el mismo receipt_number, aunque generen varias filas de ledger.
-  const { data: lastReceipt } = await supabase
-    .from('ledger')
-    .select('receipt_number')
-    .eq('tenant_id', profile.tenantId)
-    .order('receipt_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const receiptNumber = (lastReceipt?.receipt_number ?? 0) + 1;
-
+  // Cada cuenta de un movimiento de caja (ingreso/egreso manual) es su
+  // propio renglón independiente en Caja — a diferencia de un pago de
+  // dispensa/cta cte, acá no hay un recibo único que las agrupe.
   const { error } = await supabase.from('ledger').insert(
     payments.map((p) => ({
       tenant_id: profile.tenantId,
@@ -118,7 +110,6 @@ export async function addMovement(formData: FormData) {
       exchange_rate: p.exchange_rate,
       amount_local: p.amount * p.exchange_rate,
       account_id: p.account_id,
-      receipt_number: receiptNumber,
     })),
   );
   if (error) return { error: error.message };
