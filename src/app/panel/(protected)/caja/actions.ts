@@ -96,9 +96,14 @@ export async function addMovement(formData: FormData) {
     }
   }
 
-  // Cada cuenta de un movimiento de caja (ingreso/egreso manual) es su
-  // propio renglón independiente en Caja — a diferencia de un pago de
-  // dispensa/cta cte, acá no hay un recibo único que las agrupe.
+  // Un movimiento (este llamado a "Registrar movimiento") es un solo
+  // renglón en Caja aunque se divida en varias cuentas — comparten
+  // receipt_number. Otro movimiento, aunque sea idéntico, es un llamado
+  // distinto y saca su propio número (next_receipt_number() es atómico:
+  // dos registros al mismo tiempo no pueden terminar con el mismo).
+  const { data: receiptNumber, error: receiptError } = await supabase.rpc('next_receipt_number');
+  if (receiptError) return { error: receiptError.message };
+
   const { error } = await supabase.from('ledger').insert(
     payments.map((p) => ({
       tenant_id: profile.tenantId,
@@ -110,6 +115,7 @@ export async function addMovement(formData: FormData) {
       exchange_rate: p.exchange_rate,
       amount_local: p.amount * p.exchange_rate,
       account_id: p.account_id,
+      receipt_number: receiptNumber,
     })),
   );
   if (error) return { error: error.message };
