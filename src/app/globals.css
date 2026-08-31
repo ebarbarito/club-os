@@ -93,6 +93,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* `color-scheme: dark` no alcanza en todos los navegadores para el popup
+   desplegable del <select> (varía según motor/SO) — se fuerza el color
+   explícito en el elemento y sus <option>, que sí se respeta siempre. */
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] option {
+  background-color: var(--color-surface-2);
+  color: var(--color-text);
+}
+
 /* Imprimir un comprobante: oculta todo menos el contenido marcado con
    .print-area (el resto de la página, el fondo del modal, los botones). */
 @media print {
