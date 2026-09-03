@@ -1,7 +1,6 @@
 export type Role = 'admin' | 'dispensador' | 'cultivo';
 
 export type ViewId =
-  | 'resumen'
   | 'dispensas'
   | 'ctacorriente'
   | 'socios'
@@ -21,9 +20,8 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
   admin: {
     name: 'Administrador',
     desc: 'Acceso total: caja, balance, salas, socios y stock',
-    home: 'resumen',
+    home: 'dispensas',
     nav: [
-      'resumen',
       'dispensas',
       'ctacorriente',
       'socios',
@@ -55,7 +53,6 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
 };
 
 export const TITLES: Record<ViewId, [string, string]> = {
-  resumen: ['Resumen', 'Vista general del club'],
   dispensas: ['Dispensa', 'Pedidos y dispensas registradas'],
   ctacorriente: ['Cuenta Corriente', 'Comprobantes adeudados por socio'],
   socios: ['Socios', 'Altas, validaciones y padrón'],
