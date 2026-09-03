@@ -14,7 +14,8 @@ export type ViewId =
   | 'balance'
   | 'usuarios'
   | 'configuracion'
-  | 'asientos';
+  | 'asientos'
+  | 'empleados';
 
 export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav: ViewId[] }> = {
   admin: {
@@ -36,6 +37,7 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
       'usuarios',
       'configuracion',
       'asientos',
+      'empleados',
     ],
   },
   dispensador: {
@@ -67,6 +69,7 @@ export const TITLES: Record<ViewId, [string, string]> = {
   usuarios: ['Usuarios', 'Cuentas del equipo'],
   configuracion: ['Configuración', 'Ajustes generales del club'],
   asientos: ['Asientos', 'Modificaciones y eliminaciones — solo administrador'],
+  empleados: ['Empleados', 'Remuneración pactada, adelantos y saldo disponible'],
 };
 
 export function isViewId(value: string): value is ViewId {

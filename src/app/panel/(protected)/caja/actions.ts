@@ -74,12 +74,14 @@ export async function addMovement(formData: FormData) {
   const type = String(formData.get('type'));
   const category = String(formData.get('category') ?? 'Otro');
   const concept = String(formData.get('concept') ?? '');
+  const employeeId = formData.get('employee_id') ? String(formData.get('employee_id')) : null;
   const payments = JSON.parse(String(formData.get('payments') ?? '[]')) as {
     account_id: string;
     amount: number;
     exchange_rate: number;
   }[];
   if (payments.length === 0) return { error: 'Cargá al menos una cuenta' };
+  const totalLocal = payments.reduce((s, p) => s + p.amount * p.exchange_rate, 0);
 
   // Caja diaria nunca queda en efectivo negativo — se valida antes de
   // insertar nada.
@@ -93,6 +95,26 @@ export async function addMovement(formData: FormData) {
       if (cashEgreso > current + 0.01) {
         return { error: `El efectivo en caja (${current}) no alcanza para este egreso` };
       }
+    }
+  }
+
+  // Un adelanto de sueldo no puede superar la remuneración pactada menos
+  // lo que ya se retiró este mes calendario — el cupo se renueva solo el
+  // 1° de cada mes (no hay ningún reset explícito: simplemente se cuentan
+  // los adelantos desde el inicio del mes actual).
+  if (employeeId) {
+    const { data: employee } = await supabase.from('employees').select('salary').eq('id', employeeId).maybeSingle();
+    if (!employee) return { error: 'Empleado no encontrado' };
+    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+    const { data: advanceRows } = await supabase
+      .from('ledger')
+      .select('amount_local')
+      .eq('employee_id', employeeId)
+      .gte('created_at', startOfMonth);
+    const alreadyAdvanced = (advanceRows ?? []).reduce((s, r) => s + r.amount_local, 0);
+    const available = employee.salary - alreadyAdvanced;
+    if (totalLocal > available + 0.01) {
+      return { error: `Saldo disponible insuficiente (disponible: ${available})` };
     }
   }
 
@@ -116,6 +138,7 @@ export async function addMovement(formData: FormData) {
       amount_local: p.amount * p.exchange_rate,
       account_id: p.account_id,
       receipt_number: receiptNumber,
+      employee_id: employeeId,
     })),
   );
   if (error) return { error: error.message };
@@ -145,7 +168,7 @@ export async function editMovement(formData: FormData) {
   if (current.category === 'Dispensa' || current.category === 'Cuenta corriente') {
     return { error: 'Este movimiento viene de una dispensa — se edita/anula desde ahí, no desde Caja' };
   }
-  if (current.category === 'Cierre de caja' || current.category === 'Envío a caja diaria') {
+  if (current.category === 'Cierre de caja' || current.category === 'Envío a caja diaria' || current.category === 'Impuesto') {
     return { error: 'Este movimiento es automático, no se edita' };
   }
 

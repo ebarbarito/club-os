@@ -11,12 +11,22 @@ const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
 const CONCEPTS = ['Alquiler', 'Ferretería', 'Eventos', 'Almacén', 'Insumos', 'Servicios', 'Membresía', 'Operativo', 'Otro'];
 
-export function MovementForm({ accounts, kind }: { accounts: PaymentAccount[]; kind: 'diaria' | 'general' }) {
+export type EmployeeOption = { id: string; name: string };
+
+export function MovementForm({
+  accounts,
+  kind,
+  employees = [],
+}: {
+  accounts: PaymentAccount[];
+  kind: 'diaria' | 'general';
+  employees?: EmployeeOption[];
+}) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [concept, setConcept] = useState(CONCEPTS[0]);
+  const [concept, setConcept] = useState<string>(CONCEPTS[0]);
   const [customConcept, setCustomConcept] = useState('');
   const [payments, setPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
 
@@ -26,10 +36,13 @@ export function MovementForm({ accounts, kind }: { accounts: PaymentAccount[]; k
       setError('Cargá al menos una cuenta con monto');
       return;
     }
-    const finalConcept = concept === 'Otro' ? customConcept || 'Otro' : concept;
+    const employeeId = concept.startsWith('emp:') ? concept.slice(4) : null;
+    const employee = employeeId ? employees.find((e) => e.id === employeeId) : null;
+    const finalConcept = employee ? `Sueldo ${employee.name}` : concept === 'Otro' ? customConcept || 'Otro' : concept;
     formData.set('kind', kind);
     formData.set('category', finalConcept);
     formData.set('concept', finalConcept);
+    if (employeeId) formData.set('employee_id', employeeId);
     formData.set(
       'payments',
       JSON.stringify(
@@ -66,6 +79,15 @@ export function MovementForm({ accounts, kind }: { accounts: PaymentAccount[]; k
           {CONCEPTS.map((c) => (
             <option key={c}>{c}</option>
           ))}
+          {employees.length > 0 && (
+            <optgroup label="Sueldos">
+              {employees.map((e) => (
+                <option key={e.id} value={`emp:${e.id}`}>
+                  Sueldo {e.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         {concept === 'Otro' && (
           <input

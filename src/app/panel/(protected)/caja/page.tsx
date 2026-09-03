@@ -6,7 +6,7 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { money, fmtDateTime, fmtDate } from '@/lib/format';
 import { ROLES } from '@/lib/roles';
 import { OpenShiftForm } from './open-shift-form';
-import { MovementForm } from './movement-form';
+import { MovementForm, type EmployeeOption } from './movement-form';
 import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
 import { ShiftSummary } from './shift-summary';
@@ -56,8 +56,12 @@ export default async function CajaPage({
   const activeTab = isAdmin && tab === 'general' ? 'general' : 'diaria';
 
   const supabase = await createClient();
-  const { data: accountRows } = await supabase.from('payment_accounts').select('*').eq('active', true).order('name');
+  const [{ data: accountRows }, { data: employeeRows }] = await Promise.all([
+    supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
+    supabase.from('employees').select('id, name').eq('active', true).order('name'),
+  ]);
   const accounts = accountRows ?? [];
+  const employees = employeeRows ?? [];
   const cashAccount = accounts.find((a) => a.is_cash);
   // La moneda extranjera no sigue un código fijo (hay tenants con "u$s",
   // "USD", etc.) — lo que la distingue es no ser ARS ni la cuenta cash.
@@ -121,6 +125,7 @@ export default async function CajaPage({
           shift={diariaShift}
           movements={diariaMovements}
           accounts={accounts}
+          employees={employees}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
           expectedCash={diariaCash}
@@ -132,6 +137,7 @@ export default async function CajaPage({
           movements={generalMovements}
           diariaMovements={diariaMovements}
           accounts={accounts}
+          employees={employees}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
           otherAccounts={otherAccounts}
@@ -149,6 +155,7 @@ function DiariaTab({
   shift,
   movements,
   accounts,
+  employees,
   cashAccount,
   usdAccount,
   expectedCash,
@@ -157,12 +164,13 @@ function DiariaTab({
   shift: { id: string; opening_cash: number; opening_usd: number } | null;
   movements: LedgerRow[];
   accounts: Account[];
+  employees: EmployeeOption[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
   expectedCash: number;
   expectedUsd: number;
 }) {
-  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria']);
+  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
   const groups = groupByReceipt(movements);
 
   return (
@@ -193,7 +201,7 @@ function DiariaTab({
                 className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                 title="Registrar movimiento"
               >
-                <MovementForm accounts={accounts} kind="diaria" />
+                <MovementForm accounts={accounts} kind="diaria" employees={employees} />
               </ModalTrigger>
               <ModalTrigger
                 label="Cerrar caja (arqueo)"
@@ -281,6 +289,7 @@ function GeneralTab({
   movements,
   diariaMovements,
   accounts,
+  employees,
   cashAccount,
   usdAccount,
   otherAccounts,
@@ -293,6 +302,7 @@ function GeneralTab({
   movements: LedgerRow[];
   diariaMovements: LedgerRow[];
   accounts: Account[];
+  employees: EmployeeOption[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
   otherAccounts: Account[];
@@ -339,7 +349,7 @@ function GeneralTab({
     }
   }
   const rows = [...grouped.values()].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria']);
+  const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
 
   return (
     <div>
@@ -389,7 +399,7 @@ function GeneralTab({
                 className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                 title="Registrar movimiento"
               >
-                <MovementForm accounts={accounts} kind="general" />
+                <MovementForm accounts={accounts} kind="general" employees={employees} />
               </ModalTrigger>
               <ModalTrigger
                 label="Enviar a caja diaria"

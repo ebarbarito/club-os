@@ -17,13 +17,34 @@ type Account = {
   active: boolean;
 };
 
-export function AccountForm({ account }: { account?: Account }) {
+type Tax = { id: string; name: string; pct: number; applies_to: string };
+type TaxLine = { name: string; pct: string; appliesTo: 'ingreso' | 'egreso' | 'ambos' };
+
+export function AccountForm({ account, taxes }: { account?: Account; taxes?: Tax[] }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [taxLines, setTaxLines] = useState<TaxLine[]>(
+    () => (taxes ?? []).map((t) => ({ name: t.name, pct: String(t.pct), appliesTo: t.applies_to as TaxLine['appliesTo'] })),
+  );
+
+  function updateTaxLine(i: number, patch: Partial<TaxLine>) {
+    setTaxLines((prev) => prev.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
+  }
+  function addTaxLine() {
+    setTaxLines((prev) => [...prev, { name: '', pct: '', appliesTo: 'ambos' }]);
+  }
+  function removeTaxLine(i: number) {
+    setTaxLines((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   function submit(formData: FormData) {
+    const validTaxes = taxLines.filter((t) => t.name.trim() && Number(t.pct) > 0);
+    formData.set(
+      'taxes',
+      JSON.stringify(validTaxes.map((t) => ({ name: t.name.trim(), pct: Number(t.pct), applies_to: t.appliesTo }))),
+    );
     startTransition(async () => {
       const res = account ? await updateAccount(formData) : await createAccount(formData);
       if (res?.error) {
@@ -69,6 +90,51 @@ export function AccountForm({ account }: { account?: Account }) {
           <input type="checkbox" name="active" defaultChecked={account.active} />
           Activa
         </label>
+      )}
+
+      {account && (
+        <div>
+          <label className={labelCls}>Impuestos</label>
+          <p className="text-xs text-text-mute mb-2">
+            Se descuentan/suman solos en Caja en cada pago o cobro por esta cuenta — al socio siempre se le cobra el importe completo.
+          </p>
+          <div className="space-y-2">
+            {taxLines.map((t, i) => (
+              <div key={i} className="flex gap-2 items-center flex-wrap">
+                <input
+                  placeholder="Nombre (ej. IIBB)"
+                  value={t.name}
+                  onChange={(e) => updateTaxLine(i, { name: e.target.value })}
+                  className={`${inputCls} flex-1 min-w-[8rem]`}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="%"
+                  value={t.pct}
+                  onChange={(e) => updateTaxLine(i, { pct: e.target.value })}
+                  className={`${inputCls} w-20`}
+                />
+                <select
+                  value={t.appliesTo}
+                  onChange={(e) => updateTaxLine(i, { appliesTo: e.target.value as TaxLine['appliesTo'] })}
+                  className={`${inputCls} w-32`}
+                >
+                  <option value="ingreso">Ingreso</option>
+                  <option value="egreso">Egreso</option>
+                  <option value="ambos">Ambos</option>
+                </select>
+                <button type="button" onClick={() => removeTaxLine(i)} className="text-red text-xs font-semibold shrink-0">
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addTaxLine} className="text-accent text-xs font-semibold mt-2">
+            + Agregar impuesto
+          </button>
+        </div>
       )}
 
       {error && <p className="text-red text-sm">{error}</p>}

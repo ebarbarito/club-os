@@ -14,6 +14,8 @@ para poder rastrear qué se pidió cuándo.
 | Modificaciones (25/08/2026) | ✅ Implementado (Fase A: recibo único · Fase B: dólares + "dejar para la siguiente" en el cierre · Fase C: envío general→diaria) |
 | Modificaciones (26/08) | ✅ Implementado (sesión que se cortaba sola, bug de dólares en Caja general, arqueo unificado + confirmación de impresión, roles por usuario) |
 | Modificaciones (27/08/26) | ✅ Implementado (saldos por cuenta en Caja general, segundo combo de deudores en Cta Cte, modal no se cierra solo, medio de pago default Efectivo) |
+| 31-08-2026 (Caja general + renglones) | ✅ Implementado (arqueo de Caja general lleva todas las cuentas a la caja siguiente, no solo efectivo/dólares; recibo único por operación vía contador atómico — antes una condición de carrera podía agrupar por error dos movimientos distintos) |
+| Modificaciones (1/9/26) | 🟡 Parcial — Fase 1 (Impuestos por cuenta) y Fase 2 (Empleados) implementadas. Pendientes: Historiales, columna Costo en Catálogo, minimizar ventana de Dispensa |
 
 ---
 
@@ -117,3 +119,35 @@ para poder rastrear qué se pidió cuándo.
 
 **Formas de pago:**
 - En todas las solapas que apliquen formas de pago, que la opción por defecto sea Efectivo.
+
+---
+
+## 31-08-2026
+
+**Caja general:**
+- Al cerrar el arqueo, se tienen que mantener todos los saldos de las cuentas y efectivo para la siguiente caja (no solo efectivo/dólares).
+
+**Cajas:**
+- Cada movimiento en cualquiera de las cajas debe ser un renglón independiente.
+  - *Aclarado en la implementación:* un movimiento con pago dividido en varias cuentas es un solo renglón (recibo único por operación); otro movimiento, aunque sea idéntico, es un renglón aparte. La causa del bug era una condición de carrera al calcular el número de recibo — se resolvió con un contador atómico por club.
+
+---
+
+## Modificaciones 1/9/26
+
+**Empleados** (solo administrador): ✅ Implementado
+- Solapa nueva: nombre, apellido, DNI, remuneración pactada, adelantos del mes y saldo disponible.
+- Cada alta de empleado genera un concepto "Sueldo <Nombre>" disponible en "+ Movimiento" de Caja, con tope = remuneración pactada menos lo ya retirado ese mes calendario (se renueva solo el 1° de cada mes).
+
+**Historiales** (solo administrador): ⬜ Pendiente
+- Historial de dispensas y pagos/cobros, filtrable por tipo y fecha, imprimible en A4.
+
+**Impuestos por cuenta (MP GL y otras):** ✅ Implementado
+- Cargable por cuenta en Cuentas (nombre, %, aplica a ingreso/egreso/ambos) — no hardcodeado a MP GL.
+- Un pago o cobro real por una cuenta con impuestos configurados genera renglones de egreso aparte por cada impuesto, sin afectar lo que se le cobra al socio.
+
+**Solapa Dispensa:** ⬜ Pendiente
+- Botón de minimizar ventana para retomar una dispensa en curso sin perder lo cargado. *Definido con el usuario:* mismo comportamiento que el minimizar de Gmail al redactar un mail (barra fija abajo a la derecha, con expandir/cerrar).
+
+**Solapa Catálogo:** ⬜ Pendiente
+- Columna "Costo" a la izquierda de "Precio", editable desde "Editar".

@@ -12,7 +12,17 @@ export default async function CuentasPage() {
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
   const supabase = await createClient();
-  const { data: accounts } = await supabase.from('payment_accounts').select('*').order('name');
+  const [{ data: accounts }, { data: taxRows }] = await Promise.all([
+    supabase.from('payment_accounts').select('*').order('name'),
+    supabase.from('account_taxes').select('*').order('name'),
+  ]);
+
+  const taxesByAccount = new Map<string, { id: string; name: string; pct: number; applies_to: string }[]>();
+  for (const t of taxRows ?? []) {
+    const list = taxesByAccount.get(t.account_id) ?? [];
+    list.push(t);
+    taxesByAccount.set(t.account_id, list);
+  }
 
   return (
     <div>
@@ -54,7 +64,7 @@ export default async function CuentasPage() {
                     className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                     title={`Editar — ${a.name}`}
                   >
-                    <AccountForm account={a} />
+                    <AccountForm account={a} taxes={taxesByAccount.get(a.id) ?? []} />
                   </ModalTrigger>
                 </td>
               </tr>

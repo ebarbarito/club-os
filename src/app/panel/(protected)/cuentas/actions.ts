@@ -46,6 +46,21 @@ export async function updateAccount(formData: FormData) {
     .eq('id', id);
   if (error) return { error: error.message };
 
+  // Reemplaza todas las reglas de impuestos de esta cuenta por las
+  // enviadas — más simple que diffear altas/bajas/ediciones una por una.
+  const taxes = JSON.parse(String(formData.get('taxes') ?? '[]')) as {
+    name: string;
+    pct: number;
+    applies_to: string;
+  }[];
+  await supabase.from('account_taxes').delete().eq('account_id', id);
+  if (taxes.length > 0) {
+    const { error: taxError } = await supabase
+      .from('account_taxes')
+      .insert(taxes.map((t) => ({ tenant_id: profile.tenantId, account_id: id, name: t.name, pct: t.pct, applies_to: t.applies_to })));
+    if (taxError) return { error: taxError.message };
+  }
+
   revalidatePath('/panel/cuentas');
   return {};
 }
