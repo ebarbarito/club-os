@@ -43,7 +43,8 @@ export default async function DispensaPage({
         ? { id: strain.id, code: strain.code, name: strain.name, item_type: strain.item_type, price_per_gram: strain.price_per_gram, grams: s.grams }
         : null;
     })
-    .filter((s): s is NonNullable<typeof s> => s !== null);
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const accounts = accountRows ?? [];
 

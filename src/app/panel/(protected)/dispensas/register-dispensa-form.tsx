@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
 import { MemberSearch, type SearchableMember } from '@/components/member-search';
+import { ItemSearch, type ItemSearchHandle } from '@/components/item-search';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
 import { registerDispensa, updateDispensa } from './actions';
 
@@ -55,7 +56,7 @@ export function RegisterDispensaForm({
     initialRows ?? [{ strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' }],
   );
   const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
-  const itemRefs = useRef<Array<HTMLSelectElement | null>>([]);
+  const itemRefs = useRef<Array<ItemSearchHandle | null>>([]);
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -100,6 +101,10 @@ export function RegisterDispensaForm({
     }
     // Pago en $0 es válido: el importe entero pasa a cuenta corriente.
     const validPayments = payments.filter((p) => Number(p.amount) > 0);
+
+    if (saldo > 0.01 && !confirm(`Van a quedar ${money(saldo)} en cuenta corriente de este socio. ¿Confirmás?`)) {
+      return;
+    }
 
     const formData = new FormData();
     if (mode === 'edit' && dispensaId) formData.set('dispensa_id', dispensaId);
@@ -178,22 +183,14 @@ export function RegisterDispensaForm({
               <div key={i} className={`p-3 space-y-2 sm:space-y-0 sm:grid ${ITEM_GRID_CLS} sm:gap-2 sm:items-center`}>
                 <div>
                   <label className={`${labelCls} sm:hidden`}>Artículo</label>
-                  <select
+                  <ItemSearch
                     ref={(el) => {
                       itemRefs.current[i] = el;
                     }}
+                    items={items}
                     value={row.strainId}
-                    onChange={(e) => selectItem(i, e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">Elegir artículo…</option>
-                    {items.map((it) => (
-                      <option key={it.id} value={it.id}>
-                        {it.code ? `${it.code} · ` : ''}
-                        {it.name} · disp. {it.grams} {it.item_type === 'genetica' ? 'g' : 'u.'} · {money(it.price_per_gram)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(strainId) => selectItem(i, strainId)}
+                  />
                 </div>
                 <div>
                   <label className={`${labelCls} sm:hidden`}>Cantidad</label>

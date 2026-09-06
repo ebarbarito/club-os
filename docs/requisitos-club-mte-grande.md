@@ -16,7 +16,7 @@ para poder rastrear qué se pidió cuándo.
 | Modificaciones (27/08/26) | ✅ Implementado (saldos por cuenta en Caja general, segundo combo de deudores en Cta Cte, modal no se cierra solo, medio de pago default Efectivo) |
 | 31-08-2026 (Caja general + renglones) | ✅ Implementado (arqueo de Caja general lleva todas las cuentas a la caja siguiente, no solo efectivo/dólares; recibo único por operación vía contador atómico — antes una condición de carrera podía agrupar por error dos movimientos distintos) |
 | Modificaciones (1/9/26) | 🟡 Parcial — Fase 1 (Impuestos por cuenta) y Fase 2 (Empleados) implementadas. Pendientes: Historiales, columna Costo en Catálogo, minimizar ventana de Dispensa |
-| Modificaciones (03/09 y 04/09) | 🟡 Parcial — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos). Pendientes: fixes chicos de 03/09 (login, orden alfabético, buscador de artículos), servicio pactado/cuota social automática (a definir con mockup) |
+| Modificaciones (03/09 y 04/09) | 🟡 Parcial — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos) + fixes chicos de 03/09 (login, buscador de artículos, cartel de confirmación) implementados. Pendiente: servicio pactado/cuota social automática (a definir con mockup) |
 
 ---
 
@@ -158,12 +158,12 @@ para poder rastrear qué se pidió cuándo.
 ## Modificaciones 03/09
 
 - Que al ingresar vaya a la solapa Dispensa y se saque la solapa Resumen. ✅ Implementado (ronda anterior).
-- Que el celular no pida usuario/contraseña o los tenga precargados. ⬜ Pendiente.
-- Combo de artículos: ordenar alfabéticamente. ⬜ Pendiente.
-- En celular, que el combo de artículos permita buscar escribiendo y sugiera. ⬜ Pendiente.
-- Ojo para mostrar/ocultar la contraseña en el login. ⬜ Pendiente.
+- Que el celular no pida usuario/contraseña o los tenga precargados. ✅ Implementado (autocomplete en el login — habilita el gestor de contraseñas del navegador/celular).
+- Combo de artículos: ordenar alfabéticamente. ✅ Implementado.
+- En celular, que el combo de artículos permita buscar escribiendo y sugiera. ✅ Implementado — se reemplazó el `<select>` nativo por un buscador (mismo patrón que el buscador de socio), funciona igual en celular y escritorio.
+- Ojo para mostrar/ocultar la contraseña en el login. ✅ Implementado.
 - **Cta Cte — saldo a favor:** si un pago supera el importe de la dispensa, la diferencia pasa a favor del socio. ✅ Implementado.
-- **Dispensa:** antes de confirmar una dispensa que deja saldo en cta cte, mostrar un cartel con el monto para confirmar. ⬜ Pendiente.
+- **Dispensa:** antes de confirmar una dispensa que deja saldo en cta cte, mostrar un cartel con el monto para confirmar. ✅ Implementado.
 
 ## Modificaciones 04/09
 
