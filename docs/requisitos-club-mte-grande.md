@@ -16,6 +16,7 @@ para poder rastrear qué se pidió cuándo.
 | Modificaciones (27/08/26) | ✅ Implementado (saldos por cuenta en Caja general, segundo combo de deudores en Cta Cte, modal no se cierra solo, medio de pago default Efectivo) |
 | 31-08-2026 (Caja general + renglones) | ✅ Implementado (arqueo de Caja general lleva todas las cuentas a la caja siguiente, no solo efectivo/dólares; recibo único por operación vía contador atómico — antes una condición de carrera podía agrupar por error dos movimientos distintos) |
 | Modificaciones (1/9/26) | 🟡 Parcial — Fase 1 (Impuestos por cuenta) y Fase 2 (Empleados) implementadas. Pendientes: Historiales, columna Costo en Catálogo, minimizar ventana de Dispensa |
+| Modificaciones (03/09 y 04/09) | 🟡 Parcial — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos). Pendientes: fixes chicos de 03/09 (login, orden alfabético, buscador de artículos), servicio pactado/cuota social automática (a definir con mockup) |
 
 ---
 
@@ -151,3 +152,27 @@ para poder rastrear qué se pidió cuándo.
 
 **Solapa Catálogo:** ⬜ Pendiente
 - Columna "Costo" a la izquierda de "Precio", editable desde "Editar".
+
+---
+
+## Modificaciones 03/09
+
+- Que al ingresar vaya a la solapa Dispensa y se saque la solapa Resumen. ✅ Implementado (ronda anterior).
+- Que el celular no pida usuario/contraseña o los tenga precargados. ⬜ Pendiente.
+- Combo de artículos: ordenar alfabéticamente. ⬜ Pendiente.
+- En celular, que el combo de artículos permita buscar escribiendo y sugiera. ⬜ Pendiente.
+- Ojo para mostrar/ocultar la contraseña en el login. ⬜ Pendiente.
+- **Cta Cte — saldo a favor:** si un pago supera el importe de la dispensa, la diferencia pasa a favor del socio. ✅ Implementado.
+- **Dispensa:** antes de confirmar una dispensa que deja saldo en cta cte, mostrar un cartel con el monto para confirmar. ⬜ Pendiente.
+
+## Modificaciones 04/09
+
+**Cta Cte — cobro por lote:** ✅ Implementado
+- Se saca el botón "Cobrar" por fila; nueva columna "Cobro" para cargar cuánto se cobra de cada comprobante a la vez (pueden ser varios), con un solo botón "Forma de pago" al final para el total.
+- Si lo pagado supera lo cargado en "Cobro", la diferencia queda como saldo a favor (mismo mecanismo del 03/09).
+- *Alcance ampliado en la implementación:* se agregó también un historial de movimientos por socio (cargos, pagos y saldo a favor generado, en orden cronológico) — la idea original de "Composición de saldos → libro mayor auxiliar" que el spec original dejaba pendiente para una segunda etapa.
+
+**Alta de socio + cuota social automática:** ⬜ Pendiente — a definir con un mockup antes de implementar
+- Campo "Servicio pactado" + "Cuota social" ($) + checkbox "Emitir factura automática".
+- El 1° de cada mes, dispensa automática por la cuota pactada a cta cte (sin movimiento en caja/stock hasta que se completa la asignación de artículos).
+- Piso de cuota social = equivalente a 5g del artículo N°022 (Sublimator OG), actualizado cuando cambia ese precio.

@@ -2,11 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
-import { ModalTrigger } from '@/components/modal-trigger';
-import { money, fmtDate } from '@/lib/format';
+import { money, fmtDateTime } from '@/lib/format';
 import { MemberPicker } from './member-picker';
-import { PayDispensaForm } from './pay-dispensa-form';
-import { DispensaDetail } from './dispensa-detail';
+import { ComprobantesTable } from './comprobantes-table';
 
 type Debtor = { id: string; name: string; dni: string; memberNumber: number | null; adeudado: number };
 
@@ -57,7 +55,6 @@ export default async function CtaCorrientePage({
     adeudado: d.adeudado,
   }));
   const totalGeneral = debtors.reduce((s, d) => s + d.adeudado, 0);
-  const selectedMember = debtors.find((d) => d.id === memberId);
 
   let comprobantes: {
     id: string;
@@ -68,32 +65,60 @@ export default async function CtaCorrientePage({
     items: { description: string; quantity: number; unit_price: number; bonif1_pct: number; bonif2_pct: number; total: number }[];
     payments: { receipt_number: number; created_at: string; amount_local: number; account_name: string }[];
   }[] = [];
+  let selectedMemberName = '—';
+  let saldoAFavor = 0;
+  type HistorialEntry = { date: string; label: string; amount: number; voided: boolean };
+  const historial: HistorialEntry[] = [];
 
   if (memberId) {
-    const { data: dispensas } = await supabase
-      .from('dispensas')
-      .select(
-        'id, number, created_at, amount, items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total), payments:dispensa_payments(receipt_number, created_at, amount_local, account:payment_accounts(name))',
-      )
-      .eq('member_id', memberId)
-      .is('voided_at', null)
-      .order('created_at', { ascending: true });
+    const [{ data: member }, { data: dispensas }, { data: creditRows }] = await Promise.all([
+      supabase.from('members').select('name').eq('id', memberId).maybeSingle(),
+      supabase
+        .from('dispensas')
+        .select(
+          'id, number, created_at, amount, voided_at, items:dispensa_items(description, quantity, unit_price, bonif1_pct, bonif2_pct, total), payments:dispensa_payments(receipt_number, created_at, amount_local, account:payment_accounts(name))',
+        )
+        .eq('member_id', memberId)
+        .order('created_at', { ascending: true }),
+      supabase.from('member_credits').select('amount, description, created_at').eq('member_id', memberId),
+    ]);
 
-    comprobantes = (dispensas ?? [])
-      .map((d) => {
-        const payments = (d.payments ?? []).map(
-          (p: { receipt_number: number; created_at: string; amount_local: number; account: { name: string } | { name: string }[] | null }) => {
-            const account = Array.isArray(p.account) ? p.account[0] : p.account;
-            return { receipt_number: p.receipt_number, created_at: p.created_at, amount_local: p.amount_local, account_name: account?.name ?? '—' };
-          },
-        );
-        const paid = payments.reduce((s, p) => s + p.amount_local, 0);
-        return { id: d.id, number: d.number, created_at: d.created_at, amount: d.amount, adeudado: d.amount - paid, items: d.items ?? [], payments };
-      })
-      .filter((d) => d.adeudado > 0.01);
+    selectedMemberName = member?.name ?? '—';
+    saldoAFavor = (creditRows ?? []).reduce((s, r) => s + r.amount, 0);
+
+    const allComprobantes = (dispensas ?? []).map((d) => {
+      const payments = (d.payments ?? []).map(
+        (p: { receipt_number: number; created_at: string; amount_local: number; account: { name: string } | { name: string }[] | null }) => {
+          const account = Array.isArray(p.account) ? p.account[0] : p.account;
+          return { receipt_number: p.receipt_number, created_at: p.created_at, amount_local: p.amount_local, account_name: account?.name ?? '—' };
+        },
+      );
+      const paid = payments.reduce((s, p) => s + p.amount_local, 0);
+      return {
+        id: d.id,
+        number: d.number,
+        created_at: d.created_at,
+        amount: d.amount,
+        voided: !!d.voided_at,
+        adeudado: d.amount - paid,
+        items: d.items ?? [],
+        payments,
+      };
+    });
+
+    comprobantes = allComprobantes.filter((d) => !d.voided && d.adeudado > 0.01);
+
+    for (const d of allComprobantes) {
+      historial.push({ date: d.created_at, label: `Dispensa N° ${d.number}${d.voided ? ' (anulada)' : ''}`, amount: d.amount, voided: d.voided });
+      for (const p of d.payments) {
+        historial.push({ date: p.created_at, label: `Pago Dispensa N° ${d.number} · rec${String(p.receipt_number).padStart(2, '0')} · ${p.account_name}`, amount: -p.amount_local, voided: false });
+      }
+    }
+    for (const c of creditRows ?? []) {
+      historial.push({ date: c.created_at, label: c.description, amount: -c.amount, voided: false });
+    }
+    historial.sort((a, b) => (a.date < b.date ? 1 : -1));
   }
-
-  const totalAdeudado = comprobantes.reduce((s, c) => s + c.adeudado, 0);
 
   return (
     <div>
@@ -149,64 +174,35 @@ export default async function CtaCorrientePage({
       )}
 
       {activeTab === 'buscar' && memberId && (
-        <div className="mt-4 rounded-xl border border-line bg-surface overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-text-soft text-left">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Fecha</th>
-                <th className="px-4 py-2.5 font-medium">Comprobante</th>
-                <th className="px-4 py-2.5 font-medium">Importe</th>
-                <th className="px-4 py-2.5 font-medium">Adeudado</th>
-                <th className="px-4 py-2.5 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {comprobantes.map((c) => (
-                <tr key={c.id} className="border-t border-line">
-                  <td className="px-4 py-2.5 text-text-soft">{fmtDate(c.created_at)}</td>
-                  <td className="px-4 py-2.5">
-                    <ModalTrigger
-                      label={`N° ${c.number}`}
-                      className="text-accent text-sm font-medium hover:underline"
-                      title="Detalle del comprobante"
-                    >
-                      <DispensaDetail
-                        number={c.number}
-                        memberName={selectedMember?.name ?? '—'}
-                        createdAt={c.created_at}
-                        items={c.items}
-                        payments={c.payments}
-                        amount={c.amount}
-                      />
-                    </ModalTrigger>
-                  </td>
-                  <td className="px-4 py-2.5 text-text-soft">{money(c.amount)}</td>
-                  <td className="px-4 py-2.5 font-medium text-red">{money(c.adeudado)}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <ModalTrigger
-                      label="Cobrar"
-                      className="rounded-lg bg-accent text-white text-xs font-semibold px-3 py-1.5"
-                      title="Cobrar comprobante"
-                    >
-                      <PayDispensaForm dispensaId={c.id} adeudado={c.adeudado} accounts={accounts ?? []} />
-                    </ModalTrigger>
-                  </td>
-                </tr>
-              ))}
-              {comprobantes.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-text-mute">
-                    Este socio no tiene comprobantes adeudados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {comprobantes.length > 0 && (
-            <div className="px-4 py-3 border-t border-line flex justify-between font-semibold text-text">
-              <span>Total adeudado</span>
-              <span>{money(totalAdeudado)}</span>
+        <div className="mt-4 space-y-4">
+          {saldoAFavor > 0.01 && (
+            <div className="rounded-xl border border-accent/30 bg-surface-2 px-4 py-3 flex justify-between items-center">
+              <span className="text-text-soft text-sm">Saldo a favor del socio</span>
+              <span className="text-accent font-semibold">{money(saldoAFavor)}</span>
             </div>
+          )}
+
+          <ComprobantesTable comprobantes={comprobantes} memberName={selectedMemberName} accounts={accounts ?? []} />
+
+          {historial.length > 0 && (
+            <details className="rounded-xl border border-line bg-surface">
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
+                Historial de movimientos ({historial.length})
+              </summary>
+              <div className="border-t border-line divide-y divide-line">
+                {historial.map((h, i) => (
+                  <div key={i} className={`flex justify-between px-4 py-2 text-sm ${h.voided ? 'opacity-50' : ''}`}>
+                    <span className="text-text-soft">
+                      {fmtDateTime(h.date)} · {h.label}
+                    </span>
+                    <span className={`font-medium ${h.amount >= 0 ? 'text-text' : 'text-accent'}`}>
+                      {h.amount >= 0 ? '+' : ''}
+                      {money(h.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
         </div>
       )}
