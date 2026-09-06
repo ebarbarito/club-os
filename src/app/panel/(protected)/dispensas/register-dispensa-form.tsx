@@ -34,6 +34,8 @@ export function RegisterDispensaForm({
   initialNote,
   initialRows,
   initialPayments,
+  creditsByMember = {},
+  virtualAccountId,
 }: {
   members: SearchableMember[];
   items: CatalogItem[];
@@ -44,6 +46,8 @@ export function RegisterDispensaForm({
   initialNote?: string;
   initialRows?: ItemRow[];
   initialPayments?: PaymentLine[];
+  creditsByMember?: Record<string, number>;
+  virtualAccountId?: string | null;
 }) {
   const router = useRouter();
   const close = useModalClose();
@@ -56,7 +60,10 @@ export function RegisterDispensaForm({
     initialRows ?? [{ strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' }],
   );
   const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
+  const [useCredit, setUseCredit] = useState('');
   const itemRefs = useRef<Array<ItemSearchHandle | null>>([]);
+
+  const availableCredit = creditsByMember[memberId] ?? 0;
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -67,7 +74,8 @@ export function RegisterDispensaForm({
   }, [rows, items]);
 
   const realTotal = rows.reduce((sum, r) => sum + lineTotal(r), 0);
-  const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0);
+  const creditUsed = Math.min(Number(useCredit) || 0, availableCredit);
+  const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0) + creditUsed;
   const saldo = realTotal - paidTotal;
 
   function updateRow(i: number, patch: Partial<ItemRow>) {
@@ -124,16 +132,15 @@ export function RegisterDispensaForm({
         })),
       ),
     );
-    formData.set(
-      'payments',
-      JSON.stringify(
-        validPayments.map((p) => ({
-          account_id: p.accountId,
-          amount: Number(p.amount),
-          exchange_rate: Number(p.exchangeRate) || 1,
-        })),
-      ),
-    );
+    const payloadPayments = validPayments.map((p) => ({
+      account_id: p.accountId,
+      amount: Number(p.amount),
+      exchange_rate: Number(p.exchangeRate) || 1,
+    }));
+    if (creditUsed > 0 && virtualAccountId) {
+      payloadPayments.push({ account_id: virtualAccountId, amount: creditUsed, exchange_rate: 1 });
+    }
+    formData.set('payments', JSON.stringify(payloadPayments));
 
     startTransition(async () => {
       const res = mode === 'edit' ? await updateDispensa(formData) : await registerDispensa(formData);
@@ -284,6 +291,26 @@ export function RegisterDispensaForm({
           </div>
         </div>
       </div>
+
+      {virtualAccountId && availableCredit > 0.01 && (
+        <div className="rounded-lg border border-amber/40 bg-amber-bg px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className="text-xs font-medium text-amber-tx">
+              🪙 Crédito cuota social disponible: {money(availableCredit)}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={availableCredit}
+              step="1"
+              placeholder="0"
+              value={useCredit}
+              onChange={(e) => setUseCredit(e.target.value)}
+              className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Forma de pago</label>

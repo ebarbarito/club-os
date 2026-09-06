@@ -33,8 +33,18 @@ export default async function DispensaPage({
         .limit(50),
       supabase.from('members').select('id, name, dni, member_number').eq('status', 'valid').order('member_number'),
       supabase.from('stock').select('grams, strain:strains(id, code, name, item_type, price_per_gram, status)'),
-      supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
+      supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     ]);
+
+  const [{ data: virtualAccountRow }, { data: creditRows }] = await Promise.all([
+    supabase.from('payment_accounts').select('id').eq('is_virtual', true).maybeSingle(),
+    supabase.from('member_credits').select('member_id, amount').eq('kind', 'cuota_social'),
+  ]);
+  const virtualAccountId = virtualAccountRow?.id ?? null;
+  const creditsByMember: Record<string, number> = {};
+  for (const c of creditRows ?? []) {
+    creditsByMember[c.member_id] = (creditsByMember[c.member_id] ?? 0) + c.amount;
+  }
 
   const items = (stockRows ?? [])
     .map((s) => {
@@ -56,7 +66,13 @@ export default async function DispensaPage({
           <p className="text-text-soft">Pedidos y dispensas registradas</p>
         </div>
         <ModalTrigger label="+ Registrar dispensa" title="Registrar dispensa" size="xl">
-          <RegisterDispensaForm members={validMembers ?? []} items={items} accounts={accounts} />
+          <RegisterDispensaForm
+            members={validMembers ?? []}
+            items={items}
+            accounts={accounts}
+            creditsByMember={creditsByMember}
+            virtualAccountId={virtualAccountId}
+          />
         </ModalTrigger>
       </div>
 
@@ -228,6 +244,8 @@ export default async function DispensaPage({
                     members={validMembers ?? []}
                     catalogItems={items}
                     accounts={accounts}
+                    creditsByMember={creditsByMember}
+                    virtualAccountId={virtualAccountId}
                   />
                 );
               })}

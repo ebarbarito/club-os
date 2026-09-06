@@ -29,6 +29,8 @@ export function DispensaRow({
   members,
   catalogItems,
   accounts,
+  creditsByMember,
+  virtualAccountId,
 }: {
   id: string;
   number: number;
@@ -45,6 +47,8 @@ export function DispensaRow({
   members: SearchableMember[];
   catalogItems: CatalogItem[];
   accounts: PaymentAccount[];
+  creditsByMember?: Record<string, number>;
+  virtualAccountId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const paid = payments.reduce((s, p) => s + p.amount_local, 0);
@@ -104,7 +108,7 @@ export function DispensaRow({
           amount={amount}
           note={note}
           voided={voided}
-          edit={voided ? undefined : { dispensaId: id, memberId, members, catalogItems, accounts }}
+          edit={voided ? undefined : { dispensaId: id, memberId, members, catalogItems, accounts, creditsByMember, virtualAccountId }}
         />
       </Modal>
     </>

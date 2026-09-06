@@ -27,6 +27,10 @@ type Member = {
   modalidad: string | null;
   patologia: string | null;
   status: string;
+  servicio_pactado_tipo: string | null;
+  servicio_pactado_cantidad: number | null;
+  cuota_social: number | null;
+  factura_automatica: boolean;
 };
 
 export function EditMemberForm({ member }: { member: Member }) {
@@ -139,6 +143,38 @@ export function EditMemberForm({ member }: { member: Member }) {
         <label className={labelCls}>Patología</label>
         <input name="patologia" defaultValue={member.patologia ?? ''} className={inputCls} />
       </div>
+
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Servicio pactado</p>
+      </div>
+      <div>
+        <label className={labelCls}>Tipo</label>
+        <select name="servicio_pactado_tipo" defaultValue={member.servicio_pactado_tipo ?? 'Gramos'} className={inputCls}>
+          <option value="Gramos">Gramos</option>
+          <option value="Aceites">Aceites</option>
+          <option value="M2 cultivo">M² de cultivo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Cantidad</label>
+        <input
+          name="servicio_pactado_cantidad"
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={member.servicio_pactado_cantidad ?? ''}
+          className={inputCls}
+        />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Cuota social</label>
+        <input name="cuota_social" type="number" min="0" step="1" defaultValue={member.cuota_social ?? ''} className={inputCls} />
+      </div>
+      <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
+        <input type="checkbox" name="factura_automatica" defaultChecked={member.factura_automatica} />
+        Emitir factura automática — genera el cargo el 1° de cada mes (Cta Cte → Cuota social)
+      </label>
 
       {error && <p className="col-span-2 text-red text-sm">{error}</p>}
 

@@ -24,6 +24,10 @@ export async function createMember(formData: FormData, submitAs: 'draft' | 'pend
     matricula: (formData.get('matricula') as string) || null,
     modalidad: (formData.get('modalidad') as string) || null,
     patologia: (formData.get('patologia') as string) || null,
+    servicio_pactado_tipo: (formData.get('servicio_pactado_tipo') as string) || null,
+    servicio_pactado_cantidad: formData.get('servicio_pactado_cantidad') ? Number(formData.get('servicio_pactado_cantidad')) : null,
+    cuota_social: formData.get('cuota_social') ? Number(formData.get('cuota_social')) : null,
+    factura_automatica: formData.get('factura_automatica') === 'on',
     status: submitAs,
   });
 
@@ -66,6 +70,10 @@ export async function updateMember(memberId: string, formData: FormData) {
       matricula: (formData.get('matricula') as string) || null,
       modalidad: (formData.get('modalidad') as string) || null,
       patologia: (formData.get('patologia') as string) || null,
+      servicio_pactado_tipo: (formData.get('servicio_pactado_tipo') as string) || null,
+      servicio_pactado_cantidad: formData.get('servicio_pactado_cantidad') ? Number(formData.get('servicio_pactado_cantidad')) : null,
+      cuota_social: formData.get('cuota_social') ? Number(formData.get('cuota_social')) : null,
+      factura_automatica: formData.get('factura_automatica') === 'on',
       status: String(formData.get('status') ?? 'draft'),
     })
     .eq('id', memberId)

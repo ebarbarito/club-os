@@ -38,6 +38,7 @@ export async function registerDispensa(formData: FormData) {
   revalidatePath('/panel/dispensas');
   revalidatePath('/panel/stock');
   revalidatePath('/panel/caja');
+  revalidatePath('/panel/ctacorriente');
   return {};
 }
 

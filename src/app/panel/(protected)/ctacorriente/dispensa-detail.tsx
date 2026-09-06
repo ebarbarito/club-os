@@ -34,6 +34,8 @@ type EditContext = {
   members: SearchableMember[];
   catalogItems: CatalogItem[];
   accounts: PaymentAccount[];
+  creditsByMember?: Record<string, number>;
+  virtualAccountId?: string | null;
 };
 
 export function DispensaDetail({
@@ -67,6 +69,8 @@ export function DispensaDetail({
         members={edit.members}
         items={edit.catalogItems}
         accounts={edit.accounts}
+        creditsByMember={edit.creditsByMember}
+        virtualAccountId={edit.virtualAccountId}
         initialMemberId={edit.memberId}
         initialNote={note ?? ''}
         initialRows={items.map((it) => ({

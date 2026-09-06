@@ -96,6 +96,31 @@ export function CreateMemberForm() {
         <input name="patologia" className={inputCls} />
       </div>
 
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Servicio pactado</p>
+      </div>
+      <div>
+        <label className={labelCls}>Tipo</label>
+        <select name="servicio_pactado_tipo" className={inputCls} defaultValue="Gramos">
+          <option value="Gramos">Gramos</option>
+          <option value="Aceites">Aceites</option>
+          <option value="M2 cultivo">M² de cultivo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Cantidad</label>
+        <input name="servicio_pactado_cantidad" type="number" min="0" step="0.01" className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Cuota social</label>
+        <input name="cuota_social" type="number" min="0" step="1" className={inputCls} />
+      </div>
+      <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
+        <input type="checkbox" name="factura_automatica" />
+        Emitir factura automática — genera el cargo el 1° de cada mes (Cta Cte → Cuota social)
+      </label>
+
       {error && <p className="col-span-2 text-red text-sm">{error}</p>}
 
       <div className="col-span-2 flex gap-2 mt-2">

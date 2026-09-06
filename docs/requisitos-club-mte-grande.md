@@ -16,7 +16,7 @@ para poder rastrear qué se pidió cuándo.
 | Modificaciones (27/08/26) | ✅ Implementado (saldos por cuenta en Caja general, segundo combo de deudores en Cta Cte, modal no se cierra solo, medio de pago default Efectivo) |
 | 31-08-2026 (Caja general + renglones) | ✅ Implementado (arqueo de Caja general lleva todas las cuentas a la caja siguiente, no solo efectivo/dólares; recibo único por operación vía contador atómico — antes una condición de carrera podía agrupar por error dos movimientos distintos) |
 | Modificaciones (1/9/26) | 🟡 Parcial — Fase 1 (Impuestos por cuenta) y Fase 2 (Empleados) implementadas. Pendientes: Historiales, columna Costo en Catálogo, minimizar ventana de Dispensa |
-| Modificaciones (03/09 y 04/09) | 🟡 Parcial — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos) + fixes chicos de 03/09 (login, buscador de artículos, cartel de confirmación) implementados. Pendiente: servicio pactado/cuota social automática (a definir con mockup) |
+| Modificaciones (03/09 y 04/09) | ✅ Implementado — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos), fixes chicos de 03/09, y servicio pactado + cuota social (generación manual mensual, acreditación, crédito de producto) |
 
 ---
 
@@ -172,7 +172,9 @@ para poder rastrear qué se pidió cuándo.
 - Si lo pagado supera lo cargado en "Cobro", la diferencia queda como saldo a favor (mismo mecanismo del 03/09).
 - *Alcance ampliado en la implementación:* se agregó también un historial de movimientos por socio (cargos, pagos y saldo a favor generado, en orden cronológico) — la idea original de "Composición de saldos → libro mayor auxiliar" que el spec original dejaba pendiente para una segunda etapa.
 
-**Alta de socio + cuota social automática:** ⬜ Pendiente — a definir con un mockup antes de implementar
-- Campo "Servicio pactado" + "Cuota social" ($) + checkbox "Emitir factura automática".
-- El 1° de cada mes, dispensa automática por la cuota pactada a cta cte (sin movimiento en caja/stock hasta que se completa la asignación de artículos).
-- Piso de cuota social = equivalente a 5g del artículo N°022 (Sublimator OG), actualizado cuando cambia ese precio.
+**Alta de socio + cuota social:** ✅ Implementado (validado con mockup antes de construir)
+- Campo "Servicio pactado" (tipo: Gramos/Aceites/M² de cultivo/Otro + cantidad) + "Cuota social" ($) + checkbox "Emitir factura automática".
+- *Corregido durante la validación:* no hay cron — un botón manual en Cta Cte → "Cuota social" genera los cargos del mes, con preview editable (monto por socio, opción de quitar) antes de confirmar.
+- Cada cargo generado es una dispensa más (pendiente, como cualquier deuda) hasta que un admin lo **acredita** (llega el comprobante de pago externo — transferencia/tarjeta/MP). No mueve caja ni stock en ningún momento de este paso.
+- Recién acreditado se convierte en **crédito de producto**, separado del saldo a favor general: no cancela otras deudas sueltas, solo se aplica en una dispensa futura (Registrar Dispensa lo ofrece como medio de pago más).
+- Se descartó la idea original de "editar la misma dispensa para asignar artículos antes de poder cobrarla" — el crédito se usa en cualquier dispensa normal futura.
