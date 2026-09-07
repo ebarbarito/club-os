@@ -39,8 +39,20 @@ export async function createMemberPublic(formData: FormData) {
   if (!tenant) return { error: 'Club no encontrado' };
 
   const birth = String(formData.get('birth') ?? '');
-  if (!birth || !isAdult(birth)) {
+  const categoriaSocio = (formData.get('categoria_socio') as string) || null;
+  // "Adherente — Menor de edad" es la única categoría que puede ser
+  // menor de 18 -- el resto sigue exigiendo mayoría de edad. La captura
+  // de datos del tutor/representante legal queda pendiente (sección 3
+  // del formulario todavía no definida).
+  if (!birth || (categoriaSocio !== 'adherente_menor' && !isAdult(birth))) {
     return { error: 'Tenés que ser mayor de 18 años para asociarte' };
+  }
+
+  const consienteEstatuto = formData.get('consiente_estatuto') === 'on';
+  const consienteDatos = formData.get('consiente_datos') === 'on';
+  const consienteVeracidad = formData.get('consiente_veracidad') === 'on';
+  if (!consienteEstatuto || !consienteDatos || !consienteVeracidad) {
+    return { error: 'Tenés que aceptar las 3 declaraciones de consentimiento' };
   }
 
   const admin = createAdminClient();
@@ -54,13 +66,28 @@ export async function createMemberPublic(formData: FormData) {
       phone: (formData.get('phone') as string) || null,
       email: (formData.get('email') as string) || null,
       zona: (formData.get('zona') as string) || null,
+      address: (formData.get('address') as string) || null,
+      nacionalidad: (formData.get('nacionalidad') as string) || null,
+      estado_civil: (formData.get('estado_civil') as string) || null,
+      cuil_cuit: (formData.get('cuil_cuit') as string) || null,
+      localidad: (formData.get('localidad') as string) || null,
+      provincia: (formData.get('provincia') as string) || null,
+      codigo_postal: (formData.get('codigo_postal') as string) || null,
+      categoria_socio: categoriaSocio,
       reprocann: (formData.get('reprocann') as string) || 'no',
       repr_num: (formData.get('repr_num') as string) || null,
       repr_exp: (formData.get('repr_exp') as string) || null,
       doctor: (formData.get('doctor') as string) || null,
+      especialidad_institucion: (formData.get('especialidad_institucion') as string) || null,
       matricula: (formData.get('matricula') as string) || null,
       modalidad: (formData.get('modalidad') as string) || null,
       patologia: (formData.get('patologia') as string) || null,
+      producto_prescripto: (formData.get('producto_prescripto') as string) || null,
+      dosis_mensual: formData.get('dosis_mensual') ? Number(formData.get('dosis_mensual')) : null,
+      dosis_unidad: (formData.get('dosis_unidad') as string) || null,
+      consiente_estatuto: consienteEstatuto,
+      consiente_datos: consienteDatos,
+      consiente_veracidad: consienteVeracidad,
       status: 'pending',
     })
     .select('id')
@@ -86,6 +113,27 @@ export async function createMemberPublic(formData: FormData) {
       storage_path: path,
       label,
     });
+  }
+
+  // La firma viaja como PNG data URL en un input hidden (ver
+  // SignaturePad) -- se decodifica y se guarda como un documento más,
+  // mismo circuito que DNI/REPROCANN.
+  const firmaDataUrl = String(formData.get('firma_data_url') ?? '');
+  if (firmaDataUrl.startsWith('data:image/png;base64,')) {
+    const base64 = firmaDataUrl.slice('data:image/png;base64,'.length);
+    const buffer = Buffer.from(base64, 'base64');
+    const path = `${tenant.id}/${memberId}/firma-${randomUUID()}.png`;
+    const { error: uploadError } = await admin.storage
+      .from('documentos')
+      .upload(path, buffer, { contentType: 'image/png' });
+    if (!uploadError) {
+      await admin.from('member_documents').insert({
+        tenant_id: tenant.id,
+        member_id: memberId,
+        storage_path: path,
+        label: 'Firma del solicitante',
+      });
+    }
   }
 
   return { memberId };

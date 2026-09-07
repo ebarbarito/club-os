@@ -21,6 +21,12 @@ const REPR_TYPE_LABEL: Record<string, string> = {
   autocultivador: 'Autocultivador',
   paciente: 'Paciente',
 };
+const CATEGORIA_LABEL: Record<string, string> = {
+  activo: 'Socio Activo',
+  autocultivador: 'Socio Autocultivador',
+  adherente_menor: 'Socio Adherente — Menor de edad',
+  adherente: 'Socio Adherente',
+};
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,10 +86,21 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div><dt className="text-text-mute">Teléfono</dt><dd>{member.phone ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Email</dt><dd>{member.email ?? '—'}</dd></div>
-          <div><dt className="text-text-mute">Zona</dt><dd>{member.zona ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Nacimiento</dt><dd>{fmtDate(member.birth)}</dd></div>
+          <div><dt className="text-text-mute">Nacionalidad</dt><dd>{member.nacionalidad ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Estado civil</dt><dd>{member.estado_civil ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">CUIL/CUIT</dt><dd>{member.cuil_cuit ?? '—'}</dd></div>
           <div className="col-span-2"><dt className="text-text-mute">Domicilio</dt><dd>{member.address ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Localidad</dt><dd>{member.localidad ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Provincia</dt><dd>{member.provincia ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Código postal</dt><dd>{member.codigo_postal ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Zona</dt><dd>{member.zona ?? '—'}</dd></div>
         </dl>
+      </div>
+
+      <div className="rounded-xl border border-line bg-surface p-5 mb-4">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-3">Categoría de socio</p>
+        <p className="text-sm">{member.categoria_socio ? CATEGORIA_LABEL[member.categoria_socio] : 'Sin especificar'}</p>
       </div>
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
@@ -95,8 +112,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           <div><dt className="text-text-mute">N° registro</dt><dd>{member.repr_num ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Vencimiento</dt><dd>{fmtDate(member.repr_exp)}</dd></div>
           <div><dt className="text-text-mute">Médico</dt><dd>{member.doctor ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Especialidad/Institución</dt><dd>{member.especialidad_institucion ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Matrícula</dt><dd>{member.matricula ?? '—'}</dd></div>
           <div className="col-span-2"><dt className="text-text-mute">Patología</dt><dd>{member.patologia ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Producto prescripto</dt><dd>{member.producto_prescripto ?? '—'}</dd></div>
+          <div>
+            <dt className="text-text-mute">Dosis mensual indicada</dt>
+            <dd>{member.dosis_mensual != null ? `${member.dosis_mensual} ${member.dosis_unidad ?? ''}` : '—'}</dd>
+          </div>
         </dl>
       </div>
 

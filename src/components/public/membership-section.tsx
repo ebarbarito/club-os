@@ -1,5 +1,4 @@
-import { ModalTrigger } from '@/components/modal-trigger';
-import { SignupForm } from './signup-form';
+import Link from 'next/link';
 import { Eyebrow } from './eyebrow';
 
 const PLANS = [
@@ -40,13 +39,9 @@ export function MembershipSection() {
         </p>
       </div>
 
-      <ModalTrigger
-        label="Quiero ser socio/a"
-        className="rounded-lg bg-gold text-green-900 text-sm font-semibold px-4 py-2"
-        title="Alta de socio"
-      >
-        <SignupForm />
-      </ModalTrigger>
+      <Link href="/alta-socio" className="inline-block rounded-lg bg-gold text-green-900 text-sm font-semibold px-4 py-2">
+        Quiero ser socio/a
+      </Link>
     </section>
   );
 }

@@ -51,9 +51,50 @@ export function CreateMemberForm() {
         <label className={labelCls}>Email</label>
         <input name="email" type="email" className={inputCls} />
       </div>
+      <div>
+        <label className={labelCls}>Nacionalidad</label>
+        <input name="nacionalidad" defaultValue="Argentina" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Estado civil</label>
+        <input name="estado_civil" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>CUIL/CUIT</label>
+        <input name="cuil_cuit" className={inputCls} />
+      </div>
       <div className="col-span-2">
+        <label className={labelCls}>Domicilio</label>
+        <input name="address" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Localidad</label>
+        <input name="localidad" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Provincia</label>
+        <input name="provincia" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Código postal</label>
+        <input name="codigo_postal" className={inputCls} />
+      </div>
+      <div>
         <label className={labelCls}>Zona</label>
         <input name="zona" className={inputCls} />
+      </div>
+
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Categoría de socio</p>
+      </div>
+      <div className="col-span-2">
+        <select name="categoria_socio" className={inputCls} defaultValue="">
+          <option value="">Sin especificar</option>
+          <option value="activo">Socio Activo</option>
+          <option value="autocultivador">Socio Autocultivador</option>
+          <option value="adherente_menor">Socio Adherente — Menor de edad</option>
+          <option value="adherente">Socio Adherente</option>
+        </select>
       </div>
 
       <div className="col-span-2 border-t border-line pt-3 mt-1">
@@ -88,12 +129,33 @@ export function CreateMemberForm() {
         <input name="doctor" className={inputCls} />
       </div>
       <div>
+        <label className={labelCls}>Especialidad / Institución</label>
+        <input name="especialidad_institucion" className={inputCls} />
+      </div>
+      <div>
         <label className={labelCls}>Matrícula</label>
         <input name="matricula" className={inputCls} />
       </div>
       <div className="col-span-2">
         <label className={labelCls}>Patología</label>
         <input name="patologia" className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Producto prescripto</label>
+        <input name="producto_prescripto" className={inputCls} />
+      </div>
+      <div className="grid grid-cols-[1fr_5.5rem] gap-2">
+        <div>
+          <label className={labelCls}>Dosis mensual indicada</label>
+          <input name="dosis_mensual" type="number" min="0" step="0.01" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Unidad</label>
+          <select name="dosis_unidad" className={inputCls} defaultValue="g">
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+          </select>
+        </div>
       </div>
 
       <div className="col-span-2 border-t border-line pt-3 mt-1">

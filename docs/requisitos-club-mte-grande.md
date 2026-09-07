@@ -17,6 +17,7 @@ para poder rastrear qué se pidió cuándo.
 | 31-08-2026 (Caja general + renglones) | ✅ Implementado (arqueo de Caja general lleva todas las cuentas a la caja siguiente, no solo efectivo/dólares; recibo único por operación vía contador atómico — antes una condición de carrera podía agrupar por error dos movimientos distintos) |
 | Modificaciones (1/9/26) | 🟡 Parcial — Fase 1 (Impuestos por cuenta) y Fase 2 (Empleados) implementadas. Pendientes: Historiales, columna Costo en Catálogo, minimizar ventana de Dispensa |
 | Modificaciones (03/09 y 04/09) | ✅ Implementado — Cta Cte consolidada (saldo a favor, cobro por lote, historial de movimientos), fixes chicos de 03/09, y servicio pactado + cuota social (generación manual mensual, acreditación, crédito de producto) |
+| Alta de Socios — mockup Green Level | 🟡 Parcial — alta pública convertida en página independiente (`/alta-socio`) con todos los campos del mockup que se pudieron comparar, sincronizados también al alta/ficha privada. Pendiente: sección 3 del mockup original (no compartida) y datos de tutor/representante legal para menores |
 
 ---
 
@@ -178,3 +179,25 @@ para poder rastrear qué se pidió cuándo.
 - Cada cargo generado es una dispensa más (pendiente, como cualquier deuda) hasta que un admin lo **acredita** (llega el comprobante de pago externo — transferencia/tarjeta/MP). No mueve caja ni stock en ningún momento de este paso.
 - Recién acreditado se convierte en **crédito de producto**, separado del saldo a favor general: no cancela otras deudas sueltas, solo se aplica en una dispensa futura (Registrar Dispensa lo ofrece como medio de pago más).
 - Se descartó la idea original de "editar la misma dispensa para asignar artículos antes de poder cobrarla" — el crédito se usa en cualquier dispensa normal futura.
+
+---
+
+## Alta de Socios — mockup Green Level
+
+Mockup compartido por el club con el formato deseado del alta de socio (público/privado). Comparado campo a campo contra lo ya implementado.
+
+**Estructural (lo más importante del pedido):**
+- El alta pública dejó de ser un modal ("Quiero ser socio/a" / "Darme de alta" dentro del sitio público) y pasó a ser una **página independiente**, `/alta-socio`, resuelta por tenant igual que el sitio público — permite compartir un link directo. Mismo gate de `public_site_enabled` que la home pública.
+
+**Campos nuevos agregados a `members`** (alta pública + alta/ficha privada):
+- Nacionalidad, Estado civil, CUIL/CUIT, Localidad, Provincia, Código postal.
+- Categoría de socio (Activo / Autocultivador / Adherente — Menor de edad / Adherente) — campo **nuevo e independiente**, no se fusionó con `modalidad` (cultivo propio/solidario/ONG, que sigue existiendo tal cual) ni con `reprocann_type`. Queda pendiente resolver con el club si se fusionan o se condicionan entre sí.
+- Especialidad/Institución del médico, Producto prescripto, Dosis mensual indicada (g/ml) — este último se guardó en columnas propias (`dosis_mensual`/`dosis_unidad`), separado de "servicio pactado" de la cuota social: uno es un dato médico/prescripción, el otro un valor comercial pactado — pueden coincidir en la práctica pero no son el mismo campo.
+- 3 checks de consentimiento (Estatuto, Ley 25.326 datos, veracidad) reemplazando el check único genérico de antes.
+- Firma digital (canvas, firma con dedo/mouse) — se guarda como un documento más (mismo circuito que DNI/REPROCANN), no como columna nueva.
+
+**Cambio de comportamiento:** en el mockup, los documentos (DNI, REPROCANN) se envían por WhatsApp/email en vez de subirse por el formulario — los campos de archivo pasaron de obligatorios a opcionales, con el mismo texto recordatorio del mockup.
+
+**Pendiente (no se pudo comparar):**
+- La sección "3." del mockup no fue compartida (las capturas saltan de "2. Categoría de socio" a "4. Información médica").
+- Datos del representante legal/tutor para "Socio Adherente — Menor de edad" — hoy solo se permite el alta sin pedir esos datos, con una nota de que se coordinan después con el club.

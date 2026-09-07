@@ -18,14 +18,25 @@ type Member = {
   email: string | null;
   address: string | null;
   zona: string | null;
+  nacionalidad: string | null;
+  estado_civil: string | null;
+  cuil_cuit: string | null;
+  localidad: string | null;
+  provincia: string | null;
+  codigo_postal: string | null;
+  categoria_socio: string | null;
   reprocann: string;
   reprocann_type: string | null;
   repr_num: string | null;
   repr_exp: string | null;
   doctor: string | null;
+  especialidad_institucion: string | null;
   matricula: string | null;
   modalidad: string | null;
   patologia: string | null;
+  producto_prescripto: string | null;
+  dosis_mensual: number | null;
+  dosis_unidad: string | null;
   status: string;
   servicio_pactado_tipo: string | null;
   servicio_pactado_cantidad: number | null;
@@ -86,13 +97,50 @@ export function EditMemberForm({ member }: { member: Member }) {
         <label className={labelCls}>Email</label>
         <input name="email" type="email" defaultValue={member.email ?? ''} className={inputCls} />
       </div>
+      <div>
+        <label className={labelCls}>Nacionalidad</label>
+        <input name="nacionalidad" defaultValue={member.nacionalidad ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Estado civil</label>
+        <input name="estado_civil" defaultValue={member.estado_civil ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>CUIL/CUIT</label>
+        <input name="cuil_cuit" defaultValue={member.cuil_cuit ?? ''} className={inputCls} />
+      </div>
       <div className="col-span-2">
         <label className={labelCls}>Domicilio</label>
         <input name="address" defaultValue={member.address ?? ''} className={inputCls} />
       </div>
-      <div className="col-span-2">
+      <div>
+        <label className={labelCls}>Localidad</label>
+        <input name="localidad" defaultValue={member.localidad ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Provincia</label>
+        <input name="provincia" defaultValue={member.provincia ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Código postal</label>
+        <input name="codigo_postal" defaultValue={member.codigo_postal ?? ''} className={inputCls} />
+      </div>
+      <div>
         <label className={labelCls}>Zona</label>
         <input name="zona" defaultValue={member.zona ?? ''} className={inputCls} />
+      </div>
+
+      <div className="col-span-2 border-t border-line pt-3 mt-1">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-2">Categoría de socio</p>
+      </div>
+      <div className="col-span-2">
+        <select name="categoria_socio" defaultValue={member.categoria_socio ?? ''} className={inputCls}>
+          <option value="">Sin especificar</option>
+          <option value="activo">Socio Activo</option>
+          <option value="autocultivador">Socio Autocultivador</option>
+          <option value="adherente_menor">Socio Adherente — Menor de edad</option>
+          <option value="adherente">Socio Adherente</option>
+        </select>
       </div>
 
       <div className="col-span-2 border-t border-line pt-3 mt-1">
@@ -136,12 +184,33 @@ export function EditMemberForm({ member }: { member: Member }) {
         <input name="doctor" defaultValue={member.doctor ?? ''} className={inputCls} />
       </div>
       <div>
+        <label className={labelCls}>Especialidad / Institución</label>
+        <input name="especialidad_institucion" defaultValue={member.especialidad_institucion ?? ''} className={inputCls} />
+      </div>
+      <div>
         <label className={labelCls}>Matrícula</label>
         <input name="matricula" defaultValue={member.matricula ?? ''} className={inputCls} />
       </div>
       <div className="col-span-2">
         <label className={labelCls}>Patología</label>
         <input name="patologia" defaultValue={member.patologia ?? ''} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Producto prescripto</label>
+        <input name="producto_prescripto" defaultValue={member.producto_prescripto ?? ''} className={inputCls} />
+      </div>
+      <div className="grid grid-cols-[1fr_5.5rem] gap-2">
+        <div>
+          <label className={labelCls}>Dosis mensual indicada</label>
+          <input name="dosis_mensual" type="number" min="0" step="0.01" defaultValue={member.dosis_mensual ?? ''} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Unidad</label>
+          <select name="dosis_unidad" defaultValue={member.dosis_unidad ?? 'g'} className={inputCls}>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+          </select>
+        </div>
       </div>
 
       <div className="col-span-2 border-t border-line pt-3 mt-1">

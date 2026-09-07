@@ -20,3 +20,19 @@ export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
   if (error || !data) return null;
   return data as Tenant;
 }
+
+// Mismo gate que usa el sitio público (/): mientras public_site_enabled
+// esté apagado, solo lo puede ver alguien logueado en el panel de ESE
+// club (el admin revisándolo antes de exponerlo), nunca un visitante
+// anónimo. Se reutiliza acá para /alta-socio, que resuelve tenant igual
+// que la home pública.
+export async function canPreviewTenant(tenantId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user.id).maybeSingle();
+  return profile?.tenant_id === tenantId;
+}

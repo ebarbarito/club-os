@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { StoreProvider, useStore } from './store';
 import { AgeGate } from './age-gate';
 import { CatalogSection } from './catalog-section';
 import { MembershipSection } from './membership-section';
 import { CartDrawer } from './cart-drawer';
-import { ModalTrigger } from '@/components/modal-trigger';
-import { SignupForm } from './signup-form';
 import type { Tenant } from '@/lib/tenant/types';
 import type { CatalogItem } from '@/lib/public/get-catalog';
 
@@ -42,13 +41,9 @@ function Nav({ tenant, onOpenCart }: { tenant: Tenant; onOpenCart: () => void })
           <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${statusMeta.cls}`}>{statusMeta.label}</span>
         )}
         {!member && (
-          <ModalTrigger
-            label="Darme de alta"
-            className="text-sm font-semibold text-amber-tx hover:text-gold"
-            title="Alta de socio"
-          >
-            <SignupForm />
-          </ModalTrigger>
+          <Link href="/alta-socio" className="text-sm font-semibold text-amber-tx hover:text-gold">
+            Darme de alta
+          </Link>
         )}
         <button
           onClick={onOpenCart}
