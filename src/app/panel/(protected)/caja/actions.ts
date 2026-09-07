@@ -148,6 +148,89 @@ export async function addMovement(formData: FormData) {
   return {};
 }
 
+// "Pagos a cuenta" (Caja diaria): el admin/dispensador elige un socio y
+// una forma de pago, sin pasar por la grilla de comprobantes de Cta Cte.
+// Se arma la asignación FIFO (comprobantes más viejos primero) del lado
+// del servidor y se reusa pay_dispensa_batch entero — así el pago
+// impacta caja real y cuenta corriente exactamente igual que un cobro
+// hecho desde Cta Cte (incluida la acreditación automática de una cuota
+// social que quede saldada). Si el socio no tiene deuda, todo el pago
+// queda directo como saldo a favor.
+export async function registrarPagoACuenta(
+  memberId: string,
+  payments: { account_id: string; amount: number; exchange_rate: number }[],
+) {
+  const profile = await requireCajaAccess('diaria');
+  if (!memberId) return { error: 'Elegí un socio' };
+  const supabase = await createClient();
+
+  const totalPayment = payments.reduce((s, p) => s + p.amount * p.exchange_rate, 0);
+  if (payments.length === 0 || totalPayment <= 0) return { error: 'Cargá al menos una cuenta con monto' };
+
+  const { data: openDispensas } = await supabase
+    .from('dispensas')
+    .select('id, amount, payments:dispensa_payments(amount_local)')
+    .eq('member_id', memberId)
+    .is('voided_at', null)
+    .order('created_at', { ascending: true });
+
+  const debts = (openDispensas ?? [])
+    .map((d) => ({ id: d.id, adeudado: d.amount - (d.payments ?? []).reduce((s, p) => s + p.amount_local, 0) }))
+    .filter((d) => d.adeudado > 0.01);
+
+  let remaining = totalPayment;
+  const allocations: { dispensa_id: string; amount: number }[] = [];
+  for (const d of debts) {
+    if (remaining <= 0.005) break;
+    const take = Math.min(remaining, d.adeudado);
+    allocations.push({ dispensa_id: d.id, amount: take });
+    remaining -= take;
+  }
+
+  if (allocations.length === 0) {
+    const { data: shift } = await supabase.from('caja_shifts').select('id').eq('kind', 'diaria').is('closed_at', null).maybeSingle();
+    if (!shift) return { error: 'No hay un turno de caja diaria abierto' };
+    const { data: receiptNumber, error: receiptError } = await supabase.rpc('next_receipt_number');
+    if (receiptError) return { error: receiptError.message };
+
+    const { error: ledgerError } = await supabase.from('ledger').insert(
+      payments.map((p) => ({
+        tenant_id: profile.tenantId,
+        shift_id: shift.id,
+        type: 'ingreso',
+        category: 'Cuenta corriente',
+        concept: `rec${String(receiptNumber).padStart(2, '0')} Pago a cuenta`,
+        amount: p.amount,
+        exchange_rate: p.exchange_rate,
+        amount_local: p.amount * p.exchange_rate,
+        account_id: p.account_id,
+        receipt_number: receiptNumber,
+      })),
+    );
+    if (ledgerError) return { error: ledgerError.message };
+
+    const { error: creditError } = await supabase.from('member_credits').insert({
+      tenant_id: profile.tenantId,
+      member_id: memberId,
+      kind: 'general',
+      amount: totalPayment,
+      description: 'Pago a cuenta (sin deuda pendiente)',
+      receipt_number: receiptNumber,
+      created_by: profile.userId,
+    });
+    if (creditError) return { error: creditError.message };
+  } else {
+    const { error } = await supabase.rpc('pay_dispensa_batch', { p_allocations: allocations, p_payments: payments });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath('/panel/caja');
+  revalidatePath('/panel/ctacorriente');
+  revalidatePath('/panel/dispensas');
+  revalidatePath('/panel/balance');
+  return {};
+}
+
 // No se edita un movimiento que vino de una dispensa (category='Dispensa'
 // o 'Cuenta corriente') — ese registro tiene que quedar en sync con
 // dispensa_payments/dispensas. Solo se editan movimientos manuales.

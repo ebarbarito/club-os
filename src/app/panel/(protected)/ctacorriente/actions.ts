@@ -54,13 +54,3 @@ export async function confirmarCuotaSocial(entries: { memberId: string; amount: 
   revalidatePath('/panel/ctacorriente');
   return {};
 }
-
-export async function acreditarCuotaSocial(dispensaId: string) {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('acreditar_cuota_social', { p_dispensa_id: dispensaId });
-  if (error) return { error: error.message };
-  revalidatePath('/panel/ctacorriente');
-  revalidatePath('/panel/dispensas');
-  return {};
-}

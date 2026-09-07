@@ -36,14 +36,17 @@ export default async function DispensaPage({
       supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     ]);
 
-  const [{ data: virtualAccountRow }, { data: creditRows }] = await Promise.all([
-    supabase.from('payment_accounts').select('id').eq('is_virtual', true).maybeSingle(),
-    supabase.from('member_credits').select('member_id, amount').eq('kind', 'cuota_social'),
+  const [{ data: virtualAccounts }, { data: creditRows }] = await Promise.all([
+    supabase.from('payment_accounts').select('id, virtual_kind').eq('is_virtual', true),
+    supabase.from('member_credits').select('member_id, amount, kind').in('kind', ['cuota_social', 'general']),
   ]);
-  const virtualAccountId = virtualAccountRow?.id ?? null;
+  const cuotaSocialAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'cuota_social')?.id ?? null;
+  const generalAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'general')?.id ?? null;
   const creditsByMember: Record<string, number> = {};
+  const generalCreditsByMember: Record<string, number> = {};
   for (const c of creditRows ?? []) {
-    creditsByMember[c.member_id] = (creditsByMember[c.member_id] ?? 0) + c.amount;
+    if (c.kind === 'cuota_social') creditsByMember[c.member_id] = (creditsByMember[c.member_id] ?? 0) + c.amount;
+    else generalCreditsByMember[c.member_id] = (generalCreditsByMember[c.member_id] ?? 0) + c.amount;
   }
 
   const items = (stockRows ?? [])
@@ -71,7 +74,9 @@ export default async function DispensaPage({
             items={items}
             accounts={accounts}
             creditsByMember={creditsByMember}
-            virtualAccountId={virtualAccountId}
+            virtualAccountId={cuotaSocialAccountId}
+            generalCreditsByMember={generalCreditsByMember}
+            generalAccountId={generalAccountId}
           />
         </ModalTrigger>
       </div>
@@ -245,7 +250,9 @@ export default async function DispensaPage({
                     catalogItems={items}
                     accounts={accounts}
                     creditsByMember={creditsByMember}
-                    virtualAccountId={virtualAccountId}
+                    virtualAccountId={cuotaSocialAccountId}
+                    generalCreditsByMember={generalCreditsByMember}
+                    generalAccountId={generalAccountId}
                   />
                 );
               })}

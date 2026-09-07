@@ -9,8 +9,7 @@ import { CuotaSocialTab } from './cuota-social-tab';
 
 type Debtor = { id: string; name: string; dni: string; memberNumber: number | null; adeudado: number };
 
-function adeudadoDe(amount: number, paid: number, esCuotaSocial: boolean, acreditadoAt: string | null): number {
-  if (esCuotaSocial && acreditadoAt) return 0;
+function adeudadoDe(amount: number, paid: number): number {
   return amount - paid;
 }
 
@@ -40,7 +39,7 @@ export default async function CtaCorrientePage({
   for (const d of allDispensas ?? []) {
     const member = Array.isArray(d.member) ? d.member[0] : d.member;
     const paid = (d.payments ?? []).reduce((s, p) => s + p.amount_local, 0);
-    const adeudado = adeudadoDe(d.amount, paid, d.es_cuota_social, d.acreditado_at);
+    const adeudado = adeudadoDe(d.amount, paid);
     if (adeudado <= 0.01) continue;
     const existing = debtorMap.get(d.member_id);
     if (existing) existing.adeudado += adeudado;
@@ -87,6 +86,7 @@ export default async function CtaCorrientePage({
     created_at: string;
     amount: number;
     adeudado: number;
+    esCuotaSocial: boolean;
     items: { description: string; quantity: number; unit_price: number; bonif1_pct: number; bonif2_pct: number; total: number }[];
     payments: { receipt_number: number; created_at: string; amount_local: number; account_name: string }[];
   }[] = [];
@@ -129,8 +129,8 @@ export default async function CtaCorrientePage({
         voided: !!d.voided_at,
         esCuotaSocial: d.es_cuota_social,
         acreditadoAt: d.acreditado_at,
-        label: d.es_cuota_social ? (d.note ?? `Cuota social`) : `Dispensa N° ${d.number}`,
-        adeudado: adeudadoDe(d.amount, paid, d.es_cuota_social, d.acreditado_at),
+        label: d.es_cuota_social ? `Cuota social N° ${d.number}` : `Dispensa N° ${d.number}`,
+        adeudado: adeudadoDe(d.amount, paid),
         items: d.items ?? [],
         payments,
       };
@@ -152,34 +152,21 @@ export default async function CtaCorrientePage({
   }
 
   let cuotaSocialCandidates: { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number }[] = [];
-  let cuotaSocialPending: { dispensaId: string; number: number; memberName: string; amount: number; createdAt: string }[] = [];
   let periodoLabel = '';
   if (activeTab === 'cuota_social') {
     const now = new Date();
     const periodoIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     periodoLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-    const [{ data: eligible }, { data: alreadyGenerated }, { data: pendingRows }] = await Promise.all([
+    const [{ data: eligible }, { data: alreadyGenerated }] = await Promise.all([
       supabase.from('members').select('id, name, member_number, cuota_social').eq('factura_automatica', true).eq('status', 'valid'),
       supabase.from('dispensas').select('member_id').eq('es_cuota_social', true).eq('cuota_social_periodo', periodoIso),
-      supabase
-        .from('dispensas')
-        .select('id, number, amount, created_at, member:members(name)')
-        .eq('es_cuota_social', true)
-        .is('acreditado_at', null)
-        .is('voided_at', null)
-        .order('created_at', { ascending: false }),
     ]);
 
     const generatedSet = new Set((alreadyGenerated ?? []).map((d) => d.member_id));
     cuotaSocialCandidates = (eligible ?? [])
       .filter((m) => !generatedSet.has(m.id))
       .map((m) => ({ memberId: m.id, memberName: m.name, memberNumber: m.member_number, cuotaSocial: m.cuota_social ?? 0 }));
-
-    cuotaSocialPending = (pendingRows ?? []).map((d) => {
-      const member = Array.isArray(d.member) ? d.member[0] : d.member;
-      return { dispensaId: d.id, number: d.number, memberName: member?.name ?? '—', amount: d.amount, createdAt: d.created_at };
-    });
   }
 
   return (
@@ -260,7 +247,7 @@ export default async function CtaCorrientePage({
       )}
 
       {activeTab === 'cuota_social' && (
-        <CuotaSocialTab candidates={cuotaSocialCandidates} pending={cuotaSocialPending} periodoLabel={periodoLabel} />
+        <CuotaSocialTab candidates={cuotaSocialCandidates} periodoLabel={periodoLabel} />
       )}
 
       {activeTab === 'buscar' && <MemberPicker members={searchableDebtors} value={memberId ?? ''} />}

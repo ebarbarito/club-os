@@ -11,9 +11,11 @@ import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
 import { ShiftSummary } from './shift-summary';
 import { TransferToDiariaForm } from './transfer-to-diaria-form';
+import { PagoACuentaForm } from './pago-a-cuenta-form';
 import { groupByReceipt } from './group-by-receipt';
+import type { SearchableMember } from '@/components/member-search';
 
-type Account = { id: string; name: string; is_cash: boolean; currency: string; exchange_rate: number };
+type Account = { id: string; name: string; is_cash: boolean; currency: string; exchange_rate: number; is_virtual?: boolean };
 type LedgerRow = {
   id: string;
   type: 'ingreso' | 'egreso';
@@ -56,12 +58,15 @@ export default async function CajaPage({
   const activeTab = isAdmin && tab === 'general' ? 'general' : 'diaria';
 
   const supabase = await createClient();
-  const [{ data: accountRows }, { data: employeeRows }] = await Promise.all([
+  const [{ data: accountRows }, { data: employeeRows }, { data: memberRows }] = await Promise.all([
     supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
     supabase.from('employees').select('id, name').eq('active', true).order('name'),
+    supabase.from('members').select('id, name, dni, member_number').is('deleted_at', null).order('member_number'),
   ]);
   const accounts = accountRows ?? [];
   const employees = employeeRows ?? [];
+  const members: SearchableMember[] = (memberRows ?? []).map((m) => ({ ...m, member_number: m.member_number ?? 0 }));
+  const realAccounts = accounts.filter((a) => !a.is_virtual);
   const cashAccount = accounts.find((a) => a.is_cash);
   // La moneda extranjera no sigue un código fijo (hay tenants con "u$s",
   // "USD", etc.) — lo que la distingue es no ser ARS ni la cuenta cash.
@@ -125,6 +130,8 @@ export default async function CajaPage({
           shift={diariaShift}
           movements={diariaMovements}
           accounts={accounts}
+          realAccounts={realAccounts}
+          members={members}
           employees={employees}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
@@ -155,6 +162,8 @@ function DiariaTab({
   shift,
   movements,
   accounts,
+  realAccounts,
+  members,
   employees,
   cashAccount,
   usdAccount,
@@ -164,6 +173,8 @@ function DiariaTab({
   shift: { id: string; opening_cash: number; opening_usd: number } | null;
   movements: LedgerRow[];
   accounts: Account[];
+  realAccounts: Account[];
+  members: SearchableMember[];
   employees: EmployeeOption[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
@@ -202,6 +213,13 @@ function DiariaTab({
                 title="Registrar movimiento"
               >
                 <MovementForm accounts={accounts} kind="diaria" employees={employees} />
+              </ModalTrigger>
+              <ModalTrigger
+                label="Pagos a cuenta"
+                className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                title="Pagos a cuenta"
+              >
+                <PagoACuentaForm members={members} accounts={realAccounts} />
               </ModalTrigger>
               <ModalTrigger
                 label="Cerrar caja (arqueo)"

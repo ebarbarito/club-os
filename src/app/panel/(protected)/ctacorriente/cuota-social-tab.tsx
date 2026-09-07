@@ -2,24 +2,14 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { money, fmtDate } from '@/lib/format';
-import { confirmarCuotaSocial, acreditarCuotaSocial } from './actions';
+import { money } from '@/lib/format';
+import { confirmarCuotaSocial } from './actions';
 
 type Candidate = { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number };
-type Pending = { dispensaId: string; number: number; memberName: string; amount: number; createdAt: string };
 
-export function CuotaSocialTab({
-  candidates,
-  pending,
-  periodoLabel,
-}: {
-  candidates: Candidate[];
-  pending: Pending[];
-  periodoLabel: string;
-}) {
+export function CuotaSocialTab({ candidates, periodoLabel }: { candidates: Candidate[]; periodoLabel: string }) {
   const router = useRouter();
   const [pendingGen, startGen] = useTransition();
-  const [pendingAcreditar, startAcreditar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(candidates.map((c) => [c.memberId, String(c.cuotaSocial)])),
@@ -44,17 +34,6 @@ export function CuotaSocialTab({
       if (res?.error) {
         setError(res.error);
         return;
-      }
-      router.refresh();
-    });
-  }
-
-  function acreditar(dispensaId: string) {
-    if (!confirm('¿Ya llegó el comprobante de pago de esta cuota? Se va a acreditar como crédito de producto.')) return;
-    startAcreditar(async () => {
-      const res = await acreditarCuotaSocial(dispensaId);
-      if (res?.error) {
-        setError(res.error);
       }
       router.refresh();
     });
@@ -132,50 +111,10 @@ export function CuotaSocialTab({
 
       {error && <p className="text-red text-sm">{error}</p>}
 
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
-        <div className="px-4 py-3 border-b border-line">
-          <p className="font-semibold text-text">Pendientes de acreditar</p>
-          <p className="text-text-mute text-xs">Se acredita cuando llega el comprobante de pago (transferencia/tarjeta/MP) — recién ahí se convierte en crédito de producto</p>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface-2 text-text-soft text-left">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Fecha</th>
-              <th className="px-4 py-2.5 font-medium">Comprobante</th>
-              <th className="px-4 py-2.5 font-medium">Socio</th>
-              <th className="px-4 py-2.5 font-medium text-right">Monto</th>
-              <th className="px-4 py-2.5 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {pending.map((p) => (
-              <tr key={p.dispensaId} className="border-t border-line">
-                <td className="px-4 py-2.5 text-text-soft">{fmtDate(p.createdAt)}</td>
-                <td className="px-4 py-2.5 text-text-soft">N° {p.number}</td>
-                <td className="px-4 py-2.5 text-text">{p.memberName}</td>
-                <td className="px-4 py-2.5 text-right font-medium text-red">{money(p.amount)}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <button
-                    type="button"
-                    disabled={pendingAcreditar}
-                    onClick={() => acreditar(p.dispensaId)}
-                    className="rounded-lg bg-accent text-white text-xs font-semibold px-3 py-1.5 disabled:opacity-60"
-                  >
-                    Acreditar pago
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {pending.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-text-mute">
-                  No hay cuotas sociales pendientes de acreditar.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <p className="text-text-mute text-xs">
+        Cada cuota generada queda como un comprobante más en la cuenta corriente del socio. Se acredita como
+        crédito de producto automáticamente al quedar pagada por completo (solapa &quot;Buscar socio&quot; → columna Cobro).
+      </p>
     </div>
   );
 }

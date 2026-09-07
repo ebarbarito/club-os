@@ -15,6 +15,7 @@ type Comprobante = {
   created_at: string;
   amount: number;
   adeudado: number;
+  esCuotaSocial: boolean;
   items: Item[];
   payments: Payment[];
 };
@@ -55,9 +56,14 @@ export function ComprobantesTable({
             <tr key={c.id} className="border-t border-line">
               <td className="px-4 py-2.5 text-text-soft">{fmtDate(c.created_at)}</td>
               <td className="px-4 py-2.5">
-                <ModalTrigger label={`N° ${c.number}`} className="text-accent text-sm font-medium hover:underline" title="Detalle del comprobante">
-                  <DispensaDetail number={c.number} memberName={memberName} createdAt={c.created_at} items={c.items} payments={c.payments} amount={c.amount} />
-                </ModalTrigger>
+                <div className="flex items-center gap-2">
+                  <ModalTrigger label={`N° ${c.number}`} className="text-accent text-sm font-medium hover:underline" title="Detalle del comprobante">
+                    <DispensaDetail number={c.number} memberName={memberName} createdAt={c.created_at} items={c.items} payments={c.payments} amount={c.amount} />
+                  </ModalTrigger>
+                  {c.esCuotaSocial && (
+                    <span className="rounded-full bg-amber-bg text-amber-tx text-xs font-semibold px-2 py-0.5">Cuota social</span>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-2.5 text-text-soft">{money(c.amount)}</td>
               <td className="px-4 py-2.5 font-medium text-red">{money(c.adeudado)}</td>

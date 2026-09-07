@@ -36,6 +36,8 @@ export function RegisterDispensaForm({
   initialPayments,
   creditsByMember = {},
   virtualAccountId,
+  generalCreditsByMember = {},
+  generalAccountId,
 }: {
   members: SearchableMember[];
   items: CatalogItem[];
@@ -48,6 +50,8 @@ export function RegisterDispensaForm({
   initialPayments?: PaymentLine[];
   creditsByMember?: Record<string, number>;
   virtualAccountId?: string | null;
+  generalCreditsByMember?: Record<string, number>;
+  generalAccountId?: string | null;
 }) {
   const router = useRouter();
   const close = useModalClose();
@@ -61,9 +65,11 @@ export function RegisterDispensaForm({
   );
   const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
   const [useCredit, setUseCredit] = useState('');
+  const [useGeneralCredit, setUseGeneralCredit] = useState('');
   const itemRefs = useRef<Array<ItemSearchHandle | null>>([]);
 
   const availableCredit = creditsByMember[memberId] ?? 0;
+  const availableGeneralCredit = generalCreditsByMember[memberId] ?? 0;
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -75,7 +81,9 @@ export function RegisterDispensaForm({
 
   const realTotal = rows.reduce((sum, r) => sum + lineTotal(r), 0);
   const creditUsed = Math.min(Number(useCredit) || 0, availableCredit);
-  const paidTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0) + creditUsed;
+  const generalCreditUsed = Math.min(Number(useGeneralCredit) || 0, availableGeneralCredit);
+  const paidTotal =
+    payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0) + creditUsed + generalCreditUsed;
   const saldo = realTotal - paidTotal;
 
   function updateRow(i: number, patch: Partial<ItemRow>) {
@@ -139,6 +147,9 @@ export function RegisterDispensaForm({
     }));
     if (creditUsed > 0 && virtualAccountId) {
       payloadPayments.push({ account_id: virtualAccountId, amount: creditUsed, exchange_rate: 1 });
+    }
+    if (generalCreditUsed > 0 && generalAccountId) {
+      payloadPayments.push({ account_id: generalAccountId, amount: generalCreditUsed, exchange_rate: 1 });
     }
     formData.set('payments', JSON.stringify(payloadPayments));
 
@@ -306,6 +317,26 @@ export function RegisterDispensaForm({
               placeholder="0"
               value={useCredit}
               onChange={(e) => setUseCredit(e.target.value)}
+              className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
+
+      {generalAccountId && availableGeneralCredit > 0.01 && (
+        <div className="rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className="text-xs font-medium text-text">
+              💰 Saldo a favor disponible: {money(availableGeneralCredit)}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={availableGeneralCredit}
+              step="1"
+              placeholder="0"
+              value={useGeneralCredit}
+              onChange={(e) => setUseGeneralCredit(e.target.value)}
               className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
             />
           </div>
