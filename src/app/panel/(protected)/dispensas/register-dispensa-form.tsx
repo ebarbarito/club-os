@@ -175,8 +175,8 @@ export function RegisterDispensaForm({
 
       <div>
         <label className={labelCls}>Artículos</label>
-        <div className="rounded-lg border border-line-2 overflow-hidden">
-          <div className={`hidden sm:grid ${ITEM_GRID_CLS} gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft`}>
+        <div className="rounded-lg border border-line-2">
+          <div className={`hidden sm:grid ${ITEM_GRID_CLS} gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft rounded-t-lg`}>
             <span>Artículo</span>
             <span>Cantidad</span>
             <span>Precio unit.</span>

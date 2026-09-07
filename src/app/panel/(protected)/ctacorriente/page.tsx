@@ -27,12 +27,13 @@ export default async function CtaCorrientePage({
   const activeTab = tab === 'resumen' ? 'resumen' : tab === 'cuota_social' && isAdmin ? 'cuota_social' : 'buscar';
   const supabase = await createClient();
 
-  const [{ data: accounts }, { data: allDispensas }] = await Promise.all([
+  const [{ data: accounts }, { data: allDispensas }, { data: generalCreditRows }] = await Promise.all([
     supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     supabase
       .from('dispensas')
       .select('member_id, amount, es_cuota_social, acreditado_at, payments:dispensa_payments(amount_local), member:members(name, dni, member_number)')
       .is('voided_at', null),
+    supabase.from('member_credits').select('member_id, amount, member:members(name, dni, member_number)').eq('kind', 'general'),
   ]);
 
   const debtorMap = new Map<string, Debtor>();
@@ -62,6 +63,23 @@ export default async function CtaCorrientePage({
     adeudado: d.adeudado,
   }));
   const totalGeneral = debtors.reduce((s, d) => s + d.adeudado, 0);
+
+  const creditorMap = new Map<string, Debtor>();
+  for (const c of generalCreditRows ?? []) {
+    const member = Array.isArray(c.member) ? c.member[0] : c.member;
+    const existing = creditorMap.get(c.member_id);
+    if (existing) existing.adeudado += c.amount;
+    else
+      creditorMap.set(c.member_id, {
+        id: c.member_id,
+        name: member?.name ?? '—',
+        dni: member?.dni ?? '',
+        memberNumber: member?.member_number ?? null,
+        adeudado: c.amount,
+      });
+  }
+  const creditors = [...creditorMap.values()].filter((c) => c.adeudado > 0.01).sort((a, b) => b.adeudado - a.adeudado);
+  const totalAFavor = creditors.reduce((s, c) => s + c.adeudado, 0);
 
   let comprobantes: {
     id: string;
@@ -212,12 +230,30 @@ export default async function CtaCorrientePage({
                 <span className="text-red font-semibold">{money(d.adeudado)}</span>
               </Link>
             ))}
-            {debtors.length === 0 && <p className="px-4 py-6 text-center text-text-mute text-sm">No hay deudores.</p>}
+            {creditors.map((c) => (
+              <Link
+                key={c.id}
+                href={`/panel/ctacorriente?member=${c.id}`}
+                className="flex justify-between items-center px-4 py-2.5 text-sm hover:bg-surface-2"
+              >
+                <span className="text-text font-medium">
+                  {c.memberNumber != null ? `N° ${c.memberNumber} — ` : ''}
+                  {c.name}
+                </span>
+                <span className="text-accent font-semibold">+{money(c.adeudado)}</span>
+              </Link>
+            ))}
+            {debtors.length === 0 && creditors.length === 0 && (
+              <p className="px-4 py-6 text-center text-text-mute text-sm">No hay deudores ni saldos a favor.</p>
+            )}
           </div>
-          {debtors.length > 0 && (
+          {(debtors.length > 0 || creditors.length > 0) && (
             <div className="px-4 py-3 border-t border-line flex justify-between font-semibold text-text bg-surface-2">
-              <span>Total adeudado</span>
-              <span>{money(totalGeneral)}</span>
+              <span>Total adeudado / a favor</span>
+              <span>
+                {money(totalGeneral)}
+                {totalAFavor > 0.01 && <span className="text-accent"> · +{money(totalAFavor)}</span>}
+              </span>
             </div>
           )}
         </div>
