@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { Badge } from '@/components/badge';
 import { MEMBER_STATUS } from '@/lib/status-meta';
-import { fmtDate } from '@/lib/format';
+import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
 
 const REPR_LABEL: Record<string, string> = {
@@ -28,10 +28,17 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { data: member } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
   if (!member) notFound();
 
-  const { data: documents } = await supabase
-    .from('member_documents')
-    .select('id, label, storage_path')
-    .eq('member_id', id);
+  const [{ data: documents }, { data: cuotaSocialRows }, { data: creditRows }] = await Promise.all([
+    supabase.from('member_documents').select('id, label, storage_path').eq('member_id', id),
+    supabase
+      .from('dispensas')
+      .select('id, number, amount, created_at, acreditado_at, voided_at')
+      .eq('member_id', id)
+      .eq('es_cuota_social', true)
+      .order('created_at', { ascending: false }),
+    supabase.from('member_credits').select('amount').eq('member_id', id).eq('kind', 'cuota_social'),
+  ]);
+  const saldoCuotaSocial = (creditRows ?? []).reduce((s, r) => s + r.amount, 0);
 
   // Bucket privado — la URL firmada es la única forma de verlo, y vence
   // a los pocos minutos (no queda un link público dando vueltas).
@@ -91,6 +98,42 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           <div><dt className="text-text-mute">Matrícula</dt><dd>{member.matricula ?? '—'}</dd></div>
           <div className="col-span-2"><dt className="text-text-mute">Patología</dt><dd>{member.patologia ?? '—'}</dd></div>
         </dl>
+      </div>
+
+      <div className="rounded-xl border border-line bg-surface p-5 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-text-mute uppercase">Servicio pactado</p>
+          <Link href={`/panel/ctacorriente?member=${id}`} className="text-accent text-xs font-semibold hover:underline">
+            Ver en Cuenta Corriente →
+          </Link>
+        </div>
+        <dl className="grid grid-cols-2 gap-3 text-sm mb-3">
+          <div>
+            <dt className="text-text-mute">Tipo</dt>
+            <dd>{member.servicio_pactado_tipo === 'M2 cultivo' ? 'M² de cultivo' : (member.servicio_pactado_tipo ?? '—')}</dd>
+          </div>
+          <div><dt className="text-text-mute">Cantidad</dt><dd>{member.servicio_pactado_cantidad ?? '—'}</dd></div>
+          <div><dt className="text-text-mute">Cuota social</dt><dd>{member.cuota_social != null ? money(member.cuota_social) : '—'}</dd></div>
+          <div><dt className="text-text-mute">Factura automática</dt><dd>{member.factura_automatica ? 'Sí' : 'No'}</dd></div>
+        </dl>
+        {saldoCuotaSocial > 0.01 && (
+          <div className="rounded-lg bg-amber-bg px-3 py-2 text-sm text-amber-tx font-medium mb-3">
+            Crédito cuota social disponible: {money(saldoCuotaSocial)}
+          </div>
+        )}
+        {(cuotaSocialRows ?? []).length > 0 && (
+          <div className="border-t border-line pt-3 space-y-1.5">
+            {(cuotaSocialRows ?? []).map((c) => (
+              <div key={c.id} className="flex justify-between items-center text-sm">
+                <span className="text-text-soft">
+                  {fmtDateTime(c.created_at)} · N° {c.number}
+                  {c.voided_at ? ' · anulada' : c.acreditado_at ? ' · acreditada' : ' · pendiente'}
+                </span>
+                <span className="font-medium text-text">{money(c.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
