@@ -4,6 +4,7 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { Badge } from '@/components/badge';
+import { ConfigTabs } from '@/components/config-tabs';
 import { AccountForm } from './account-form';
 
 export default async function CuentasPage() {
@@ -26,11 +27,11 @@ export default async function CuentasPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text">Cuentas</h1>
-          <p className="text-text-soft">Medios de pago disponibles para Dispensa, Cuenta Corriente y Caja</p>
-        </div>
+      <h1 className="font-display text-2xl font-bold text-text">Cuentas</h1>
+      <p className="text-text-soft mb-4">Medios de pago disponibles para Dispensa, Cuenta Corriente y Caja</p>
+      <ConfigTabs active="cuentas" />
+
+      <div className="flex items-center justify-end mb-4">
         <ModalTrigger label="+ Nueva cuenta" title="Nueva cuenta">
           <AccountForm />
         </ModalTrigger>

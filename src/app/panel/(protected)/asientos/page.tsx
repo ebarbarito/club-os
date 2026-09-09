@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { fmtDateTime } from '@/lib/format';
+import { ConfigTabs } from '@/components/config-tabs';
 import { PurgeAuditForm } from './purge-audit-form';
 
 const CHANGE_TYPE_LABEL: Record<string, string> = { edicion: 'Edición', eliminacion: 'Eliminación' };
@@ -37,11 +38,11 @@ export default async function AsientosPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text">Asientos</h1>
-          <p className="text-text-soft">Modificaciones y eliminaciones — solo administrador</p>
-        </div>
+      <h1 className="font-display text-2xl font-bold text-text">Asientos</h1>
+      <p className="text-text-soft mb-4">Modificaciones y eliminaciones — solo administrador</p>
+      <ConfigTabs active="asientos" />
+
+      <div className="flex items-center justify-end mb-4">
         <PurgeAuditForm />
       </div>
 

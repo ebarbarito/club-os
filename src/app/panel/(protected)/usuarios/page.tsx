@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { ModalTrigger } from '@/components/modal-trigger';
+import { ConfigTabs } from '@/components/config-tabs';
 import { CreateUserForm } from './create-user-form';
 import { DeleteUserButton } from './delete-user-button';
 
@@ -35,11 +36,11 @@ export default async function UsuariosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text">Usuarios</h1>
-          <p className="text-text-soft">Cuentas del equipo</p>
-        </div>
+      <h1 className="font-display text-2xl font-bold text-text">Usuarios</h1>
+      <p className="text-text-soft mb-4">Cuentas del equipo</p>
+      <ConfigTabs active="usuarios" />
+
+      <div className="flex items-center justify-end mb-4">
         <ModalTrigger label="+ Nuevo usuario" title="Nuevo usuario">
           <CreateUserForm />
         </ModalTrigger>

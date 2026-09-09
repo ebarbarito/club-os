@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
+import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
 
 export default async function ConfiguracionPage() {
@@ -20,11 +21,12 @@ export default async function ConfiguracionPage() {
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
 
   return (
-    <div className="max-w-xl">
+    <div>
       <h1 className="font-display text-2xl font-bold text-text">Configuración</h1>
-      <p className="text-text-soft mb-6">Ajustes generales del club</p>
+      <p className="text-text-soft mb-4">Ajustes generales del club</p>
+      <ConfigTabs active="configuracion" />
 
-      <div className="rounded-xl border border-line bg-surface p-5 space-y-4">
+      <div className="max-w-xl rounded-xl border border-line bg-surface p-5 space-y-4">
         <div>
           <p className="text-xs font-semibold text-text-mute uppercase mb-2">Sitio público</p>
           <p className="text-text-soft text-sm mb-3">

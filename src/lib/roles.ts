@@ -21,22 +21,9 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     name: 'Administrador',
     desc: 'Acceso total: caja, balance, salas, socios y stock',
     home: 'dispensas',
-    nav: [
-      'dispensas',
-      'ctacorriente',
-      'socios',
-      'catalogo',
-      'stock',
-      'salas',
-      'sensores',
-      'caja',
-      'cuentas',
-      'balance',
-      'usuarios',
-      'configuracion',
-      'asientos',
-      'empleados',
-    ],
+    // Asientos, Cuentas y Usuarios quedan agrupados dentro de Configuración
+    // (ver ConfigTabs) en vez de ser entradas propias del menú.
+    nav: ['dispensas', 'ctacorriente', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'balance', 'configuracion', 'empleados'],
   },
   dispensador: {
     name: 'Dispensador/a',
