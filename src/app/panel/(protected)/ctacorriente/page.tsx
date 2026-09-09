@@ -26,14 +26,17 @@ export default async function CtaCorrientePage({
   const activeTab = tab === 'resumen' ? 'resumen' : tab === 'cuota_social' && isAdmin ? 'cuota_social' : 'buscar';
   const supabase = await createClient();
 
-  const [{ data: accounts }, { data: allDispensas }, { data: generalCreditRows }] = await Promise.all([
+  const [{ data: accounts }, { data: allDispensas }, { data: generalCreditRows }, { data: virtualAccounts }] = await Promise.all([
     supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     supabase
       .from('dispensas')
       .select('member_id, amount, es_cuota_social, acreditado_at, payments:dispensa_payments(amount_local), member:members(name, dni, member_number)')
       .is('voided_at', null),
     supabase.from('member_credits').select('member_id, amount, member:members(name, dni, member_number)').eq('kind', 'general'),
+    supabase.from('payment_accounts').select('id, virtual_kind').eq('is_virtual', true),
   ]);
+  const cuotaSocialAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'cuota_social')?.id ?? null;
+  const generalAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'general')?.id ?? null;
 
   const debtorMap = new Map<string, Debtor>();
   for (const d of allDispensas ?? []) {
@@ -273,7 +276,15 @@ export default async function CtaCorrientePage({
             </div>
           )}
 
-          <ComprobantesTable comprobantes={comprobantes} memberName={selectedMemberName} accounts={accounts ?? []} />
+          <ComprobantesTable
+            comprobantes={comprobantes}
+            memberName={selectedMemberName}
+            accounts={accounts ?? []}
+            cuotaSocialAccountId={cuotaSocialAccountId}
+            saldoCuotaSocial={saldoCuotaSocial}
+            generalAccountId={generalAccountId}
+            saldoAFavorGeneral={saldoAFavorGeneral}
+          />
 
           {historial.length > 0 && (
             <details className="rounded-xl border border-line bg-surface">

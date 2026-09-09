@@ -121,6 +121,9 @@ export function RegisterDispensaForm({
     if (saldo > 0.01 && !confirm(`Van a quedar ${money(saldo)} en cuenta corriente de este socio. ¿Confirmás?`)) {
       return;
     }
+    if (saldo < -0.01 && !confirm(`Va a quedar ${money(-saldo)} de saldo a favor en la cuenta corriente de este socio. ¿Confirmás?`)) {
+      return;
+    }
 
     const formData = new FormData();
     if (mode === 'edit' && dispensaId) formData.set('dispensa_id', dispensaId);
@@ -297,8 +300,10 @@ export function RegisterDispensaForm({
             <p className="text-text font-medium">{money(paidTotal)}</p>
           </div>
           <div>
-            <p className="text-text-mute text-xs">Saldo (a cta cte)</p>
-            <p className={`font-bold text-base ${saldo > 0.01 ? 'text-red' : 'text-text-mute'}`}>{money(Math.max(saldo, 0))}</p>
+            <p className="text-text-mute text-xs">{saldo < -0.01 ? 'Saldo a favor (a cta cte)' : 'Saldo (a cta cte)'}</p>
+            <p className={`font-bold text-base ${saldo > 0.01 ? 'text-red' : saldo < -0.01 ? 'text-accent' : 'text-text-mute'}`}>
+              {saldo < -0.01 ? `+${money(-saldo)}` : money(Math.max(saldo, 0))}
+            </p>
           </div>
         </div>
       </div>

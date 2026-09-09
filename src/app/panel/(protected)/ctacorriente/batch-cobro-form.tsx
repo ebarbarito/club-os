@@ -9,7 +9,21 @@ import { payDispensaBatch } from './actions';
 
 type Allocation = { dispensaId: string; number: number; amount: number };
 
-export function BatchCobroForm({ allocations, accounts }: { allocations: Allocation[]; accounts: PaymentAccount[] }) {
+export function BatchCobroForm({
+  allocations,
+  accounts,
+  cuotaSocialAccountId,
+  saldoCuotaSocial = 0,
+  generalAccountId,
+  saldoAFavorGeneral = 0,
+}: {
+  allocations: Allocation[];
+  accounts: PaymentAccount[];
+  cuotaSocialAccountId?: string | null;
+  saldoCuotaSocial?: number;
+  generalAccountId?: string | null;
+  saldoAFavorGeneral?: number;
+}) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
@@ -19,17 +33,28 @@ export function BatchCobroForm({ allocations, accounts }: { allocations: Allocat
     const account = defaultAccount(accounts);
     return [{ accountId: account?.id ?? '', amount: String(total), exchangeRate: String(account?.exchange_rate ?? 1) }];
   });
+  const [useCredit, setUseCredit] = useState('');
+  const [useGeneralCredit, setUseGeneralCredit] = useState('');
+  const creditUsed = Math.min(Number(useCredit) || 0, saldoCuotaSocial);
+  const generalCreditUsed = Math.min(Number(useGeneralCredit) || 0, saldoAFavorGeneral);
 
   function submit() {
     const validLines = lines.filter((l) => Number(l.amount) > 0);
-    if (validLines.length === 0) {
+    if (validLines.length === 0 && creditUsed <= 0 && generalCreditUsed <= 0) {
       setError('Cargá al menos un medio de pago');
       return;
+    }
+    const payments = validLines.map((l) => ({ account_id: l.accountId, amount: Number(l.amount), exchange_rate: Number(l.exchangeRate) || 1 }));
+    if (creditUsed > 0 && cuotaSocialAccountId) {
+      payments.push({ account_id: cuotaSocialAccountId, amount: creditUsed, exchange_rate: 1 });
+    }
+    if (generalCreditUsed > 0 && generalAccountId) {
+      payments.push({ account_id: generalAccountId, amount: generalCreditUsed, exchange_rate: 1 });
     }
     startTransition(async () => {
       const res = await payDispensaBatch(
         allocations.map((a) => ({ dispensa_id: a.dispensaId, amount: a.amount })),
-        validLines.map((l) => ({ account_id: l.accountId, amount: Number(l.amount), exchange_rate: Number(l.exchangeRate) || 1 })),
+        payments,
       );
       if (res?.error) {
         setError(res.error);
@@ -57,6 +82,46 @@ export function BatchCobroForm({ allocations, accounts }: { allocations: Allocat
           <span>{money(total)}</span>
         </div>
       </div>
+
+      {cuotaSocialAccountId && saldoCuotaSocial > 0.01 && (
+        <div className="rounded-lg border border-amber/40 bg-amber-bg px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className="text-xs font-medium text-amber-tx">
+              🪙 Crédito cuota social disponible: {money(saldoCuotaSocial)}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={saldoCuotaSocial}
+              step="1"
+              placeholder="0"
+              value={useCredit}
+              onChange={(e) => setUseCredit(e.target.value)}
+              className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
+
+      {generalAccountId && saldoAFavorGeneral > 0.01 && (
+        <div className="rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className="text-xs font-medium text-text">
+              💰 Saldo a favor disponible: {money(saldoAFavorGeneral)}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={saldoAFavorGeneral}
+              step="1"
+              placeholder="0"
+              value={useGeneralCredit}
+              onChange={(e) => setUseGeneralCredit(e.target.value)}
+              className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
 
       <PaymentSplitEditor accounts={accounts} lines={lines} onChange={setLines} />
       <p className="text-text-mute text-xs">

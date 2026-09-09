@@ -26,10 +26,18 @@ export function ComprobantesTable({
   comprobantes,
   memberName,
   accounts,
+  cuotaSocialAccountId,
+  saldoCuotaSocial,
+  generalAccountId,
+  saldoAFavorGeneral,
 }: {
   comprobantes: Comprobante[];
   memberName: string;
   accounts: PaymentAccount[];
+  cuotaSocialAccountId?: string | null;
+  saldoCuotaSocial?: number;
+  generalAccountId?: string | null;
+  saldoAFavorGeneral?: number;
 }) {
   const [cobros, setCobros] = useState<Record<string, string>>({});
 
@@ -104,7 +112,14 @@ export function ComprobantesTable({
           </div>
           {totalCobro > 0 ? (
             <ModalTrigger label="Forma de pago" className="rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2" title="Cobrar">
-              <BatchCobroForm allocations={allocations} accounts={accounts} />
+              <BatchCobroForm
+                allocations={allocations}
+                accounts={accounts}
+                cuotaSocialAccountId={cuotaSocialAccountId}
+                saldoCuotaSocial={saldoCuotaSocial}
+                generalAccountId={generalAccountId}
+                saldoAFavorGeneral={saldoAFavorGeneral}
+              />
             </ModalTrigger>
           ) : (
             <button type="button" disabled className="rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2 opacity-40 cursor-not-allowed">
