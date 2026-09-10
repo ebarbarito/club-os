@@ -23,7 +23,7 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     home: 'dispensas',
     // Asientos, Cuentas y Usuarios quedan agrupados dentro de Configuración
     // (ver ConfigTabs) en vez de ser entradas propias del menú.
-    nav: ['dispensas', 'ctacorriente', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'balance', 'configuracion', 'empleados'],
+    nav: ['dispensas', 'ctacorriente', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'balance', 'empleados', 'configuracion'],
   },
   dispensador: {
     name: 'Dispensador/a',
