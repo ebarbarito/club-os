@@ -18,7 +18,7 @@ export default async function DispensaPage({
 
   const supabase = await createClient();
 
-  const [{ data: orders }, { data: dispensas }, { data: validMembers }, { data: stockRows }, { data: accountRows }] =
+  const [{ data: orders }, { data: dispensas }, { data: allMembers }, { data: stockRows }, { data: accountRows }] =
     await Promise.all([
       supabase
         .from('orders')
@@ -31,7 +31,7 @@ export default async function DispensaPage({
         )
         .order('created_at', { ascending: false })
         .limit(50),
-      supabase.from('members').select('id, name, dni, member_number').eq('status', 'valid').order('member_number'),
+      supabase.from('members').select('id, name, dni, member_number, status').is('deleted_at', null).order('member_number'),
       supabase.from('stock').select('grams, strain:strains(id, code, name, item_type, price_per_gram, status)'),
       supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     ]);
@@ -70,7 +70,7 @@ export default async function DispensaPage({
         </div>
         <ModalTrigger label="+ Registrar dispensa" title="Registrar dispensa" size="xl">
           <RegisterDispensaForm
-            members={validMembers ?? []}
+            members={allMembers ?? []}
             items={items}
             accounts={accounts}
             creditsByMember={creditsByMember}
@@ -246,7 +246,7 @@ export default async function DispensaPage({
                     byName={by?.name ?? '—'}
                     items={rowItems}
                     payments={rowPayments}
-                    members={validMembers ?? []}
+                    members={allMembers ?? []}
                     catalogItems={items}
                     accounts={accounts}
                     creditsByMember={creditsByMember}

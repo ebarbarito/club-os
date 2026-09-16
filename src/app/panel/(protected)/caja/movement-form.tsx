@@ -26,6 +26,7 @@ export function MovementForm({
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [type, setType] = useState<'ingreso' | 'egreso'>('ingreso');
   const [concept, setConcept] = useState<string>(CONCEPTS[0]);
   const [customConcept, setCustomConcept] = useState('');
   const [payments, setPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
@@ -68,7 +69,7 @@ export function MovementForm({
     <form action={submit} className="space-y-3">
       <div>
         <label className={labelCls}>Categoría</label>
-        <select name="type" className={inputCls} defaultValue="ingreso">
+        <select name="type" value={type} onChange={(e) => setType(e.target.value as 'ingreso' | 'egreso')} className={inputCls}>
           <option value="ingreso">Ingreso</option>
           <option value="egreso">Egreso</option>
         </select>

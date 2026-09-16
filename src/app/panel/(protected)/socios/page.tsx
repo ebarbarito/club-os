@@ -3,13 +3,9 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
-import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
-import { MEMBER_STATUS } from '@/lib/status-meta';
-import { fmtDate } from '@/lib/format';
 import { CreateMemberForm } from './create-member-form';
-import { EditMemberForm } from './edit-member-form';
-import { DeleteMemberForm } from './delete-member-form';
+import { SociosTable } from './socios-table';
 
 const TABS = [
   { key: 'todos', label: 'Todos' },
@@ -18,15 +14,6 @@ const TABS = [
   { key: 'draft', label: 'Borradores' },
   { key: 'rejected', label: 'Rechazados' },
 ] as const;
-
-const REPROCANN_LABEL: Record<string, string> = { vigente: 'Vigente', tramite: 'En trámite', no: 'Sin REPROCANN' };
-const REPROCANN_TYPE_LABEL: Record<string, string> = { autocultivador: 'Autocultivador', paciente: 'Paciente' };
-
-function reprocannCell(reprocann: string, type: string | null): string {
-  const status = REPROCANN_LABEL[reprocann] ?? reprocann;
-  if (!type) return status;
-  return `${REPROCANN_TYPE_LABEL[type] ?? type} · ${status}`;
-}
 
 export default async function SociosPage({
   searchParams,
@@ -81,69 +68,7 @@ export default async function SociosPage({
         ))}
       </div>
 
-      <div className="rounded-xl border border-line bg-surface overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-surface-2 text-text-soft text-left">
-            <tr>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Código</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Nombre</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">DNI</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Domicilio</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">REPROCANN</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Alta</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Estado</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(members ?? []).map((m) => (
-              <tr key={m.id} className="border-t border-line hover:bg-surface-2">
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.member_number ?? '—'}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap">
-                  <Link href={`/panel/socios/${m.id}`} className="font-medium text-text hover:text-accent">
-                    {m.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.dni}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft max-w-[220px] truncate" title={m.address ?? m.zona ?? ''}>
-                  {m.address ?? m.zona ?? '—'}
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{reprocannCell(m.reprocann, m.reprocann_type)}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{fmtDate(m.alta_date)}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap">
-                  <Badge label={MEMBER_STATUS[m.status as keyof typeof MEMBER_STATUS].label} color={MEMBER_STATUS[m.status as keyof typeof MEMBER_STATUS].color} />
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                  <div className="flex gap-2 justify-end">
-                    <ModalTrigger
-                      label="Editar"
-                      className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                      title={`Editar socio · ${m.name}`}
-                      size="xl"
-                    >
-                      <EditMemberForm member={m} />
-                    </ModalTrigger>
-                    <ModalTrigger
-                      label="Eliminar"
-                      className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-red hover:text-red"
-                      title="Eliminar socio"
-                    >
-                      <DeleteMemberForm memberId={m.id} memberName={m.name} />
-                    </ModalTrigger>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {(members ?? []).length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-text-mute">
-                  Sin socios en esta vista.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <SociosTable members={members ?? []} />
     </div>
   );
 }

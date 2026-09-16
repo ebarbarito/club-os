@@ -182,7 +182,10 @@ function DiariaTab({
   expectedUsd: number;
 }) {
   const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
-  const groups = groupByReceipt(movements);
+  // Los descuentos de impuesto por cuenta (categoría "Impuesto") son ruido
+  // contable para el operador de caja diaria — se ven en detalle en Caja
+  // general, acá no aportan nada.
+  const groups = groupByReceipt(movements.filter((m) => m.category !== 'Impuesto'));
 
   return (
     <div>

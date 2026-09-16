@@ -3,7 +3,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { money } from '@/lib/format';
 
-export type SearchableMember = { id: string; name: string; dni: string; member_number: number; adeudado?: number };
+export type SearchableMember = { id: string; name: string; dni: string; member_number: number; adeudado?: number; status?: string };
+
+const MEMBER_STATUS_WARN_LABEL: Record<string, string> = { draft: 'Borrador', pending: 'En evaluación', rejected: 'Rechazado' };
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 
@@ -69,6 +71,7 @@ export function MemberSearch({
   }
 
   if (selected && !open) {
+    const warnLabel = selected.status ? MEMBER_STATUS_WARN_LABEL[selected.status] : undefined;
     return (
       <div className="flex items-center justify-between rounded-lg border border-line-2 px-3 py-2 text-sm">
         <div>
@@ -77,6 +80,7 @@ export function MemberSearch({
           </span>
           <span className="text-text-mute"> · DNI {selected.dni}</span>
           {typeof selected.adeudado === 'number' && <span className="text-red font-medium"> · {money(selected.adeudado)}</span>}
+          {warnLabel && <span className="text-amber-tx font-semibold"> · ⚠ {warnLabel}</span>}
         </div>
         <button
           type="button"
@@ -106,21 +110,25 @@ export function MemberSearch({
       />
       {open && (
         <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-line-2 bg-surface shadow-lg">
-          {filtered.map((m, i) => (
-            <button
-              key={m.id}
-              type="button"
-              onMouseEnter={() => setHighlighted(i)}
-              onClick={() => select(m.id)}
-              className={`w-full text-left px-3 py-2 text-sm ${i === safeHighlighted ? 'bg-surface-2' : 'hover:bg-surface-2'}`}
-            >
-              <span className="font-medium text-text">
-                #{m.member_number} · {m.name}
-              </span>
-              <span className="text-text-mute"> · DNI {m.dni}</span>
-              {typeof m.adeudado === 'number' && <span className="text-red font-medium"> · {money(m.adeudado)}</span>}
-            </button>
-          ))}
+          {filtered.map((m, i) => {
+            const warnLabel = m.status ? MEMBER_STATUS_WARN_LABEL[m.status] : undefined;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onMouseEnter={() => setHighlighted(i)}
+                onClick={() => select(m.id)}
+                className={`w-full text-left px-3 py-2 text-sm ${i === safeHighlighted ? 'bg-surface-2' : 'hover:bg-surface-2'}`}
+              >
+                <span className="font-medium text-text">
+                  #{m.member_number} · {m.name}
+                </span>
+                <span className="text-text-mute"> · DNI {m.dni}</span>
+                {typeof m.adeudado === 'number' && <span className="text-red font-medium"> · {money(m.adeudado)}</span>}
+                {warnLabel && <span className="text-amber-tx font-semibold"> · ⚠ {warnLabel}</span>}
+              </button>
+            );
+          })}
           {filtered.length === 0 && <p className="px-3 py-2 text-sm text-text-mute">Sin resultados.</p>}
         </div>
       )}

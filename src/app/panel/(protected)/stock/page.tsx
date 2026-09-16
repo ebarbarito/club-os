@@ -4,6 +4,7 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { SendStockForm } from './send-stock-form';
 import { AdjustGeneralStockForm } from './adjust-general-stock-form';
+import { AdjustDispensaStockForm } from './adjust-dispensa-stock-form';
 import { StockMovements } from './stock-movements';
 
 function levelTextColor(dispensaGrams: number, generalGrams: number): string {
@@ -43,7 +44,12 @@ export default async function StockPage({
     if (s) strainMap.set(r.strain_id, s);
   }
 
-  const strains = [...strainMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  // Genéticas primero (orden alfabético), después el resto de los artículos
+  // (también alfabético) — así se ven agrupadas en vez de mezcladas.
+  const strains = [...strainMap.values()].sort((a, b) => {
+    if (a.item_type !== b.item_type) return a.item_type === 'genetica' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 
   return (
     <div>
@@ -78,12 +84,14 @@ export default async function StockPage({
               <tr>
                 <th className="px-4 py-2.5 font-medium">Artículo</th>
                 <th className="px-4 py-2.5 font-medium">Disponible</th>
+                {profile?.role === 'admin' && <th className="px-4 py-2.5 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
               {strains.map((s) => {
                 const dGrams = dispensaByStrain.get(s.id) ?? 0;
                 const gGrams = generalByStrain.get(s.id) ?? 0;
+                const unit = s.item_type === 'genetica' ? 'g' : 'u.';
                 return (
                   <tr key={s.id} className="border-t border-line">
                     <td className="px-4 py-2.5">
@@ -94,14 +102,25 @@ export default async function StockPage({
                       <div className="text-text-mute text-xs">{s.item_type === 'genetica' ? s.type : 'Accesorio'}</div>
                     </td>
                     <td className={`px-4 py-2.5 font-medium ${levelTextColor(dGrams, gGrams)}`}>
-                      {dGrams} {s.item_type === 'genetica' ? 'g' : 'u.'}
+                      {dGrams} {unit}
                     </td>
+                    {profile?.role === 'admin' && (
+                      <td className="px-4 py-2.5 text-right">
+                        <ModalTrigger
+                          label="Ajustar"
+                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                          title={`Ajustar stock dispensa — ${s.name}`}
+                        >
+                          <AdjustDispensaStockForm strainId={s.id} currentGrams={dGrams} unit={unit} />
+                        </ModalTrigger>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {strains.length === 0 && (
                 <tr>
-                  <td colSpan={2} className="px-4 py-10 text-center text-text-mute">
+                  <td colSpan={3} className="px-4 py-10 text-center text-text-mute">
                     Sin artículos cargados todavía.
                   </td>
                 </tr>

@@ -42,3 +42,20 @@ export async function adjustGeneralStock(formData: FormData) {
   revalidatePath('/panel/stock');
   return {};
 }
+
+export async function adjustDispensaStock(formData: FormData) {
+  await requireAdminProfile();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc('adjust_stock_dispensa', {
+    p_strain_id: String(formData.get('strain_id')),
+    p_mode: String(formData.get('mode')),
+    p_value: Number(formData.get('value')),
+    p_note: (formData.get('note') as string) || null,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/stock');
+  revalidatePath('/panel/asientos');
+  return {};
+}

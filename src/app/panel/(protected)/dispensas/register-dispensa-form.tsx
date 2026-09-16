@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
 import { money } from '@/lib/format';
 import { MemberSearch, type SearchableMember } from '@/components/member-search';
+import { MEMBER_STATUS } from '@/lib/status-meta';
 import { ItemSearch, type ItemSearchHandle } from '@/components/item-search';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
 import { registerDispensa, updateDispensa } from './actions';
@@ -70,6 +71,8 @@ export function RegisterDispensaForm({
 
   const availableCredit = creditsByMember[memberId] ?? 0;
   const availableGeneralCredit = generalCreditsByMember[memberId] ?? 0;
+  const selectedMember = members.find((m) => m.id === memberId);
+  const memberNotValid = !!selectedMember && selectedMember.status !== 'valid';
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -108,6 +111,9 @@ export function RegisterDispensaForm({
     setError(null);
     if (!memberId) {
       setError('Elegí un socio');
+      return;
+    }
+    if (memberNotValid && !confirm('Este socio no está validado. ¿Confirmás que querés dispensarle igual?')) {
       return;
     }
     const validRows = rows.filter((r) => r.strainId && Number(r.quantity) > 0);
@@ -168,7 +174,7 @@ export function RegisterDispensaForm({
   }
 
   if (members.length === 0) {
-    return <p className="text-text-soft text-sm">No hay socios validados para dispensar.</p>;
+    return <p className="text-text-soft text-sm">No hay socios cargados.</p>;
   }
   if (items.length === 0) {
     return <p className="text-text-soft text-sm">No hay artículos con stock cargado. Cargá stock primero.</p>;
@@ -177,7 +183,7 @@ export function RegisterDispensaForm({
   return (
     <div className="space-y-4">
       <div>
-        <label className={labelCls}>Socio (válido)</label>
+        <label className={labelCls}>Socio</label>
         <MemberSearch
           members={members}
           value={memberId}
@@ -185,6 +191,11 @@ export function RegisterDispensaForm({
           onSelected={() => itemRefs.current[0]?.focus()}
           autoFocus
         />
+        {memberNotValid && (
+          <p className="mt-1.5 text-xs font-medium text-amber-tx">
+            ⚠ Este socio no está validado (estado: {MEMBER_STATUS[selectedMember!.status as keyof typeof MEMBER_STATUS]?.label ?? selectedMember!.status}). Se puede dispensar igual.
+          </p>
+        )}
       </div>
 
       <div>
