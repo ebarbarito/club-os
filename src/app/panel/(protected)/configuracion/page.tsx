@@ -5,6 +5,7 @@ import { ROLES } from '@/lib/roles';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
+import { PlanDeCuentas } from './plan-de-cuentas';
 
 export default async function ConfiguracionPage() {
   const profile = await getSessionProfile();
@@ -12,11 +13,10 @@ export default async function ConfiguracionPage() {
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
   const supabase = await createClient();
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('slug, public_site_enabled')
-    .eq('id', profile.tenantId)
-    .single();
+  const [{ data: tenant }, { data: conceptRows }] = await Promise.all([
+    supabase.from('tenants').select('slug, public_site_enabled').eq('id', profile.tenantId).single(),
+    supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
+  ]);
 
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
 
@@ -26,7 +26,7 @@ export default async function ConfiguracionPage() {
       <p className="text-text-soft mb-4">Ajustes generales del club</p>
       <ConfigTabs active="configuracion" />
 
-      <div className="max-w-xl rounded-xl border border-line bg-surface p-5 space-y-4">
+      <div className="max-w-xl rounded-xl border border-line bg-surface p-5 space-y-4 mb-6">
         <div>
           <p className="text-xs font-semibold text-text-mute uppercase mb-2">Sitio público</p>
           <p className="text-text-soft text-sm mb-3">
@@ -53,6 +53,10 @@ export default async function ConfiguracionPage() {
             </p>
           </div>
         )}
+      </div>
+
+      <div className="max-w-3xl">
+        <PlanDeCuentas concepts={conceptRows ?? []} />
       </div>
     </div>
   );

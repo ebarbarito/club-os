@@ -6,7 +6,7 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { money, fmtDateTime, fmtDate } from '@/lib/format';
 import { ROLES } from '@/lib/roles';
 import { OpenShiftForm } from './open-shift-form';
-import { MovementForm, type EmployeeOption } from './movement-form';
+import { MovementForm, type EmployeeOption, type ConceptOption } from './movement-form';
 import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
 import { ShiftSummary } from './shift-summary';
@@ -58,13 +58,15 @@ export default async function CajaPage({
   const activeTab = isAdmin && tab === 'general' ? 'general' : 'diaria';
 
   const supabase = await createClient();
-  const [{ data: accountRows }, { data: employeeRows }, { data: memberRows }] = await Promise.all([
+  const [{ data: accountRows }, { data: employeeRows }, { data: memberRows }, { data: conceptRows }] = await Promise.all([
     supabase.from('payment_accounts').select('*').eq('active', true).order('name'),
     supabase.from('employees').select('id, name').eq('active', true).order('name'),
     supabase.from('members').select('id, name, dni, member_number').is('deleted_at', null).order('member_number'),
+    supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso').eq('active', true).order('sort_order'),
   ]);
   const accounts = accountRows ?? [];
   const employees = employeeRows ?? [];
+  const concepts: ConceptOption[] = conceptRows ?? [];
   const members: SearchableMember[] = (memberRows ?? []).map((m) => ({ ...m, member_number: m.member_number ?? 0 }));
   const realAccounts = accounts.filter((a) => !a.is_virtual);
   const cashAccount = accounts.find((a) => a.is_cash);
@@ -133,6 +135,7 @@ export default async function CajaPage({
           realAccounts={realAccounts}
           members={members}
           employees={employees}
+          concepts={concepts}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
           expectedCash={diariaCash}
@@ -145,6 +148,7 @@ export default async function CajaPage({
           diariaMovements={diariaMovements}
           accounts={accounts}
           employees={employees}
+          concepts={concepts}
           cashAccount={cashAccount}
           usdAccount={usdAccount}
           otherAccounts={otherAccounts}
@@ -165,6 +169,7 @@ function DiariaTab({
   realAccounts,
   members,
   employees,
+  concepts,
   cashAccount,
   usdAccount,
   expectedCash,
@@ -176,6 +181,7 @@ function DiariaTab({
   realAccounts: Account[];
   members: SearchableMember[];
   employees: EmployeeOption[];
+  concepts: ConceptOption[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
   expectedCash: number;
@@ -215,7 +221,7 @@ function DiariaTab({
                 className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                 title="Registrar movimiento"
               >
-                <MovementForm accounts={accounts} kind="diaria" employees={employees} />
+                <MovementForm accounts={accounts} kind="diaria" employees={employees} concepts={concepts} />
               </ModalTrigger>
               <ModalTrigger
                 label="Pagos a cuenta"
@@ -311,6 +317,7 @@ function GeneralTab({
   diariaMovements,
   accounts,
   employees,
+  concepts,
   cashAccount,
   usdAccount,
   otherAccounts,
@@ -324,6 +331,7 @@ function GeneralTab({
   diariaMovements: LedgerRow[];
   accounts: Account[];
   employees: EmployeeOption[];
+  concepts: ConceptOption[];
   cashAccount: Account | undefined;
   usdAccount: Account | undefined;
   otherAccounts: Account[];
@@ -420,7 +428,7 @@ function GeneralTab({
                 className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
                 title="Registrar movimiento"
               >
-                <MovementForm accounts={accounts} kind="general" employees={employees} />
+                <MovementForm accounts={accounts} kind="general" employees={employees} concepts={concepts} />
               </ModalTrigger>
               <ModalTrigger
                 label="Enviar a caja diaria"

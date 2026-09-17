@@ -9,27 +9,42 @@ import { addMovement } from './actions';
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
-const CONCEPTS = ['Alquiler', 'Ferretería', 'Eventos', 'Almacén', 'Insumos', 'Servicios', 'Membresía', 'Operativo', 'Otro'];
-
 export type EmployeeOption = { id: string; name: string };
+export type ConceptOption = { id: string; name: string; allows_ingreso: boolean; allows_egreso: boolean };
+
+function firstValidConcept(concepts: ConceptOption[], type: 'ingreso' | 'egreso'): string {
+  const valid = concepts.filter((c) => type === 'ingreso' ? c.allows_ingreso : c.allows_egreso);
+  return valid[0]?.name ?? '';
+}
 
 export function MovementForm({
   accounts,
   kind,
   employees = [],
+  concepts = [],
 }: {
   accounts: PaymentAccount[];
   kind: 'diaria' | 'general';
   employees?: EmployeeOption[];
+  concepts?: ConceptOption[];
 }) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<'ingreso' | 'egreso'>('ingreso');
-  const [concept, setConcept] = useState<string>(CONCEPTS[0]);
+  const [concept, setConcept] = useState<string>(() => firstValidConcept(concepts, 'ingreso'));
   const [customConcept, setCustomConcept] = useState('');
   const [payments, setPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
+
+  const validConcepts = concepts.filter((c) => type === 'ingreso' ? c.allows_ingreso : c.allows_egreso);
+
+  function handleTypeChange(newType: 'ingreso' | 'egreso') {
+    setType(newType);
+    // Reset concept to first valid one for the new type
+    const first = firstValidConcept(concepts, newType);
+    setConcept(first);
+  }
 
   function submit(formData: FormData) {
     const validPayments = payments.filter((p) => Number(p.amount) > 0);
@@ -39,10 +54,14 @@ export function MovementForm({
     }
     const employeeId = concept.startsWith('emp:') ? concept.slice(4) : null;
     const employee = employeeId ? employees.find((e) => e.id === employeeId) : null;
-    const finalConcept = employee ? `Sueldo ${employee.name}` : concept === 'Otro' ? customConcept || 'Otro' : concept;
+    const resolvedConcept = employee
+      ? `Sueldo ${employee.name}`
+      : concept === '__custom__'
+      ? customConcept.trim() || 'Otro'
+      : concept;
     formData.set('kind', kind);
-    formData.set('category', finalConcept);
-    formData.set('concept', finalConcept);
+    formData.set('category', resolvedConcept);
+    formData.set('concept', resolvedConcept);
     if (employeeId) formData.set('employee_id', employeeId);
     formData.set(
       'payments',
@@ -68,8 +87,8 @@ export function MovementForm({
   return (
     <form action={submit} className="space-y-3">
       <div>
-        <label className={labelCls}>Categoría</label>
-        <select name="type" value={type} onChange={(e) => setType(e.target.value as 'ingreso' | 'egreso')} className={inputCls}>
+        <label className={labelCls}>Tipo</label>
+        <select name="type" value={type} onChange={(e) => handleTypeChange(e.target.value as 'ingreso' | 'egreso')} className={inputCls}>
           <option value="ingreso">Ingreso</option>
           <option value="egreso">Egreso</option>
         </select>
@@ -77,10 +96,10 @@ export function MovementForm({
       <div>
         <label className={labelCls}>Concepto</label>
         <select value={concept} onChange={(e) => setConcept(e.target.value)} className={inputCls}>
-          {CONCEPTS.map((c) => (
-            <option key={c}>{c}</option>
+          {validConcepts.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
           ))}
-          {employees.length > 0 && (
+          {type === 'egreso' && employees.length > 0 && (
             <optgroup label="Sueldos">
               {employees.map((e) => (
                 <option key={e.id} value={`emp:${e.id}`}>
@@ -89,8 +108,9 @@ export function MovementForm({
               ))}
             </optgroup>
           )}
+          <option value="__custom__">Otro…</option>
         </select>
-        {concept === 'Otro' && (
+        {concept === '__custom__' && (
           <input
             value={customConcept}
             onChange={(e) => setCustomConcept(e.target.value)}
