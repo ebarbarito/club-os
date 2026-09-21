@@ -74,6 +74,34 @@ export async function cobrarCuotasSociales(formData: FormData) {
   return {};
 }
 
+export async function fetchStrainHistory(strainId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('dispensa_items')
+    .select('quantity, dispensa:dispensas(created_at, voided_at, member:members(name, member_number))')
+    .eq('strain_id', strainId)
+    .limit(60);
+  if (error) return { error: error.message };
+  type RawEntry = { date: string; memberName: string; memberNumber: number | null; quantity: number; voided: boolean };
+  const entries: RawEntry[] = (data ?? [])
+    .map((item: { quantity: unknown; dispensa: unknown }) => {
+      const disp = Array.isArray(item.dispensa) ? (item.dispensa[0] as Record<string, unknown>) : (item.dispensa as Record<string, unknown> | null);
+      const mem = Array.isArray(disp?.['member']) ? (disp['member'][0] as Record<string, unknown>) : (disp?.['member'] as Record<string, unknown> | null);
+      return {
+        date: (disp?.['created_at'] ?? '') as string,
+        memberName: (mem?.['name'] ?? '—') as string,
+        memberNumber: (mem?.['member_number'] ?? null) as number | null,
+        quantity: item.quantity as number,
+        voided: !!(disp?.['voided_at']),
+      };
+    })
+    .filter((e: RawEntry) => !e.voided && e.date)
+    .sort((a: RawEntry, b: RawEntry) => b.date.localeCompare(a.date))
+    .slice(0, 30);
+  const mapped = entries.map(({ voided: _v, ...rest }) => rest);
+  return { data: mapped };
+}
+
 export async function voidDispensa(dispensaId: string, reason: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc('void_dispensa', { p_dispensa_id: dispensaId, p_reason: reason });

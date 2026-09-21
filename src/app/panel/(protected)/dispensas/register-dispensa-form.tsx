@@ -8,15 +8,17 @@ import { MemberSearch, type SearchableMember } from '@/components/member-search'
 import { MEMBER_STATUS } from '@/lib/status-meta';
 import { ItemSearch, type ItemSearchHandle } from '@/components/item-search';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
-import { registerDispensa, updateDispensa, cobrarCuotasSociales } from './actions';
+import { registerDispensa, updateDispensa, cobrarCuotasSociales, fetchStrainHistory } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
-const ITEM_GRID_CLS = 'sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_5rem_5rem_7rem_1.5rem]';
+const ITEM_GRID_CLS = 'sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_5rem_5rem_7rem_4rem]';
 
 export type CatalogItem = { id: string; code: string | null; name: string; item_type: 'genetica' | 'accesorio'; price_per_gram: number; grams: number };
 export type ItemRow = { strainId: string; description: string; quantity: string; unitPrice: string; bonif1: string; bonif2: string };
 export type PendingCuota = { id: string; periodo: string; amount: number; paid_amount: number };
+export type HistoryEntry = { date: string; memberName: string; memberNumber: number | null; quantity: number };
+type HistoryState = HistoryEntry[] | 'loading' | 'error';
 
 function formatPeriodo(periodo: string): string {
   const d = new Date(periodo + 'T12:00:00Z');
@@ -84,6 +86,10 @@ export function RegisterDispensaForm({
   // Crédito generado localmente (sin necesidad de reload) tras cobrar cuotas
   const [localCuotaCredit, setLocalCuotaCredit] = useState(0);
 
+  // Historial de movimientos por artículo
+  const [historyOpenIdx, setHistoryOpenIdx] = useState<number | null>(null);
+  const [historyCache, setHistoryCache] = useState<Record<string, HistoryState>>({});
+
   const availableCredit = (creditsByMember[memberId] ?? 0) + localCuotaCredit;
   const availableGeneralCredit = generalCreditsByMember[memberId] ?? 0;
   const selectedMember = members.find((m) => m.id === memberId);
@@ -125,6 +131,19 @@ export function RegisterDispensaForm({
   }
   function removeRow(i: number) {
     setRows((prev) => prev.filter((_, idx) => idx !== i));
+    if (historyOpenIdx === i) setHistoryOpenIdx(null);
+  }
+
+  function toggleHistory(i: number) {
+    const strainId = rows[i]?.strainId;
+    if (!strainId) return;
+    if (historyOpenIdx === i) { setHistoryOpenIdx(null); return; }
+    setHistoryOpenIdx(i);
+    if (historyCache[strainId]) return;
+    setHistoryCache((prev) => ({ ...prev, [strainId]: 'loading' }));
+    fetchStrainHistory(strainId).then((result) => {
+      setHistoryCache((prev) => ({ ...prev, [strainId]: result.error ? 'error' : (result.data ?? []) }));
+    });
   }
 
   function cobrarCuotas() {
@@ -349,85 +368,132 @@ export function RegisterDispensaForm({
           </div>
           <div className="divide-y divide-line-2">
             {rows.map((row, i) => (
-              <div key={i} className={`p-3 space-y-2 sm:space-y-0 sm:grid ${ITEM_GRID_CLS} sm:gap-2 sm:items-center`}>
-                <div>
-                  <label className={`${labelCls} sm:hidden`}>Artículo</label>
-                  <ItemSearch
-                    ref={(el) => {
-                      itemRefs.current[i] = el;
-                    }}
-                    items={items}
-                    value={row.strainId}
-                    onChange={(strainId) => selectItem(i, strainId)}
-                  />
+              <div key={i}>
+                <div className={`p-3 space-y-2 sm:space-y-0 sm:grid ${ITEM_GRID_CLS} sm:gap-2 sm:items-center`}>
+                  <div>
+                    <label className={`${labelCls} sm:hidden`}>Artículo</label>
+                    <ItemSearch
+                      ref={(el) => {
+                        itemRefs.current[i] = el;
+                      }}
+                      items={items}
+                      value={row.strainId}
+                      onChange={(strainId) => selectItem(i, strainId)}
+                    />
+                  </div>
+                  <div>
+                    <label className={`${labelCls} sm:hidden`}>Cantidad</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                      value={row.quantity}
+                      onChange={(e) => updateRow(i, { quantity: e.target.value })}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={`${labelCls} sm:hidden`}>Precio unitario</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="0"
+                      value={row.unitPrice}
+                      onChange={(e) => updateRow(i, { unitPrice: e.target.value })}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={`${labelCls} sm:hidden`}>Bonificación 1 (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      value={row.bonif1}
+                      onChange={(e) => updateRow(i, { bonif1: e.target.value })}
+                      className={inputCls}
+                      title="Porcentaje de descuento sobre el precio unitario"
+                    />
+                  </div>
+                  <div>
+                    <label className={`${labelCls} sm:hidden`}>Bonificación 2 (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      value={row.bonif2}
+                      onChange={(e) => updateRow(i, { bonif2: e.target.value })}
+                      className={inputCls}
+                      title="Segundo descuento, se aplica sobre el resultado de la Bonificación 1"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between sm:block sm:text-right">
+                    <span className={`${labelCls} sm:hidden !mb-0`}>Total línea</span>
+                    <span className="text-sm font-semibold text-text">{money(lineTotal(row))}</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5">
+                    {row.strainId && (
+                      <button
+                        type="button"
+                        onClick={() => toggleHistory(i)}
+                        className={`text-sm shrink-0 ${historyOpenIdx === i ? 'text-accent' : 'text-text-mute hover:text-accent'}`}
+                        title="Ver historial de movimientos"
+                      >
+                        ⏱
+                      </button>
+                    )}
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(i)}
+                        className="text-red text-xs font-semibold shrink-0"
+                        aria-label="Quitar línea"
+                        title="Quitar línea"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className={`${labelCls} sm:hidden`}>Cantidad</label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0"
-                    value={row.quantity}
-                    onChange={(e) => updateRow(i, { quantity: e.target.value })}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={`${labelCls} sm:hidden`}>Precio unitario</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="0"
-                    value={row.unitPrice}
-                    onChange={(e) => updateRow(i, { unitPrice: e.target.value })}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={`${labelCls} sm:hidden`}>Bonificación 1 (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="0"
-                    value={row.bonif1}
-                    onChange={(e) => updateRow(i, { bonif1: e.target.value })}
-                    className={inputCls}
-                    title="Porcentaje de descuento sobre el precio unitario"
-                  />
-                </div>
-                <div>
-                  <label className={`${labelCls} sm:hidden`}>Bonificación 2 (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="0"
-                    value={row.bonif2}
-                    onChange={(e) => updateRow(i, { bonif2: e.target.value })}
-                    className={inputCls}
-                    title="Segundo descuento, se aplica sobre el resultado de la Bonificación 1"
-                  />
-                </div>
-                <div className="flex items-center justify-between sm:block sm:text-right">
-                  <span className={`${labelCls} sm:hidden !mb-0`}>Total línea</span>
-                  <span className="text-sm font-semibold text-text">{money(lineTotal(row))}</span>
-                </div>
-                <div className="flex justify-end">
-                  {rows.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRow(i)}
-                      className="text-red text-xs font-semibold shrink-0"
-                      aria-label="Quitar línea"
-                      title="Quitar línea"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+                {historyOpenIdx === i && row.strainId && (() => {
+                  const h = historyCache[row.strainId];
+                  return (
+                    <div className="px-3 pb-3 border-t border-line-2">
+                      {h === 'loading' && <p className="text-xs text-text-soft pt-2">Cargando historial…</p>}
+                      {h === 'error' && <p className="text-xs text-red pt-2">Error al cargar historial</p>}
+                      {Array.isArray(h) && h.length === 0 && <p className="text-xs text-text-mute pt-2">Sin movimientos registrados</p>}
+                      {Array.isArray(h) && h.length > 0 && (
+                        <table className="w-full text-xs mt-2">
+                          <thead>
+                            <tr className="text-text-soft">
+                              <th className="text-left py-1 pr-4 font-medium">Fecha</th>
+                              <th className="text-left py-1 pr-4 font-medium">Socio</th>
+                              <th className="text-right py-1 font-medium">Cantidad</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {h.map((entry, j) => (
+                              <tr key={j} className="border-t border-line-2">
+                                <td className="py-1 pr-4 text-text-soft">
+                                  {new Date(entry.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                </td>
+                                <td className="py-1 pr-4 text-text">
+                                  {entry.memberNumber != null ? <span className="text-text-mute mr-1">#{entry.memberNumber}</span> : null}
+                                  {entry.memberName}
+                                </td>
+                                <td className="py-1 text-right font-medium text-text">{entry.quantity} g</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
