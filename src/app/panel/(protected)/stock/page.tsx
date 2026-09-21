@@ -6,6 +6,7 @@ import { SendStockForm } from './send-stock-form';
 import { AdjustGeneralStockForm } from './adjust-general-stock-form';
 import { AdjustDispensaStockForm } from './adjust-dispensa-stock-form';
 import { StockMovements } from './stock-movements';
+import { DispensaHistory } from './dispensa-history';
 
 function levelTextColor(dispensaGrams: number, generalGrams: number): string {
   if (dispensaGrams > 0) return 'text-text-soft';
@@ -106,13 +107,22 @@ export default async function StockPage({
                     </td>
                     {profile?.role === 'admin' && (
                       <td className="px-4 py-2.5 text-right">
-                        <ModalTrigger
-                          label="Ajustar"
-                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                          title={`Ajustar stock dispensa — ${s.name}`}
-                        >
-                          <AdjustDispensaStockForm strainId={s.id} currentGrams={dGrams} unit={unit} />
-                        </ModalTrigger>
+                        <div className="flex gap-2 justify-end">
+                          <ModalTrigger
+                            label="Historial"
+                            className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                            title={`Historial de retiros — ${s.name}`}
+                          >
+                            <DispensaHistory strainId={s.id} unit={unit} />
+                          </ModalTrigger>
+                          <ModalTrigger
+                            label="Ajustar"
+                            className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                            title={`Ajustar stock dispensa — ${s.name}`}
+                          >
+                            <AdjustDispensaStockForm strainId={s.id} currentGrams={dGrams} unit={unit} />
+                          </ModalTrigger>
+                        </div>
                       </td>
                     )}
                   </tr>
