@@ -149,6 +149,9 @@ export default async function CtaCorrientePage({
       }
     }
     for (const c of creditRows ?? []) {
+      // Cuota social credits are transient (cobro paralelo → apply) and already
+      // reflected in the dispensa payment line; only general credits go to historial.
+      if (c.kind !== 'general') continue;
       historial.push({ date: c.created_at, label: c.description, amount: -c.amount, voided: false });
     }
     historial.sort((a, b) => (a.date < b.date ? 1 : -1));
