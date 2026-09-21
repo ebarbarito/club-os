@@ -51,14 +51,14 @@ export async function DispensaHistory({ strainId, unit }: { strainId: string; un
         <tbody>
           {entries.map((entry, i) => (
             <tr key={i} className="border-t border-line">
-              <td className="py-2 pr-4 text-text-soft text-xs whitespace-nowrap">
+              <td className="py-2 pr-4 text-left text-text-soft text-xs whitespace-nowrap">
                 {new Date(entry.date).toLocaleDateString('es-AR', {
                   day: '2-digit',
                   month: '2-digit',
                   year: 'numeric',
                 })}
               </td>
-              <td className="py-2 pr-4 text-text text-xs">
+              <td className="py-2 pr-4 text-left text-text text-xs">
                 {entry.memberNumber != null && (
                   <span className="text-text-mute mr-1">#{entry.memberNumber}</span>
                 )}
