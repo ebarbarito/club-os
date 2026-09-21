@@ -36,9 +36,10 @@ export default async function DispensaPage({
       supabase.from('payment_accounts').select('*').eq('active', true).eq('is_virtual', false).order('name'),
     ]);
 
-  const [{ data: virtualAccounts }, { data: creditRows }] = await Promise.all([
+  const [{ data: virtualAccounts }, { data: creditRows }, { data: cuotaChargeRows }] = await Promise.all([
     supabase.from('payment_accounts').select('id, virtual_kind').eq('is_virtual', true),
     supabase.from('member_credits').select('member_id, amount, kind').in('kind', ['cuota_social', 'general']),
+    supabase.from('cuota_social_charges').select('id, member_id, periodo, amount, paid_amount').is('paid_at', null).order('periodo'),
   ]);
   const cuotaSocialAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'cuota_social')?.id ?? null;
   const generalAccountId = (virtualAccounts ?? []).find((a) => a.virtual_kind === 'general')?.id ?? null;
@@ -47,6 +48,12 @@ export default async function DispensaPage({
   for (const c of creditRows ?? []) {
     if (c.kind === 'cuota_social') creditsByMember[c.member_id] = (creditsByMember[c.member_id] ?? 0) + c.amount;
     else generalCreditsByMember[c.member_id] = (generalCreditsByMember[c.member_id] ?? 0) + c.amount;
+  }
+
+  const pendingCuotasByMember: Record<string, { id: string; periodo: string; amount: number; paid_amount: number }[]> = {};
+  for (const c of cuotaChargeRows ?? []) {
+    if (!pendingCuotasByMember[c.member_id]) pendingCuotasByMember[c.member_id] = [];
+    pendingCuotasByMember[c.member_id].push({ id: c.id, periodo: c.periodo, amount: c.amount, paid_amount: c.paid_amount });
   }
 
   const items = (stockRows ?? [])
@@ -77,6 +84,7 @@ export default async function DispensaPage({
             virtualAccountId={cuotaSocialAccountId}
             generalCreditsByMember={generalCreditsByMember}
             generalAccountId={generalAccountId}
+            pendingCuotasByMember={pendingCuotasByMember}
           />
         </ModalTrigger>
       </div>

@@ -60,6 +60,20 @@ export async function updateDispensa(formData: FormData) {
   return {};
 }
 
+export async function cobrarCuotasSociales(formData: FormData) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('cobrar_cuotas_sociales_paralelo', {
+    p_member_id: String(formData.get('member_id')),
+    p_cobros: JSON.parse(String(formData.get('cobros') ?? '[]')),
+    p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/panel/dispensas');
+  revalidatePath('/panel/caja');
+  revalidatePath('/panel/ctacorriente');
+  return {};
+}
+
 export async function voidDispensa(dispensaId: string, reason: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc('void_dispensa', { p_dispensa_id: dispensaId, p_reason: reason });

@@ -8,7 +8,7 @@ import { MemberSearch, type SearchableMember } from '@/components/member-search'
 import { MEMBER_STATUS } from '@/lib/status-meta';
 import { ItemSearch, type ItemSearchHandle } from '@/components/item-search';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
-import { registerDispensa, updateDispensa } from './actions';
+import { registerDispensa, updateDispensa, cobrarCuotasSociales } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -16,6 +16,12 @@ const ITEM_GRID_CLS = 'sm:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_5rem_5rem_7rem_
 
 export type CatalogItem = { id: string; code: string | null; name: string; item_type: 'genetica' | 'accesorio'; price_per_gram: number; grams: number };
 export type ItemRow = { strainId: string; description: string; quantity: string; unitPrice: string; bonif1: string; bonif2: string };
+export type PendingCuota = { id: string; periodo: string; amount: number; paid_amount: number };
+
+function formatPeriodo(periodo: string): string {
+  const d = new Date(periodo + 'T12:00:00Z');
+  return d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
 
 function lineTotal(row: ItemRow): number {
   const qty = Number(row.quantity) || 0;
@@ -39,6 +45,7 @@ export function RegisterDispensaForm({
   virtualAccountId,
   generalCreditsByMember = {},
   generalAccountId,
+  pendingCuotasByMember = {},
 }: {
   members: SearchableMember[];
   items: CatalogItem[];
@@ -53,6 +60,7 @@ export function RegisterDispensaForm({
   virtualAccountId?: string | null;
   generalCreditsByMember?: Record<string, number>;
   generalAccountId?: string | null;
+  pendingCuotasByMember?: Record<string, PendingCuota[]>;
 }) {
   const router = useRouter();
   const close = useModalClose();
@@ -61,18 +69,30 @@ export function RegisterDispensaForm({
 
   const [memberId, setMemberId] = useState(initialMemberId ?? '');
   const [note, setNote] = useState(initialNote ?? '');
-  const [rows, setRows] = useState<ItemRow[]>(
-    initialRows ?? [{ strainId: '', description: '', quantity: '', unitPrice: '', bonif1: '0', bonif2: '0' }],
-  );
+  const [rows, setRows] = useState<ItemRow[]>(initialRows ?? []);
   const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
   const [useCredit, setUseCredit] = useState('');
   const [useGeneralCredit, setUseGeneralCredit] = useState('');
   const itemRefs = useRef<Array<ItemSearchHandle | null>>([]);
 
-  const availableCredit = creditsByMember[memberId] ?? 0;
+  // Panel cuota social paralela
+  const [cuotaPending, startCuotaTransition] = useTransition();
+  const [cuotaError, setCuotaError] = useState<string | null>(null);
+  const [cuotaOpen, setCuotaOpen] = useState(false);
+  const [cuotaCobros, setCuotaCobros] = useState<Record<string, string>>({});
+  const [cuotaPayments, setCuotaPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
+  // Crédito generado localmente (sin necesidad de reload) tras cobrar cuotas
+  const [localCuotaCredit, setLocalCuotaCredit] = useState(0);
+
+  const availableCredit = (creditsByMember[memberId] ?? 0) + localCuotaCredit;
   const availableGeneralCredit = generalCreditsByMember[memberId] ?? 0;
   const selectedMember = members.find((m) => m.id === memberId);
   const memberNotValid = !!selectedMember && selectedMember.status !== 'valid';
+
+  // Cuotas pendientes del socio seleccionado
+  const pendingCuotas = memberId ? (pendingCuotasByMember[memberId] ?? []) : [];
+  const cuotaTotalCobros = pendingCuotas.reduce((s, c) => s + (Number(cuotaCobros[c.id]) || 0), 0);
+  const cuotaTotalPago = cuotaPayments.reduce((s, p) => s + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 1), 0);
 
   const suggestedTotal = useMemo(() => {
     return rows.reduce((sum, r) => {
@@ -105,6 +125,42 @@ export function RegisterDispensaForm({
   }
   function removeRow(i: number) {
     setRows((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function cobrarCuotas() {
+    setCuotaError(null);
+    const cobros = pendingCuotas
+      .map((c) => ({ charge_id: c.id, amount: Number(cuotaCobros[c.id]) || 0 }))
+      .filter((c) => c.amount > 0);
+    if (cobros.length === 0) {
+      setCuotaError('Ingresá al menos un importe a cobrar');
+      return;
+    }
+    const validPayments = cuotaPayments.filter((p) => Number(p.amount) > 0);
+    if (validPayments.length === 0) {
+      setCuotaError('Elegí una forma de pago');
+      return;
+    }
+    const formData = new FormData();
+    formData.set('member_id', memberId);
+    formData.set('cobros', JSON.stringify(cobros));
+    formData.set('payments', JSON.stringify(validPayments.map((p) => ({
+      account_id: p.accountId,
+      amount: Number(p.amount),
+      exchange_rate: Number(p.exchangeRate) || 1,
+    }))));
+    startCuotaTransition(async () => {
+      const res = await cobrarCuotasSociales(formData);
+      if (res?.error) {
+        setCuotaError(res.error);
+        return;
+      }
+      // Acreditar localmente para que el crédito esté disponible sin reload
+      setLocalCuotaCredit((prev) => prev + cuotaTotalCobros);
+      setCuotaCobros({});
+      setCuotaPayments([newPaymentLine(accounts)]);
+      setCuotaOpen(false);
+    });
   }
 
   function submit() {
@@ -197,6 +253,87 @@ export function RegisterDispensaForm({
           </p>
         )}
       </div>
+
+      {/* Panel cuota social paralela */}
+      {pendingCuotas.length > 0 && (
+        <div className="rounded-lg border border-red/40 bg-red/5">
+          <button
+            type="button"
+            onClick={() => { setCuotaOpen((v) => !v); setCuotaError(null); }}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+          >
+            <span className="text-sm font-semibold text-red">
+              ⚠ Cuota social adeudada ({pendingCuotas.length} período{pendingCuotas.length > 1 ? 's' : ''})
+            </span>
+            <span className="text-xs text-red/70">{cuotaOpen ? '▲ cerrar' : '▼ cobrar'}</span>
+          </button>
+
+          {cuotaOpen && (
+            <div className="px-3 pb-3 space-y-3 border-t border-red/20 pt-3">
+              {/* Tabla de cargos */}
+              <div className="rounded-lg border border-line-2 overflow-hidden">
+                <div className="hidden sm:grid grid-cols-[1fr_7rem_7rem_7rem] gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft">
+                  <span>Período</span>
+                  <span className="text-right">Importe</span>
+                  <span className="text-right">Adeudado</span>
+                  <span className="text-right">Cobro</span>
+                </div>
+                <div className="divide-y divide-line-2">
+                  {pendingCuotas.map((c) => {
+                    const pendiente = c.amount - c.paid_amount;
+                    return (
+                      <div key={c.id} className="grid grid-cols-[1fr_7rem_7rem_7rem] gap-2 items-center px-3 py-2">
+                        <span className="text-sm text-text capitalize">{formatPeriodo(c.periodo)}</span>
+                        <span className="text-sm text-right text-text-soft">{money(c.amount)}</span>
+                        <span className="text-sm text-right font-medium text-red">{money(pendiente)}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={pendiente}
+                          step="1"
+                          placeholder="0"
+                          value={cuotaCobros[c.id] ?? ''}
+                          onChange={(e) => setCuotaCobros((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                          className="w-full rounded-lg border border-line-2 px-2 py-1 text-sm text-right outline-none focus:border-accent"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {cuotaTotalCobros > 0 && (
+                  <div className="flex justify-end px-3 py-2 bg-surface-2 text-xs font-medium text-text-soft border-t border-line-2">
+                    Total a cobrar: <span className="ml-1 text-text">{money(cuotaTotalCobros)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Forma de pago cuota social */}
+              <div>
+                <label className={labelCls}>Forma de pago (cuota social)</label>
+                <PaymentSplitEditor accounts={accounts} lines={cuotaPayments} onChange={setCuotaPayments} />
+              </div>
+
+              {cuotaError && <p className="text-red text-xs">{cuotaError}</p>}
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-text-soft">
+                  {cuotaTotalPago > 0 && cuotaTotalCobros > 0
+                    ? `Pago: ${money(cuotaTotalPago)} · Cobros: ${money(cuotaTotalCobros)}`
+                    : null}
+                </span>
+                <button
+                  type="button"
+                  disabled={cuotaPending || cuotaTotalCobros <= 0}
+                  onClick={cobrarCuotas}
+                  className="rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2 disabled:opacity-60"
+                >
+                  {cuotaPending ? 'Cobrando…' : 'Cobrar cuotas sociales'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Artículos</label>
