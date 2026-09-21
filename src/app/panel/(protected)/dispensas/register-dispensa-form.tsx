@@ -25,6 +25,17 @@ function formatPeriodo(periodo: string): string {
   return d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+function formatFechaCuota(periodo: string): string {
+  const d = new Date(periodo + 'T12:00:00Z');
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+}
+
+function formatComprobante(periodo: string): string {
+  const d = new Date(periodo + 'T12:00:00Z');
+  const mes = d.toLocaleDateString('es-AR', { month: 'long', timeZone: 'UTC' });
+  return `cuota social ${mes}`;
+}
+
 function lineTotal(row: ItemRow): number {
   const qty = Number(row.quantity) || 0;
   const price = Number(row.unitPrice) || 0;
@@ -291,8 +302,9 @@ export function RegisterDispensaForm({
             <div className="px-3 pb-3 space-y-3 border-t border-red/20 pt-3">
               {/* Tabla de cargos */}
               <div className="rounded-lg border border-line-2 overflow-hidden">
-                <div className="hidden sm:grid grid-cols-[1fr_7rem_7rem_7rem] gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft">
-                  <span>Período</span>
+                <div className="hidden sm:grid grid-cols-[5.5rem_1fr_7rem_7rem_6rem] gap-2 bg-surface-2 px-3 py-2 text-xs font-medium text-text-soft">
+                  <span>Fecha</span>
+                  <span>Comprobante</span>
                   <span className="text-right">Importe</span>
                   <span className="text-right">Adeudado</span>
                   <span className="text-right">Cobro</span>
@@ -301,8 +313,9 @@ export function RegisterDispensaForm({
                   {pendingCuotas.map((c) => {
                     const pendiente = c.amount - c.paid_amount;
                     return (
-                      <div key={c.id} className="grid grid-cols-[1fr_7rem_7rem_7rem] gap-2 items-center px-3 py-2">
-                        <span className="text-sm text-text capitalize">{formatPeriodo(c.periodo)}</span>
+                      <div key={c.id} className="grid grid-cols-[5.5rem_1fr_7rem_7rem_6rem] gap-2 items-center px-3 py-2">
+                        <span className="text-xs text-text-soft whitespace-nowrap">{formatFechaCuota(c.periodo)}</span>
+                        <span className="text-sm text-text capitalize font-medium">{formatComprobante(c.periodo)}</span>
                         <span className="text-sm text-right text-text-soft">{money(c.amount)}</span>
                         <span className="text-sm text-right font-medium text-red">{money(pendiente)}</span>
                         <input
@@ -346,7 +359,7 @@ export function RegisterDispensaForm({
                   onClick={cobrarCuotas}
                   className="rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2 disabled:opacity-60"
                 >
-                  {cuotaPending ? 'Cobrando…' : 'Cobrar cuotas sociales'}
+                  {cuotaPending ? 'Procesando…' : 'Forma de pago'}
                 </button>
               </div>
             </div>
