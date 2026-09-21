@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Archivos locales / Claude
+*.patch
+Claude outputs/
+supabase/migrations_pendientes_EJECUTAR.sql
