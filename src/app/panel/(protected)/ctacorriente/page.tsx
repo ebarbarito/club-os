@@ -55,17 +55,6 @@ export default async function CtaCorrientePage({
         adeudado,
       });
   }
-  // Combo de búsqueda y resumen: mismo universo, solo socios con deuda.
-  const debtors = [...debtorMap.values()].sort((a, b) => b.adeudado - a.adeudado);
-  const searchableDebtors = debtors.map((d) => ({
-    id: d.id,
-    name: d.name,
-    dni: d.dni,
-    member_number: d.memberNumber ?? 0,
-    adeudado: d.adeudado,
-  }));
-  const totalGeneral = debtors.reduce((s, d) => s + d.adeudado, 0);
-
   const creditorMap = new Map<string, Debtor>();
   for (const c of generalCreditRows ?? []) {
     const member = Array.isArray(c.member) ? c.member[0] : c.member;
@@ -82,6 +71,26 @@ export default async function CtaCorrientePage({
   }
   const creditors = [...creditorMap.values()].filter((c) => c.adeudado > 0.01).sort((a, b) => b.adeudado - a.adeudado);
   const totalAFavor = creditors.reduce((s, c) => s + c.adeudado, 0);
+
+  // Socios con saldo negativo en member_credits (deuda anterior al sistema) también son deudores
+  for (const entry of creditorMap.values()) {
+    if (entry.adeudado < -0.01) {
+      const existing = debtorMap.get(entry.id);
+      if (existing) existing.adeudado += -entry.adeudado;
+      else debtorMap.set(entry.id, { ...entry, adeudado: -entry.adeudado });
+    }
+  }
+
+  // Combo de búsqueda y resumen: construir debtors DESPUÉS de agregar saldos negativos
+  const debtors = [...debtorMap.values()].sort((a, b) => b.adeudado - a.adeudado);
+  const searchableDebtors = debtors.map((d) => ({
+    id: d.id,
+    name: d.name,
+    dni: d.dni,
+    member_number: d.memberNumber ?? 0,
+    adeudado: d.adeudado,
+  }));
+  const totalGeneral = debtors.reduce((s, d) => s + d.adeudado, 0);
 
   let comprobantes: {
     id: string;
@@ -260,13 +269,20 @@ export default async function CtaCorrientePage({
 
       {activeTab === 'buscar' && memberId && (
         <div className="mt-4 space-y-4">
-          {(saldoAFavorGeneral > 0.01 || saldoCuotaSocial > 0.01) && (
+          {(saldoAFavorGeneral > 0.01 || saldoAFavorGeneral < -0.01 || saldoCuotaSocial > 0.01) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {saldoAFavorGeneral > 0.01 && (
                 <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
                   <p className="text-text-mute text-xs">Saldo a favor general</p>
                   <p className="text-accent font-semibold">{money(saldoAFavorGeneral)}</p>
                   <p className="text-text-mute text-xs mt-0.5">Usable para cualquier comprobante</p>
+                </div>
+              )}
+              {saldoAFavorGeneral < -0.01 && (
+                <div className="rounded-xl border border-red/30 bg-surface-2 px-4 py-3">
+                  <p className="text-red text-xs">Saldo deudor</p>
+                  <p className="text-red font-semibold">{money(-saldoAFavorGeneral)}</p>
+                  <p className="text-text-mute text-xs mt-0.5">Deuda anterior al sistema</p>
                 </div>
               )}
               {saldoCuotaSocial > 0.01 && (
