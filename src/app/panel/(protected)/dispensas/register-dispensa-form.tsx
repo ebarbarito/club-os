@@ -101,8 +101,10 @@ export function RegisterDispensaForm({
   const [historyOpenIdx, setHistoryOpenIdx] = useState<number | null>(null);
   const [historyCache, setHistoryCache] = useState<Record<string, HistoryState>>({});
 
-  const availableCredit = (creditsByMember[memberId] ?? 0) + localCuotaCredit;
-  const availableGeneralCredit = generalCreditsByMember[memberId] ?? 0;
+  // Clamp a 0: el balance puede ser negativo en la DB si un comprobante de
+  // cuota social fue anulado después de haberse consumido en una dispensa.
+  const availableCredit = Math.max(0, (creditsByMember[memberId] ?? 0) + localCuotaCredit);
+  const availableGeneralCredit = Math.max(0, generalCreditsByMember[memberId] ?? 0);
   const selectedMember = members.find((m) => m.id === memberId);
   const memberNotValid = !!selectedMember && selectedMember.status !== 'valid';
 

@@ -6,6 +6,7 @@ import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
 import { PlanDeCuentas } from './plan-de-cuentas';
+import { GenerarCuotasForm } from './generar-cuotas-form';
 
 export default async function ConfiguracionPage() {
   const profile = await getSessionProfile();
@@ -13,9 +14,10 @@ export default async function ConfiguracionPage() {
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
   const supabase = await createClient();
-  const [{ data: tenant }, { data: conceptRows }] = await Promise.all([
+  const [{ data: tenant }, { data: conceptRows }, { count: memberCount }] = await Promise.all([
     supabase.from('tenants').select('slug, public_site_enabled').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
+    supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null),
   ]);
 
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
@@ -53,6 +55,16 @@ export default async function ConfiguracionPage() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Cuotas sociales */}
+      <div className="max-w-2xl rounded-xl border border-line bg-surface p-5 mb-6">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-1">Cuotas sociales</p>
+        <p className="text-text-soft text-sm mb-4">
+          Generá los cargos mensuales de cuota social para todos los socios activos. Una vez generados,
+          el aviso de cuota adeudada aparece automáticamente al registrar una dispensa del socio.
+        </p>
+        <GenerarCuotasForm memberCount={memberCount ?? 0} />
       </div>
 
       <div className="max-w-3xl">
