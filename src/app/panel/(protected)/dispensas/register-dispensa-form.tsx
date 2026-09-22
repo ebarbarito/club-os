@@ -94,8 +94,6 @@ export function RegisterDispensaForm({
   const [cuotaOpen, setCuotaOpen] = useState(false);
   const [cuotaCobros, setCuotaCobros] = useState<Record<string, string>>({});
   const [cuotaPayments, setCuotaPayments] = useState<PaymentLine[]>(() => [newPaymentLine(accounts)]);
-  // Crédito generado localmente (sin necesidad de reload) tras cobrar cuotas
-  const [localCuotaCredit, setLocalCuotaCredit] = useState(0);
 
   // Historial de movimientos por artículo
   const [historyOpenIdx, setHistoryOpenIdx] = useState<number | null>(null);
@@ -103,7 +101,9 @@ export function RegisterDispensaForm({
 
   // Clamp a 0: el balance puede ser negativo en la DB si un comprobante de
   // cuota social fue anulado después de haberse consumido en una dispensa.
-  const availableCredit = Math.max(0, (creditsByMember[memberId] ?? 0) + localCuotaCredit);
+  // No se usa estado local: revalidatePath en cobrarCuotasSociales ya dispara
+  // el re-render del server component con el valor actualizado de la DB.
+  const availableCredit = Math.max(0, creditsByMember[memberId] ?? 0);
   const availableGeneralCredit = Math.max(0, generalCreditsByMember[memberId] ?? 0);
   const selectedMember = members.find((m) => m.id === memberId);
   const memberNotValid = !!selectedMember && selectedMember.status !== 'valid';
@@ -187,8 +187,9 @@ export function RegisterDispensaForm({
         setCuotaError(res.error);
         return;
       }
-      // Acreditar localmente para que el crédito esté disponible sin reload
-      setLocalCuotaCredit((prev) => prev + cuotaTotalCobros);
+      // revalidatePath en el server action dispara el re-render del server
+      // component automáticamente — el crédito aparece en creditsByMember
+      // sin necesidad de estado local.
       setCuotaCobros({});
       setCuotaPayments([newPaymentLine(accounts)]);
       setCuotaOpen(false);
@@ -361,7 +362,7 @@ export function RegisterDispensaForm({
                   onClick={cobrarCuotas}
                   className="rounded-lg bg-accent text-white text-sm font-semibold px-4 py-2 disabled:opacity-60"
                 >
-                  {cuotaPending ? 'Procesando…' : 'Forma de pago'}
+                  {cuotaPending ? 'Procesando…' : 'Aceptar'}
                 </button>
               </div>
             </div>
