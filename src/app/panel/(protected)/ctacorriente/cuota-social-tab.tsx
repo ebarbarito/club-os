@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { money } from '@/lib/format';
 import { confirmarCuotaSocial, deshacerGeneracionCuotaSocial } from './actions';
 
-type Candidate = { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number };
+type Candidate = { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number; bonificada: boolean };
 
 export function CuotaSocialTab({
   candidates,
@@ -29,13 +29,14 @@ export function CuotaSocialTab({
   const [undoError, setUndoError] = useState<string | null>(null);
 
   const rows = candidates.filter((c) => !removed.has(c.memberId));
-  const total = rows.reduce((s, c) => s + (Number(amounts[c.memberId]) || 0), 0);
+  const total = rows.filter((c) => !c.bonificada).reduce((s, c) => s + (Number(amounts[c.memberId]) || 0), 0);
 
   function confirmar() {
     setError(null);
+    // Include bonificadas with amount=0 (they still need a dispensa record, just $0)
     const entries = rows
-      .map((c) => ({ memberId: c.memberId, amount: Number(amounts[c.memberId]) || 0 }))
-      .filter((e) => e.amount > 0);
+      .map((c) => ({ memberId: c.memberId, amount: Number(amounts[c.memberId]) || 0, bonificada: c.bonificada }))
+      .filter((e) => e.amount > 0 || e.bonificada);
     if (entries.length === 0) {
       setError('No hay ningún socio para generar');
       return;
@@ -115,18 +116,29 @@ export function CuotaSocialTab({
             {rows.map((c) => (
               <tr key={c.memberId} className="border-t border-line">
                 <td className="px-4 py-2.5 text-text">
-                  {c.memberNumber != null ? `N° ${c.memberNumber} — ` : ''}
-                  {c.memberName}
+                  <span>
+                    {c.memberNumber != null ? `N° ${c.memberNumber} — ` : ''}
+                    {c.memberName}
+                  </span>
+                  {c.bonificada && (
+                    <span className="ml-2 inline-block rounded-full bg-amber-bg border border-gold/40 text-amber-tx text-xs px-2 py-0.5 font-medium">
+                      Bonificado
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={amounts[c.memberId] ?? ''}
-                    onChange={(e) => setAmounts((prev) => ({ ...prev, [c.memberId]: e.target.value }))}
-                    className="w-28 text-right rounded-lg border border-line-2 px-2 py-1 text-sm outline-none focus:border-accent"
-                  />
+                  {c.bonificada ? (
+                    <span className="text-text-mute text-sm">$0 (crédito automático)</span>
+                  ) : (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={amounts[c.memberId] ?? ''}
+                      onChange={(e) => setAmounts((prev) => ({ ...prev, [c.memberId]: e.target.value }))}
+                      className="w-28 text-right rounded-lg border border-line-2 px-2 py-1 text-sm outline-none focus:border-accent"
+                    />
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <button

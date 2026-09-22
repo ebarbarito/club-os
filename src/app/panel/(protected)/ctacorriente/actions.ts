@@ -28,7 +28,7 @@ export async function payDispensaBatch(
 // el preview (edición/exclusión ya la hizo el admin del lado del
 // cliente) — cada uno queda como una dispensa más, pendiente, igual que
 // cualquier deuda de cta cte.
-export async function confirmarCuotaSocial(entries: { memberId: string; amount: number }[]) {
+export async function confirmarCuotaSocial(entries: { memberId: string; amount: number; bonificada?: boolean }[]) {
   const profile = await requireAdmin();
   if (entries.length === 0) return { error: 'No hay nada para generar' };
 
@@ -36,20 +36,54 @@ export async function confirmarCuotaSocial(entries: { memberId: string; amount: 
   const periodo = new Date();
   const periodoIso = `${periodo.getFullYear()}-${String(periodo.getMonth() + 1).padStart(2, '0')}-01`;
   const nota = `Cuota social ${periodo.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`;
+  const ahora = new Date().toISOString();
 
-  const { error } = await supabase.from('dispensas').insert(
-    entries.map((e) => ({
+  const regular = entries.filter((e) => !e.bonificada);
+  const bonificadas = entries.filter((e) => e.bonificada);
+
+  // Insertar dispensas regulares (con deuda)
+  if (regular.length > 0) {
+    const { error } = await supabase.from('dispensas').insert(
+      regular.map((e) => ({
+        tenant_id: profile.tenantId,
+        member_id: e.memberId,
+        amount: e.amount,
+        suggested_amount: e.amount,
+        registered_by: profile.userId,
+        note: nota,
+        es_cuota_social: true,
+        cuota_social_periodo: periodoIso,
+      })),
+    );
+    if (error) return { error: error.message };
+  }
+
+  // Insertar dispensas bonificadas ($0, ya acreditadas) + crédito de producto automático
+  for (const e of bonificadas) {
+    const { error: errDisp } = await supabase.from('dispensas').insert({
+      tenant_id: profile.tenantId,
+      member_id: e.memberId,
+      amount: 0,
+      suggested_amount: e.amount,
+      registered_by: profile.userId,
+      note: `${nota} (bonificada)`,
+      es_cuota_social: true,
+      cuota_social_periodo: periodoIso,
+      acreditado_at: ahora,
+    });
+    if (errDisp) return { error: errDisp.message };
+
+    // Acreditar el importe original como crédito de producto (cuota_social)
+    const { error: errCredit } = await supabase.from('member_credits').insert({
       tenant_id: profile.tenantId,
       member_id: e.memberId,
       amount: e.amount,
-      suggested_amount: e.amount,
-      registered_by: profile.userId,
-      note: nota,
-      es_cuota_social: true,
-      cuota_social_periodo: periodoIso,
-    })),
-  );
-  if (error) return { error: error.message };
+      kind: 'cuota_social',
+      description: `${nota} — crédito bonificación`,
+      created_by: profile.userId,
+    });
+    if (errCredit) return { error: errCredit.message };
+  }
 
   revalidatePath('/panel/ctacorriente');
   return {};

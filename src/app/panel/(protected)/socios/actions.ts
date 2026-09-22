@@ -40,6 +40,7 @@ export async function createMember(formData: FormData, submitAs: 'draft' | 'pend
     servicio_pactado_cantidad: formData.get('servicio_pactado_cantidad') ? Number(formData.get('servicio_pactado_cantidad')) : null,
     cuota_social: formData.get('cuota_social') ? Number(formData.get('cuota_social')) : null,
     factura_automatica: formData.get('factura_automatica') === 'on',
+    cuota_social_bonificada: formData.get('cuota_social_bonificada') === 'on',
     status: submitAs,
   });
 
@@ -97,6 +98,7 @@ export async function updateMember(memberId: string, formData: FormData) {
       servicio_pactado_cantidad: formData.get('servicio_pactado_cantidad') ? Number(formData.get('servicio_pactado_cantidad')) : null,
       cuota_social: formData.get('cuota_social') ? Number(formData.get('cuota_social')) : null,
       factura_automatica: formData.get('factura_automatica') === 'on',
+      cuota_social_bonificada: formData.get('cuota_social_bonificada') === 'on',
       status: String(formData.get('status') ?? 'draft'),
     })
     .eq('id', memberId)

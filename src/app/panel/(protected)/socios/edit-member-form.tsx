@@ -42,6 +42,7 @@ type Member = {
   servicio_pactado_cantidad: number | null;
   cuota_social: number | null;
   factura_automatica: boolean;
+  cuota_social_bonificada: boolean;
 };
 
 export function EditMemberForm({ member }: { member: Member }) {
@@ -243,6 +244,10 @@ export function EditMemberForm({ member }: { member: Member }) {
       <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
         <input type="checkbox" name="factura_automatica" defaultChecked={member.factura_automatica} />
         Emitir factura automática — genera el cargo el 1° de cada mes (Cta Cte → Cuota social)
+      </label>
+      <label className="col-span-2 flex items-center gap-2 text-sm text-text-soft">
+        <input type="checkbox" name="cuota_social_bonificada" defaultChecked={member.cuota_social_bonificada} />
+        Cuota social 100% bonificada — al generar, no crea deuda y acredita el importe para retirar producto
       </label>
 
       {error && <p className="col-span-2 text-red text-sm">{error}</p>}

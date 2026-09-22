@@ -166,7 +166,7 @@ export default async function CtaCorrientePage({
     historial.sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
-  let cuotaSocialCandidates: { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number }[] = [];
+  let cuotaSocialCandidates: { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number; bonificada: boolean }[] = [];
   let periodoLabel = '';
   let cuotaSocialUndoableCount = 0;
   let cuotaSocialPeriodoIso = '';
@@ -176,7 +176,7 @@ export default async function CtaCorrientePage({
     periodoLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
     const [{ data: eligible }, { data: allGeneratedRaw }] = await Promise.all([
-      supabase.from('members').select('id, name, member_number, cuota_social').eq('factura_automatica', true).eq('status', 'valid'),
+      supabase.from('members').select('id, name, member_number, cuota_social, cuota_social_bonificada').eq('factura_automatica', true).eq('status', 'valid'),
       supabase
         .from('dispensas')
         .select('id, member_id, voided_at, dispensa_payments(id)')
@@ -197,7 +197,7 @@ export default async function CtaCorrientePage({
 
     cuotaSocialCandidates = (eligible ?? [])
       .filter((m) => !activeGeneratedSet.has(m.id))
-      .map((m) => ({ memberId: m.id, memberName: m.name, memberNumber: m.member_number, cuotaSocial: m.cuota_social ?? 0 }));
+      .map((m) => ({ memberId: m.id, memberName: m.name, memberNumber: m.member_number, cuotaSocial: m.cuota_social ?? 0, bonificada: m.cuota_social_bonificada ?? false }));
   }
 
   return (
