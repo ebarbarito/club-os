@@ -27,20 +27,22 @@ type ArticuloRow = {
 type PagoRow = {
   id: string;
   date: string;
-  memberName: string;
+  memberName: string | null;
   memberNumber: number | null;
   accountName: string;
+  concept: string | null;
   amount: number;
+  tipo: 'ingreso' | 'egreso';
 };
 
-type SearchParams = { tab?: string; member?: string; from?: string; to?: string; account?: string; strain?: string };
+type SearchParams = { tab?: string; member?: string; from?: string; to?: string; account?: string; strain?: string; tipo?: string };
 
 export default async function HistorialPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
-  const { tab, member, from, to, account, strain } = await searchParams;
+  const { tab, member, from, to, account, strain, tipo } = await searchParams;
   const activeTab = tab === 'pago' ? 'pago' : 'articulo';
   const supabase = await createClient();
 
@@ -77,7 +79,7 @@ export default async function HistorialPage({ searchParams }: { searchParams: Pr
       {activeTab === 'articulo' ? (
         <ArticuloTab member={member} from={from} to={to} account={account} strain={strain} members={members ?? []} accounts={accounts ?? []} />
       ) : (
-        <PagoTab member={member} from={from} to={to} account={account} members={members ?? []} accounts={accounts ?? []} />
+        <PagoTab member={member} from={from} to={to} account={account} tipo={tipo} members={members ?? []} accounts={accounts ?? []} />
       )}
     </div>
   );
@@ -283,6 +285,7 @@ async function PagoTab({
   from,
   to,
   account,
+  tipo,
   members,
   accounts,
 }: {
@@ -290,54 +293,107 @@ async function PagoTab({
   from?: string;
   to?: string;
   account?: string;
+  tipo?: string;
   members: { id: string; name: string; member_number: number | null }[];
   accounts: { id: string; name: string }[];
 }) {
   const supabase = await createClient();
 
-  let query = supabase
-    .from('dispensa_payments')
-    .select(
-      'id, amount, account:payment_accounts(name), dispensa:dispensas!inner(number, created_at, member_id, voided_at, member:members(name, member_number))',
-    )
-    .is('dispensa.voided_at', null)
-    .limit(1000);
-  if (member) query = query.eq('dispensa.member_id', member);
-  if (from) query = query.gte('dispensa.created_at', `${from}T00:00:00`);
-  if (to) query = query.lte('dispensa.created_at', `${to}T23:59:59`);
-  if (account) query = query.eq('account_id', account);
+  const showIngreso = !tipo || tipo === 'ingreso' || tipo === 'ambos';
+  const showEgreso = !tipo || tipo === 'egreso' || tipo === 'ambos';
 
-  const { data: payments } = await query;
+  const rows: PagoRow[] = [];
 
-  const rows: PagoRow[] = ((payments ?? []) as unknown as {
-    id: string;
-    amount: number;
-    account: { name: string } | { name: string }[] | null;
-    dispensa:
-      | { created_at: string; member: { name: string; member_number: number | null } | { name: string; member_number: number | null }[] | null }
-      | { created_at: string; member: { name: string; member_number: number | null } | { name: string; member_number: number | null }[] | null }[]
-      | null;
-  }[]).map((p) => {
-    const dispensa = one(p.dispensa);
-    const memberRow = dispensa ? one(dispensa.member) : null;
-    const acc = one(p.account);
-    return {
-      id: p.id,
-      date: dispensa?.created_at ?? '',
-      memberName: memberRow?.name ?? '—',
-      memberNumber: memberRow?.member_number ?? null,
-      accountName: acc?.name ?? '—',
-      amount: p.amount,
-    };
-  });
+  // Ingresos: dispensa_payments (payments received for product dispensed)
+  if (showIngreso) {
+    let query = supabase
+      .from('dispensa_payments')
+      .select(
+        'id, amount, account:payment_accounts(name), dispensa:dispensas!inner(number, created_at, member_id, voided_at, member:members(name, member_number))',
+      )
+      .is('dispensa.voided_at', null)
+      .limit(1000);
+    if (member) query = query.eq('dispensa.member_id', member);
+    if (from) query = query.gte('dispensa.created_at', `${from}T00:00:00`);
+    if (to) query = query.lte('dispensa.created_at', `${to}T23:59:59`);
+    if (account) query = query.eq('account_id', account);
+
+    const { data: payments } = await query;
+
+    for (const p of (payments ?? []) as unknown as {
+      id: string;
+      amount: number;
+      account: { name: string } | { name: string }[] | null;
+      dispensa:
+        | { created_at: string; member: { name: string; member_number: number | null } | { name: string; member_number: number | null }[] | null }
+        | { created_at: string; member: { name: string; member_number: number | null } | { name: string; member_number: number | null }[] | null }[]
+        | null;
+    }[]) {
+      const dispensa = one(p.dispensa);
+      const memberRow = dispensa ? one(dispensa.member) : null;
+      const acc = one(p.account);
+      rows.push({
+        id: p.id,
+        date: dispensa?.created_at ?? '',
+        memberName: memberRow?.name ?? null,
+        memberNumber: memberRow?.member_number ?? null,
+        accountName: acc?.name ?? '—',
+        concept: null,
+        amount: p.amount,
+        tipo: 'ingreso',
+      });
+    }
+  }
+
+  // Egresos: ledger entries where type='egreso'
+  if (showEgreso && !member) {
+    let ledgerQuery = supabase
+      .from('ledger')
+      .select('id, amount, concept, created_at, account:payment_accounts(name)')
+      .eq('type', 'egreso')
+      .limit(1000);
+    if (from) ledgerQuery = ledgerQuery.gte('created_at', `${from}T00:00:00`);
+    if (to) ledgerQuery = ledgerQuery.lte('created_at', `${to}T23:59:59`);
+    if (account) ledgerQuery = ledgerQuery.eq('account_id', account);
+
+    const { data: egresos } = await ledgerQuery;
+
+    for (const e of (egresos ?? []) as { id: string; amount: number; concept: string; created_at: string; account: { name: string } | { name: string }[] | null }[]) {
+      const acc = one(e.account);
+      rows.push({
+        id: e.id,
+        date: e.created_at,
+        memberName: null,
+        memberNumber: null,
+        accountName: acc?.name ?? '—',
+        concept: e.concept,
+        amount: e.amount,
+        tipo: 'egreso',
+      });
+    }
+  }
+
   rows.sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  const totalImporte = rows.reduce((s, r) => s + r.amount, 0);
+  const totalIngreso = rows.filter((r) => r.tipo === 'ingreso').reduce((s, r) => s + r.amount, 0);
+  const totalEgreso = rows.filter((r) => r.tipo === 'egreso').reduce((s, r) => s + r.amount, 0);
 
   return (
     <div>
       <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
         <input type="hidden" name="tab" value="pago" />
+        <div>
+          <label className="block text-xs font-medium text-text-soft mb-1">Tipo</label>
+          <select
+            name="tipo"
+            defaultValue={tipo ?? ''}
+            className="rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent"
+          >
+            <option value="">Ambos</option>
+            <option value="ingreso">Ingreso</option>
+            <option value="egreso">Egreso</option>
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-medium text-text-soft mb-1">Socio</label>
           <select
@@ -399,8 +455,9 @@ async function PagoTab({
         <table className="w-full text-sm">
           <thead className="bg-surface-2 text-text-soft text-left">
             <tr>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Tipo</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">Fecha</th>
-              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Socio</th>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Socio / Concepto</th>
               <th className="px-4 py-2.5 font-medium">Forma de pago</th>
               <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Monto</th>
             </tr>
@@ -408,18 +465,37 @@ async function PagoTab({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-line">
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  {r.tipo === 'ingreso' ? (
+                    <span className="inline-block rounded-full bg-green-50 border border-green-200 text-green-700 text-xs px-2 py-0.5 font-medium">
+                      Ingreso
+                    </span>
+                  ) : (
+                    <span className="inline-block rounded-full bg-red-50 border border-red-200 text-red-700 text-xs px-2 py-0.5 font-medium">
+                      Egreso
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{fmtDate(r.date)}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text">
-                  {r.memberNumber != null ? `N° ${r.memberNumber} — ` : ''}
-                  {r.memberName}
+                <td className="px-4 py-2.5 text-text">
+                  {r.memberName != null ? (
+                    <>
+                      {r.memberNumber != null ? `N° ${r.memberNumber} — ` : ''}
+                      {r.memberName}
+                    </>
+                  ) : (
+                    <span className="text-text-soft">{r.concept ?? '—'}</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-text-soft">{r.accountName}</td>
-                <td className="px-4 py-2.5 text-right font-medium text-text whitespace-nowrap">{money(r.amount)}</td>
+                <td className={`px-4 py-2.5 text-right font-medium whitespace-nowrap ${r.tipo === 'egreso' ? 'text-red-600' : 'text-text'}`}>
+                  {r.tipo === 'egreso' ? `−${money(r.amount)}` : money(r.amount)}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-text-mute">
+                <td colSpan={5} className="px-4 py-10 text-center text-text-mute">
                   Sin resultados para este filtro.
                 </td>
               </tr>
@@ -427,9 +503,13 @@ async function PagoTab({
           </tbody>
         </table>
         {rows.length > 0 && (
-          <div className="px-4 py-3 border-t border-line flex justify-between font-semibold text-text bg-surface-2">
+          <div className="px-4 py-3 border-t border-line flex flex-wrap justify-between gap-2 font-semibold text-text bg-surface-2">
             <span>Total: {rows.length} línea(s)</span>
-            <span>{money(totalImporte)}</span>
+            <span className="flex gap-4">
+              {showIngreso && <span className="text-text">↑ {money(totalIngreso)}</span>}
+              {showEgreso && <span className="text-red-600">↓ {money(totalEgreso)}</span>}
+              {showIngreso && showEgreso && <span>Neto: {money(totalIngreso - totalEgreso)}</span>}
+            </span>
           </div>
         )}
       </div>
