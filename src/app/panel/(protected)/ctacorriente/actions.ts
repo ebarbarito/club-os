@@ -54,3 +54,34 @@ export async function confirmarCuotaSocial(entries: { memberId: string; amount: 
   revalidatePath('/panel/ctacorriente');
   return {};
 }
+
+// Deshace la generación de cuotas sociales de un período completo.
+// Solo elimina dispensas sin pagos — si alguna ya cobró, lanza error.
+export async function deshacerGeneracionCuotaSocial(periodoIso: string) {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  // Verificar que ninguna tiene pagos
+  const { data: conPagos } = await supabase
+    .from('dispensas')
+    .select('id, dispensa_payments(id)')
+    .eq('es_cuota_social', true)
+    .eq('cuota_social_periodo', periodoIso);
+
+  const conPagosFiltradas = (conPagos ?? []).filter(
+    (d: { id: string; dispensa_payments: { id: string }[] }) => d.dispensa_payments?.length > 0,
+  );
+  if (conPagosFiltradas.length > 0) {
+    return { error: `No se puede deshacer: ${conPagosFiltradas.length} cuota(s) ya tienen pagos registrados.` };
+  }
+
+  const { error } = await supabase
+    .from('dispensas')
+    .delete()
+    .eq('es_cuota_social', true)
+    .eq('cuota_social_periodo', periodoIso);
+
+  if (error) return { error: error.message };
+  revalidatePath('/panel/ctacorriente');
+  return {};
+}

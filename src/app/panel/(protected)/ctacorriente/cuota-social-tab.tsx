@@ -3,11 +3,21 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { money } from '@/lib/format';
-import { confirmarCuotaSocial } from './actions';
+import { confirmarCuotaSocial, deshacerGeneracionCuotaSocial } from './actions';
 
 type Candidate = { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number };
 
-export function CuotaSocialTab({ candidates, periodoLabel }: { candidates: Candidate[]; periodoLabel: string }) {
+export function CuotaSocialTab({
+  candidates,
+  periodoLabel,
+  undoableCount,
+  periodoIso,
+}: {
+  candidates: Candidate[];
+  periodoLabel: string;
+  undoableCount: number;
+  periodoIso: string;
+}) {
   const router = useRouter();
   const [pendingGen, startGen] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +25,8 @@ export function CuotaSocialTab({ candidates, periodoLabel }: { candidates: Candi
     Object.fromEntries(candidates.map((c) => [c.memberId, String(c.cuotaSocial)])),
   );
   const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const [pendingUndo, startUndo] = useTransition();
+  const [undoError, setUndoError] = useState<string | null>(null);
 
   const rows = candidates.filter((c) => !removed.has(c.memberId));
   const total = rows.reduce((s, c) => s + (Number(amounts[c.memberId]) || 0), 0);
@@ -39,8 +51,43 @@ export function CuotaSocialTab({ candidates, periodoLabel }: { candidates: Candi
     });
   }
 
+  function deshacer() {
+    setUndoError(null);
+    if (!confirm(`¿Eliminar todas las cuotas sociales generadas para ${periodoLabel} que no tienen pagos?`)) return;
+    startUndo(async () => {
+      const res = await deshacerGeneracionCuotaSocial(periodoIso);
+      if (res?.error) {
+        setUndoError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {undoableCount > 0 && (
+        <div className="rounded-xl border border-red/30 bg-surface p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-text">
+              {undoableCount} cuota(s) generada(s) sin pagos — podés deshacerlas
+            </p>
+            <p className="text-xs text-text-mute mt-0.5">
+              Esto las elimina por completo (ninguna tiene cobros registrados).
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={pendingUndo}
+            onClick={deshacer}
+            className="rounded-lg border border-red text-red text-sm font-semibold px-4 py-2 hover:bg-red/5 disabled:opacity-40 shrink-0"
+          >
+            {pendingUndo ? 'Deshaciendo…' : 'Deshacer generación'}
+          </button>
+        </div>
+      )}
+      {undoError && <p className="text-red text-sm">{undoError}</p>}
+
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
         <div className="px-4 py-3 border-b border-line flex items-center justify-between flex-wrap gap-2">
           <div>

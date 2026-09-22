@@ -168,19 +168,35 @@ export default async function CtaCorrientePage({
 
   let cuotaSocialCandidates: { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number }[] = [];
   let periodoLabel = '';
+  let cuotaSocialUndoableCount = 0;
+  let cuotaSocialPeriodoIso = '';
   if (activeTab === 'cuota_social') {
     const now = new Date();
     const periodoIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     periodoLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
-    const [{ data: eligible }, { data: alreadyGenerated }] = await Promise.all([
+    const [{ data: eligible }, { data: allGeneratedRaw }] = await Promise.all([
       supabase.from('members').select('id, name, member_number, cuota_social').eq('factura_automatica', true).eq('status', 'valid'),
-      supabase.from('dispensas').select('member_id').eq('es_cuota_social', true).eq('cuota_social_periodo', periodoIso),
+      supabase
+        .from('dispensas')
+        .select('id, member_id, voided_at, dispensa_payments(id)')
+        .eq('es_cuota_social', true)
+        .eq('cuota_social_periodo', periodoIso),
     ]);
 
-    const generatedSet = new Set((alreadyGenerated ?? []).map((d) => d.member_id));
+    // Solo las activas (no anuladas) bloquean la re-generación del mes
+    const activeGeneratedSet = new Set(
+      (allGeneratedRaw ?? []).filter((d) => !d.voided_at).map((d) => d.member_id),
+    );
+    // Las que no tienen pagos pueden deshacerse por completo
+    cuotaSocialUndoableCount = (allGeneratedRaw ?? []).filter(
+      (d: { voided_at: string | null; dispensa_payments: { id: string }[] }) =>
+        (d.dispensa_payments ?? []).length === 0,
+    ).length;
+    cuotaSocialPeriodoIso = periodoIso;
+
     cuotaSocialCandidates = (eligible ?? [])
-      .filter((m) => !generatedSet.has(m.id))
+      .filter((m) => !activeGeneratedSet.has(m.id))
       .map((m) => ({ memberId: m.id, memberName: m.name, memberNumber: m.member_number, cuotaSocial: m.cuota_social ?? 0 }));
   }
 
@@ -262,7 +278,7 @@ export default async function CtaCorrientePage({
       )}
 
       {activeTab === 'cuota_social' && (
-        <CuotaSocialTab candidates={cuotaSocialCandidates} periodoLabel={periodoLabel} />
+        <CuotaSocialTab candidates={cuotaSocialCandidates} periodoLabel={periodoLabel} undoableCount={cuotaSocialUndoableCount} periodoIso={cuotaSocialPeriodoIso} />
       )}
 
       {activeTab === 'buscar' && <MemberPicker members={searchableDebtors} value={memberId ?? ''} />}
