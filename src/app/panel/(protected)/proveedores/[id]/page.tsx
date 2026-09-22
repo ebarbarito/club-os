@@ -11,6 +11,7 @@ import type { PaymentAccount } from '@/components/payment-split';
 import { DeleteMovimientoButton } from './delete-movimiento-button';
 import { DeleteProveedorButton } from './delete-proveedor-button';
 import { DeleteComprobanteButton } from './comprobantes/delete-comprobante-button';
+import { DeletePagoButton } from './pagos/delete-pago-button';
 
 export default async function ProveedorDetailPage({
   params,
@@ -46,6 +47,15 @@ export default async function ProveedorDetailPage({
     .eq('proveedor_id', id)
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
+
+  const { data: pagos } = await supabase
+    .from('proveedor_pagos')
+    .select('id, fecha, total, notas, impacta_caja, created_at, proveedor_pago_comprobantes(count)')
+    .eq('proveedor_id', id)
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const saldoComprobantes = (comprobantes ?? []).reduce((s, c) => s + (c.saldo as number), 0);
 
   const { data: accounts } = await supabase
     .from('payment_accounts')
@@ -131,15 +141,17 @@ export default async function ProveedorDetailPage({
       {/* Saldo tiles */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-line-2 bg-surface p-4">
-          <p className="text-xs text-text-mute mb-1">Total deuda</p>
+          <p className="text-xs text-text-mute mb-1">Deuda (movimientos)</p>
           <p className="text-lg font-semibold text-red">{money(totalDeuda)}</p>
         </div>
         <div className="rounded-xl border border-line-2 bg-surface p-4">
-          <p className="text-xs text-text-mute mb-1">Total pagado</p>
-          <p className="text-lg font-semibold text-green-600">{money(totalPagado)}</p>
+          <p className="text-xs text-text-mute mb-1">Saldo comprobantes</p>
+          <p className={`text-lg font-semibold ${saldoComprobantes > 0 ? 'text-red' : 'text-text-soft'}`}>
+            {saldoComprobantes > 0 ? money(saldoComprobantes) : 'Sin deuda'}
+          </p>
         </div>
         <div className={`rounded-xl border p-4 ${saldo > 0 ? 'border-red/30 bg-red/5' : saldo < 0 ? 'border-green-600/30 bg-green-600/5' : 'border-line-2 bg-surface'}`}>
-          <p className="text-xs text-text-mute mb-1">Saldo pendiente</p>
+          <p className="text-xs text-text-mute mb-1">Saldo mov. pendiente</p>
           <p className={`text-lg font-bold ${saldo > 0 ? 'text-red' : saldo < 0 ? 'text-green-600' : 'text-text-soft'}`}>
             {saldo === 0 ? 'Sin deuda' : saldo > 0 ? money(saldo) : `${money(Math.abs(saldo))} a favor`}
           </p>
@@ -150,12 +162,22 @@ export default async function ProveedorDetailPage({
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-text">Comprobantes</h2>
-          <Link
-            href={`/panel/proveedores/${id}/comprobantes/new`}
-            className="rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5 hover:bg-accent/90"
-          >
-            + Ingresar comprobante
-          </Link>
+          <div className="flex gap-2">
+            {saldoComprobantes > 0 && (
+              <Link
+                href={`/panel/proveedores/${id}/pagos/new`}
+                className="rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5 hover:bg-accent/90"
+              >
+                + Registrar pago
+              </Link>
+            )}
+            <Link
+              href={`/panel/proveedores/${id}/comprobantes/new`}
+              className="rounded-lg border border-line-2 text-text-soft text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+            >
+              + Ingresar comprobante
+            </Link>
+          </div>
         </div>
 
         {(comprobantes ?? []).length === 0 ? (
@@ -215,6 +237,51 @@ export default async function ProveedorDetailPage({
           </div>
         )}
       </div>
+
+      {/* Pagos por comprobante */}
+      {(pagos ?? []).length > 0 && (
+        <div>
+          <h2 className="font-semibold text-text mb-3">Pagos registrados</h2>
+          <div className="rounded-xl border border-line-2 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-surface-2 text-text-soft text-xs">
+                  <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                  <th className="px-4 py-3 text-left font-medium">Comprobantes</th>
+                  <th className="px-4 py-3 text-left font-medium">Notas</th>
+                  <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="px-4 py-3 w-20" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {(pagos ?? []).map((pago) => {
+                  const cnt = Array.isArray(pago.proveedor_pago_comprobantes)
+                    ? (pago.proveedor_pago_comprobantes[0] as { count: number } | undefined)?.count ?? 0
+                    : 0;
+                  return (
+                    <tr key={pago.id} className="hover:bg-surface-2/50">
+                      <td className="px-4 py-3 text-text-soft tabular-nums">{fmtDate(pago.fecha)}</td>
+                      <td className="px-4 py-3 text-text-soft">
+                        {cnt} comprobante{cnt !== 1 ? 's' : ''}
+                        {pago.impacta_caja && (
+                          <span className="ml-2 text-xs text-accent bg-accent/10 rounded-full px-1.5 py-0.5">caja</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-text-soft text-xs">{pago.notas ?? ''}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-accent">
+                        {money(pago.total)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <DeletePagoButton id={pago.id} proveedorId={id} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Movimientos */}
       <div>

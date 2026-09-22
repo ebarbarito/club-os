@@ -307,3 +307,79 @@ export async function deleteComprobante(comprobanteId: string, proveedorId: stri
   revalidatePath(`/panel/proveedores/${proveedorId}`);
   return {};
 }
+
+// ── Pagos por comprobante ─────────────────────────────────────────────────────
+
+export async function createPagoComprobante(
+  proveedorId: string,
+  data: {
+    fecha: string;
+    total: number;
+    notas: string;
+    impacta_caja: boolean;
+    items: { comprobante_id: string; monto: number }[];
+    payments: { account_id: string; amount: number; exchange_rate: number }[];
+  },
+) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  // Registrar pago y actualizar saldos de comprobantes (atómico via RPC)
+  const { data: pagoId, error } = await supabase.rpc('registrar_pago_proveedor', {
+    p_tenant_id: profile.tenantId,
+    p_proveedor_id: proveedorId,
+    p_fecha: data.fecha,
+    p_total: data.total,
+    p_notas: data.notas || null,
+    p_impacta_caja: data.impacta_caja,
+    p_created_by: profile.userId,
+    p_items: data.items,
+  });
+
+  if (error) return { error: error.message };
+
+  // Si impacta caja, registrar egresos en ledger
+  if (data.impacta_caja && data.payments.length > 0) {
+    const { data: shift } = await supabase
+      .from('caja_shifts')
+      .select('id')
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const ledgerRows = data.payments.map((p) => ({
+      tenant_id: profile.tenantId,
+      shift_id: shift?.id ?? null,
+      type: 'egreso' as const,
+      category: 'Proveedores',
+      concept: `Pago proveedor`,
+      amount: p.amount / (p.exchange_rate || 1),
+      exchange_rate: p.exchange_rate || 1,
+      amount_local: p.amount,
+      account_id: p.account_id,
+    }));
+
+    const { error: ledgerError } = await supabase.from('ledger').insert(ledgerRows);
+    if (ledgerError) return { error: ledgerError.message };
+    revalidatePath('/panel/caja');
+  }
+
+  revalidatePath(`/panel/proveedores/${proveedorId}`);
+  return { id: pagoId };
+}
+
+export async function deletePagoComprobante(pagoId: string, proveedorId: string) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  // RPC restaura saldos y elimina el pago atómicamente
+  const { error } = await supabase.rpc('eliminar_pago_proveedor', {
+    p_pago_id: pagoId,
+    p_tenant_id: profile.tenantId,
+  });
+
+  if (error) return { error: error.message };
+  revalidatePath(`/panel/proveedores/${proveedorId}`);
+  return {};
+}
