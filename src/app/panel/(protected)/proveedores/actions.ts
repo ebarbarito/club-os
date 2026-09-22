@@ -81,12 +81,17 @@ export async function addMovimiento(
     date: string;
     account_id?: string | null;
     exchange_rate?: number;
+    impacta_caja?: boolean;
+    payments?: { account_id: string; amount: number; exchange_rate: number }[];
   },
 ) {
   const profile = await requireAdmin();
   const supabase = await createClient();
 
-  const exchangeRate = data.exchange_rate ?? 1;
+  // Para el movimiento de proveedor guardamos la primer cuenta (o la única)
+  const firstPayment = data.payments?.[0];
+  const accountId = firstPayment?.account_id ?? data.account_id ?? null;
+  const exchangeRate = firstPayment?.exchange_rate ?? data.exchange_rate ?? 1;
 
   const { error } = await supabase.from('proveedor_movimientos').insert({
     tenant_id: profile.tenantId,
@@ -95,38 +100,47 @@ export async function addMovimiento(
     amount: data.amount,
     description: data.description,
     date: data.date,
-    account_id: data.account_id || null,
+    account_id: accountId,
     exchange_rate: exchangeRate,
     created_by: profile.userId,
   });
 
   if (error) return { error: error.message };
 
-  // Si es un pago, también registrar el egreso en el ledger.
-  // Se intenta enlazar al turno abierto actual (si hay uno).
-  if (data.type === 'pago' && data.account_id) {
-    const { data: shift } = await supabase
-      .from('caja_shifts')
-      .select('id')
-      .is('closed_at', null)
-      .order('opened_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  // Si es un pago y se pide impactar caja, registrar egreso(s) en ledger
+  // enlazados al turno abierto actual (si hay uno).
+  if (data.type === 'pago' && data.impacta_caja) {
+    const payments = data.payments && data.payments.length > 0
+      ? data.payments
+      : accountId
+      ? [{ account_id: accountId, amount: data.amount, exchange_rate: exchangeRate }]
+      : [];
 
-    const { error: ledgerError } = await supabase.from('ledger').insert({
-      tenant_id: profile.tenantId,
-      shift_id: shift?.id ?? null,
-      type: 'egreso',
-      category: 'Proveedores',
-      concept: data.description,
-      amount: data.amount,
-      exchange_rate: exchangeRate,
-      amount_local: data.amount * exchangeRate,
-      account_id: data.account_id,
-    });
+    if (payments.length > 0) {
+      const { data: shift } = await supabase
+        .from('caja_shifts')
+        .select('id')
+        .is('closed_at', null)
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (ledgerError) return { error: ledgerError.message };
-    revalidatePath('/panel/caja');
+      const ledgerRows = payments.map((p) => ({
+        tenant_id: profile.tenantId,
+        shift_id: shift?.id ?? null,
+        type: 'egreso' as const,
+        category: 'Proveedores',
+        concept: data.description,
+        amount: p.amount / (p.exchange_rate || 1),   // monto en moneda de la cuenta
+        exchange_rate: p.exchange_rate || 1,
+        amount_local: p.amount,                       // ya viene en pesos
+        account_id: p.account_id,
+      }));
+
+      const { error: ledgerError } = await supabase.from('ledger').insert(ledgerRows);
+      if (ledgerError) return { error: ledgerError.message };
+      revalidatePath('/panel/caja');
+    }
   }
 
   revalidatePath(`/panel/proveedores/${proveedorId}`);

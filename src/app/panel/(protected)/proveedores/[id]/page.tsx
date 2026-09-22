@@ -7,6 +7,7 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { money, fmtDate } from '@/lib/format';
 import { ProveedorForm } from '../proveedor-form';
 import { MovimientoForm } from '../movimiento-form';
+import type { PaymentAccount } from '@/components/payment-split';
 import { DeleteMovimientoButton } from './delete-movimiento-button';
 import { DeleteProveedorButton } from './delete-proveedor-button';
 
@@ -40,7 +41,7 @@ export default async function ProveedorDetailPage({
 
   const { data: accounts } = await supabase
     .from('payment_accounts')
-    .select('id, name, currency, exchange_rate')
+    .select('id, name, currency, exchange_rate, is_cash')
     .eq('is_active', true)
     .order('name');
 
@@ -146,14 +147,14 @@ export default async function ProveedorDetailPage({
               <MovimientoForm
                 proveedorId={id}
                 defaultType="deuda"
-                accounts={accounts ?? []}
+                accounts={(accounts ?? []) as PaymentAccount[]}
               />
             </ModalTrigger>
             <ModalTrigger label="+ Registrar pago" title="Registrar pago">
               <MovimientoForm
                 proveedorId={id}
                 defaultType="pago"
-                accounts={accounts ?? []}
+                accounts={(accounts ?? []) as PaymentAccount[]}
               />
             </ModalTrigger>
           </div>
