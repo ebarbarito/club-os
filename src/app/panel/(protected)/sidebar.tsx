@@ -45,6 +45,7 @@ function SidebarContent({
           const CONFIG_SUBROUTES = ['/panel/balance', '/panel/historial', '/panel/empleados', '/panel/asientos', '/panel/cuentas', '/panel/usuarios'];
           const active =
             pathname === `/panel/${view}` ||
+            pathname.startsWith(`/panel/${view}/`) ||
             (view === 'configuracion' && CONFIG_SUBROUTES.some((r) => pathname.startsWith(r)));
           return (
             <Link

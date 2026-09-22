@@ -15,7 +15,8 @@ export type ViewId =
   | 'configuracion'
   | 'asientos'
   | 'empleados'
-  | 'historial';
+  | 'historial'
+  | 'proveedores';
 
 export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav: ViewId[] }> = {
   admin: {
@@ -25,7 +26,7 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     // Balance, Historial, Empleados, Asientos, Cuentas y Usuarios quedan
     // agrupados dentro de Configuración (ver ConfigTabs) en vez de ser
     // entradas propias del menú.
-    nav: ['dispensas', 'ctacorriente', 'socios', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'configuracion'],
+    nav: ['dispensas', 'ctacorriente', 'socios', 'proveedores', 'catalogo', 'stock', 'salas', 'sensores', 'caja', 'configuracion'],
   },
   dispensador: {
     name: 'Dispensador/a',
@@ -57,6 +58,7 @@ export const TITLES: Record<ViewId, [string, string]> = {
   asientos: ['Asientos', 'Modificaciones y eliminaciones — solo administrador'],
   empleados: ['Empleados', 'Remuneración pactada, adelantos y saldo disponible'],
   historial: ['Historial', 'Dispensas por socio, fecha, forma de pago y artículo'],
+  proveedores: ['Proveedores', 'Cuenta corriente y pagos a proveedores'],
 };
 
 export function isViewId(value: string): value is ViewId {
