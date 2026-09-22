@@ -53,6 +53,7 @@ type Member = {
   servicio_pactado_cantidad: number | null;
   cuota_social: number | null;
   factura_automatica: boolean;
+  cuota_social_bonificada: boolean;
 };
 
 export function SociosTable({ members }: { members: Member[] }) {
