@@ -42,7 +42,7 @@ export default async function ProveedorDetailPage({
   const { data: accounts } = await supabase
     .from('payment_accounts')
     .select('id, name, currency, exchange_rate, is_cash')
-    .eq('is_active', true)
+    .eq('active', true)
     .order('name');
 
   // Calcular saldos
