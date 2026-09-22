@@ -73,7 +73,7 @@ export default async function CajaPage({
   // La moneda extranjera no sigue un código fijo (hay tenants con "u$s",
   // "USD", etc.) — lo que la distingue es no ser ARS ni la cuenta cash.
   const usdAccount = accounts.find((a) => !a.is_cash && a.currency !== 'ARS');
-  const otherAccounts = accounts.filter((a) => !a.is_cash && a.id !== usdAccount?.id);
+  const otherAccounts = accounts.filter((a) => !a.is_cash && a.id !== usdAccount?.id && !a.is_virtual);
 
   const [{ data: diariaShift }, { data: generalShift }] = await Promise.all([
     supabase.from('caja_shifts').select('*').eq('kind', 'diaria').is('closed_at', null).maybeSingle(),
@@ -411,10 +411,7 @@ function GeneralTab({
               return (
                 <div key={a.id}>
                   <p className="text-text-mute">{a.name}</p>
-                  <p className="font-display font-bold text-text">
-                    {money(d)} <span className="text-text-mute font-normal text-sm">/ {money(g)}</span>
-                  </p>
-                  <p className="text-text-mute text-xs">diaria / general · total {money(d + g)}</p>
+                  <p className="font-display font-bold text-text">{money(d + g)}</p>
                 </div>
               );
             })}
