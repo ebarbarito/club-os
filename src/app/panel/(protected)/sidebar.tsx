@@ -38,7 +38,14 @@ function SidebarContent({
 
       <nav className="flex-1 py-3">
         {nav.map((view) => {
-          const active = pathname === `/panel/${view}`;
+          // Las páginas agrupadas bajo ConfigTabs (balance, historial, empleados,
+          // asientos, cuentas, usuarios) no están en el nav — solo "configuracion"
+          // lo está. Si el pathname corresponde a una de ellas, marcamos
+          // "configuracion" como activo para que el menú lo muestre seleccionado.
+          const CONFIG_SUBROUTES = ['/panel/balance', '/panel/historial', '/panel/empleados', '/panel/asientos', '/panel/cuentas', '/panel/usuarios'];
+          const active =
+            pathname === `/panel/${view}` ||
+            (view === 'configuracion' && CONFIG_SUBROUTES.some((r) => pathname.startsWith(r)));
           return (
             <Link
               key={view}

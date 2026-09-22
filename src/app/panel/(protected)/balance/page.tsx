@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { money, monthLabel, monthRange, shiftMonth, fmtDate, currentMonthKeyAR } from '@/lib/format';
+import { ConfigTabs } from '@/components/config-tabs';
 
 export default async function BalancePage({
   searchParams,
@@ -61,20 +62,17 @@ export default async function BalancePage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text">Balance</h1>
-          <p className="text-text-soft">Ingresos y egresos del club</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Link href={`/panel/balance?month=${shiftMonth(activeMonth, -1)}`} className="rounded-lg border border-line-2 px-2 py-1">
-            ←
-          </Link>
-          <span className="font-semibold text-text w-24 text-center">{monthLabel(activeMonth)}</span>
-          <Link href={`/panel/balance?month=${shiftMonth(activeMonth, 1)}`} className="rounded-lg border border-line-2 px-2 py-1">
-            →
-          </Link>
-        </div>
+      <h1 className="font-display text-2xl font-bold text-text">Balance</h1>
+      <p className="text-text-soft mb-4">Ingresos y egresos del club</p>
+      <ConfigTabs active="balance" />
+      <div className="flex items-center gap-2 text-sm mb-4">
+        <Link href={`/panel/balance?month=${shiftMonth(activeMonth, -1)}`} className="rounded-lg border border-line-2 px-2 py-1">
+          ←
+        </Link>
+        <span className="font-semibold text-text w-24 text-center">{monthLabel(activeMonth)}</span>
+        <Link href={`/panel/balance?month=${shiftMonth(activeMonth, 1)}`} className="rounded-lg border border-line-2 px-2 py-1">
+          →
+        </Link>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">

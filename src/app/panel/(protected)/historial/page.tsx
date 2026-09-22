@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { money, fmtDate } from '@/lib/format';
+import { ConfigTabs } from '@/components/config-tabs';
 
 function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
@@ -57,6 +58,7 @@ export default async function HistorialPage({ searchParams }: { searchParams: Pr
     <div>
       <h1 className="font-display text-2xl font-bold text-text">Historial</h1>
       <p className="text-text-soft mb-4">Dispensas por socio, fecha, forma de pago y artículo</p>
+      <ConfigTabs active="historial" />
 
       <div className="flex gap-1 mb-4 border-b border-line">
         {TABS.map((t) => (

@@ -7,6 +7,7 @@ import { Badge } from '@/components/badge';
 import { money } from '@/lib/format';
 import { EmployeeForm } from './employee-form';
 import { SalaryPaymentForm } from './salary-payment-form';
+import { ConfigTabs } from '@/components/config-tabs';
 
 export default async function EmpleadosPage() {
   const profile = await getSessionProfile();
@@ -31,11 +32,10 @@ export default async function EmpleadosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text">Empleados</h1>
-          <p className="text-text-soft">Cuenta corriente de sueldos — solo administrador</p>
-        </div>
+      <h1 className="font-display text-2xl font-bold text-text">Empleados</h1>
+      <p className="text-text-soft mb-4">Cuenta corriente de sueldos — solo administrador</p>
+      <ConfigTabs active="empleados" />
+      <div className="flex items-center justify-end mb-4">
         <ModalTrigger label="+ Nueva alta" title="Alta de empleado">
           <EmployeeForm />
         </ModalTrigger>

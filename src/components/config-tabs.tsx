@@ -2,15 +2,18 @@ import Link from 'next/link';
 
 const TABS = [
   { href: '/panel/configuracion', key: 'configuracion', label: 'Ajustes generales' },
+  { href: '/panel/balance', key: 'balance', label: 'Balance' },
+  { href: '/panel/historial', key: 'historial', label: 'Historial' },
+  { href: '/panel/empleados', key: 'empleados', label: 'Empleados' },
   { href: '/panel/asientos', key: 'asientos', label: 'Asientos' },
   { href: '/panel/cuentas', key: 'cuentas', label: 'Cuentas' },
   { href: '/panel/usuarios', key: 'usuarios', label: 'Usuarios' },
 ] as const;
 
-// Asientos, Cuentas y Usuarios viven en sus propias rutas (no anidadas bajo
+// Estas páginas viven en sus propias rutas (no anidadas bajo
 // /panel/configuracion) para no tocar todos los links/redirects que ya
 // apuntan a ellas — esta barra es lo que las agrupa visualmente "dentro de"
-// Configuración, un mismo tab bar repetido en las 4 páginas.
+// Configuración, un mismo tab bar repetido en las páginas.
 export function ConfigTabs({ active }: { active: (typeof TABS)[number]['key'] }) {
   return (
     <div className="flex gap-1 mb-4 border-b border-line">
