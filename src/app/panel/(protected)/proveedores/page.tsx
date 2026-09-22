@@ -48,9 +48,17 @@ export default async function ProveedoresPage() {
           <h1 className="font-display text-2xl font-bold text-text">Proveedores</h1>
           <p className="text-text-soft">Cuenta corriente y pagos a proveedores</p>
         </div>
-        <ModalTrigger label="+ Nuevo proveedor" title="Nuevo proveedor">
-          <ProveedorForm />
-        </ModalTrigger>
+        <div className="flex gap-2">
+          <Link
+            href="/panel/proveedores/articulos"
+            className="rounded-lg border border-line-2 text-text-soft text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+          >
+            Artículos
+          </Link>
+          <ModalTrigger label="+ Nuevo proveedor" title="Nuevo proveedor">
+            <ProveedorForm />
+          </ModalTrigger>
+        </div>
       </div>
 
       {rows.length === 0 ? (

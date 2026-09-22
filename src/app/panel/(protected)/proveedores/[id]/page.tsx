@@ -10,6 +10,7 @@ import { MovimientoForm } from '../movimiento-form';
 import type { PaymentAccount } from '@/components/payment-split';
 import { DeleteMovimientoButton } from './delete-movimiento-button';
 import { DeleteProveedorButton } from './delete-proveedor-button';
+import { DeleteComprobanteButton } from './comprobantes/delete-comprobante-button';
 
 export default async function ProveedorDetailPage({
   params,
@@ -37,6 +38,13 @@ export default async function ProveedorDetailPage({
     .select('id, type, amount, exchange_rate, description, date, account_id, created_at, payment_accounts(name)')
     .eq('proveedor_id', id)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  const { data: comprobantes } = await supabase
+    .from('proveedor_comprobantes')
+    .select('id, tipo, fecha, punto_venta, numero, subtotal, iva, total, saldo, notas, created_at')
+    .eq('proveedor_id', id)
+    .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
 
   const { data: accounts } = await supabase
@@ -138,10 +146,80 @@ export default async function ProveedorDetailPage({
         </div>
       </div>
 
+      {/* Comprobantes */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-text">Comprobantes</h2>
+          <Link
+            href={`/panel/proveedores/${id}/comprobantes/new`}
+            className="rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5 hover:bg-accent/90"
+          >
+            + Ingresar comprobante
+          </Link>
+        </div>
+
+        {(comprobantes ?? []).length === 0 ? (
+          <div className="rounded-xl border border-line-2 bg-surface p-8 text-center text-text-soft text-sm">
+            No hay comprobantes registrados.{' '}
+            <Link href={`/panel/proveedores/${id}/comprobantes/new`} className="text-accent hover:underline">
+              Ingresar el primero
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-line-2 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-surface-2 text-text-soft text-xs">
+                  <th className="px-4 py-3 text-left font-medium">Fecha</th>
+                  <th className="px-4 py-3 text-left font-medium">Tipo</th>
+                  <th className="px-4 py-3 text-left font-medium">Nro.</th>
+                  <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="px-4 py-3 text-right font-medium">Saldo</th>
+                  <th className="px-4 py-3 w-20" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {(comprobantes ?? []).map((comp) => {
+                  const isFactura = comp.tipo === 'factura';
+                  const nro = `${comp.punto_venta}-${comp.numero}`;
+                  return (
+                    <tr key={comp.id} className="hover:bg-surface-2/50">
+                      <td className="px-4 py-3 text-text-soft tabular-nums">{fmtDate(comp.fecha)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          isFactura ? 'bg-red/10 text-red' : 'bg-accent/10 text-accent'
+                        }`}>
+                          {isFactura ? 'Factura' : 'Nota de crédito'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-text font-mono text-xs">{nro}</td>
+                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${isFactura ? 'text-red' : 'text-accent'}`}>
+                        {isFactura ? '' : '−'}{money(comp.total)}
+                      </td>
+                      <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
+                        {comp.saldo === 0 ? 'Cancelado' : comp.saldo > 0 ? money(comp.saldo) : `${money(Math.abs(comp.saldo))} a favor`}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <DeleteComprobanteButton id={comp.id} proveedorId={id} label={nro} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-line bg-surface-2 text-xs text-text-soft">
+                  <td className="px-4 py-2" colSpan={6}>{(comprobantes ?? []).length} comprobante{(comprobantes ?? []).length !== 1 ? 's' : ''}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Movimientos */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-text">Cuenta corriente</h2>
+          <h2 className="font-semibold text-text">Movimientos manuales</h2>
           <div className="flex gap-2">
             <ModalTrigger label="+ Registrar deuda" title="Registrar deuda">
               <MovimientoForm

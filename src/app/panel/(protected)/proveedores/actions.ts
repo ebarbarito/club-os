@@ -161,3 +161,149 @@ export async function deleteMovimiento(movId: string, proveedorId: string) {
   revalidatePath(`/panel/proveedores/${proveedorId}`);
   return {};
 }
+
+// ── Artículos ────────────────────────────────────────────────────────────────
+
+export async function createArticulo(formData: FormData) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('proveedor_articulos').insert({
+    tenant_id: profile.tenantId,
+    code: (formData.get('code') as string) || null,
+    description: String(formData.get('description') ?? '').trim(),
+    unit: (formData.get('unit') as string) || null,
+    notes: (formData.get('notes') as string) || null,
+  });
+
+  if (error) return { error: error.message };
+  revalidatePath('/panel/proveedores/articulos');
+  return {};
+}
+
+export async function updateArticulo(id: string, formData: FormData) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('proveedor_articulos')
+    .update({
+      code: (formData.get('code') as string) || null,
+      description: String(formData.get('description') ?? '').trim(),
+      unit: (formData.get('unit') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+    })
+    .eq('id', id)
+    .eq('tenant_id', profile.tenantId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/panel/proveedores/articulos');
+  return {};
+}
+
+export async function deleteArticulo(id: string) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('proveedor_articulos')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('tenant_id', profile.tenantId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/panel/proveedores/articulos');
+  return {};
+}
+
+// ── Comprobantes ─────────────────────────────────────────────────────────────
+
+export async function createComprobante(
+  proveedorId: string,
+  data: {
+    tipo: 'factura' | 'nota_credito';
+    fecha: string;
+    punto_venta: string;
+    numero: string;
+    subtotal: number;
+    iva: number;
+    iva_adicional: number;
+    otros_impuestos: number;
+    total: number;
+    notas: string;
+    items: {
+      articulo_id: string | null;
+      descripcion: string;
+      cantidad: number;
+      precio_unitario: number;
+      descuento: number;
+      total: number;
+      orden: number;
+    }[];
+  },
+) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  // Factura: saldo positivo (debemos) | Nota de crédito: saldo negativo (nos deben)
+  const saldo = data.tipo === 'factura' ? data.total : -data.total;
+
+  const { data: comp, error } = await supabase
+    .from('proveedor_comprobantes')
+    .insert({
+      tenant_id: profile.tenantId,
+      proveedor_id: proveedorId,
+      tipo: data.tipo,
+      fecha: data.fecha,
+      punto_venta: data.punto_venta,
+      numero: data.numero,
+      subtotal: data.subtotal,
+      iva: data.iva,
+      iva_adicional: data.iva_adicional,
+      otros_impuestos: data.otros_impuestos,
+      total: data.total,
+      saldo,
+      notas: data.notas || null,
+      created_by: profile.userId,
+    })
+    .select('id')
+    .single();
+
+  if (error) return { error: error.message };
+
+  if (data.items.length > 0) {
+    const { error: itemsError } = await supabase.from('proveedor_comprobante_items').insert(
+      data.items.map((item) => ({
+        comprobante_id: comp.id,
+        tenant_id: profile.tenantId,
+        articulo_id: item.articulo_id || null,
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        descuento: item.descuento,
+        total: item.total,
+        orden: item.orden,
+      })),
+    );
+    if (itemsError) return { error: itemsError.message };
+  }
+
+  revalidatePath(`/panel/proveedores/${proveedorId}`);
+  return { id: comp.id };
+}
+
+export async function deleteComprobante(comprobanteId: string, proveedorId: string) {
+  const profile = await requireAdmin();
+  const supabase = await createClient();
+
+  // Los items se eliminan en cascada por FK
+  const { error } = await supabase
+    .from('proveedor_comprobantes')
+    .delete()
+    .eq('id', comprobanteId)
+    .eq('tenant_id', profile.tenantId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/panel/proveedores/${proveedorId}`);
+  return {};
+}
