@@ -33,7 +33,7 @@ export default async function ProveedorDetailPage({
 
   const { data: comprobantes } = await supabase
     .from('proveedor_comprobantes')
-    .select('id, tipo, fecha, punto_venta, numero, subtotal, iva, total, saldo, notas, created_at')
+    .select('id, tipo, fecha, punto_venta, numero, subtotal, iva, total, saldo, moneda, tipo_cambio, notas, created_at')
     .eq('proveedor_id', id)
     .neq('saldo', 0)
     .order('fecha', { ascending: true })
@@ -47,6 +47,13 @@ export default async function ProveedorDetailPage({
     .order('created_at', { ascending: false });
 
   const saldoComprobantes = (comprobantes ?? []).reduce((s, c) => s + (c.saldo as number), 0);
+
+  function fmtTotal(total: number, moneda: string): string {
+    if (moneda === 'USD') {
+      return 'USD ' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return money(total);
+  }
 
   const hasFacturasPendientes = (comprobantes ?? []).some(
     (c) => c.tipo === 'factura' && c.saldo > 0,
@@ -186,7 +193,10 @@ export default async function ProveedorDetailPage({
                       </td>
                       <td className="px-4 py-3 text-text font-mono text-xs">{nro}</td>
                       <td className={`px-4 py-3 text-right font-semibold tabular-nums ${isFactura ? 'text-red' : 'text-accent'}`}>
-                        {isFactura ? '' : '−'}{money(comp.total)}
+                        {isFactura ? '' : '−'}{fmtTotal(comp.total, comp.moneda as string)}
+                        {(comp.moneda as string) === 'USD' && (
+                          <span className="ml-1 text-[10px] font-normal bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded px-1">USD</span>
+                        )}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
                         {comp.saldo > 0 ? money(comp.saldo) : money(Math.abs(comp.saldo))}

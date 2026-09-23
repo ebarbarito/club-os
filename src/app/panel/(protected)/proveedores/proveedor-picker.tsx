@@ -6,6 +6,7 @@ import { money } from '@/lib/format';
 
 export type ProveedorRow = {
   id: string;
+  numero: number | null;
   name: string;
   rubro: string | null;
   cuit: string | null;
@@ -49,6 +50,7 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-surface-2 text-text-soft text-xs">
+                <th className="px-4 py-3 text-left font-medium w-14">Nro.</th>
                 <th className="px-4 py-3 text-left font-medium">Proveedor</th>
                 <th className="px-4 py-3 text-left font-medium hidden sm:table-cell">Rubro</th>
                 <th className="px-4 py-3 text-right font-medium">Saldo</th>
@@ -57,6 +59,9 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
             <tbody className="divide-y divide-line">
               {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-surface-2/50 transition-colors">
+                  <td className="px-4 py-3 text-text-mute font-mono text-xs tabular-nums">
+                    {p.numero != null ? String(p.numero).padStart(3, '0') : '—'}
+                  </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/panel/proveedores/${p.id}`}
@@ -90,7 +95,7 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
             {proveedores.length > 1 && (
               <tfoot>
                 <tr className="border-t border-line bg-surface-2 text-xs font-semibold">
-                  <td className="px-4 py-2 text-text-soft" colSpan={2}>
+                  <td className="px-4 py-2 text-text-soft" colSpan={3}>
                     {filtered.length === proveedores.length
                       ? `${proveedores.length} proveedor${proveedores.length !== 1 ? 'es' : ''}`
                       : `${filtered.length} de ${proveedores.length}`}

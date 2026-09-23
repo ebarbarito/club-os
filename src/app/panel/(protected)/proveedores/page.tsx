@@ -25,7 +25,7 @@ export default async function ProveedoresPage({
   const [{ data: proveedores }, { data: comprobantes }, { data: articulos }] = await Promise.all([
     supabase
       .from('proveedores')
-      .select('id, name, rubro, cuit, contact_name, phone')
+      .select('id, name, rubro, cuit, contact_name, phone, numero')
       .is('deleted_at', null)
       .order('name', { ascending: true }),
     supabase
@@ -48,6 +48,7 @@ export default async function ProveedoresPage({
 
   const rows = (proveedores ?? []).map((p) => ({
     id: p.id,
+    numero: p.numero ?? null,
     name: p.name,
     rubro: p.rubro ?? null,
     cuit: p.cuit ?? null,

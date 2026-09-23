@@ -15,8 +15,19 @@ export async function createProveedor(formData: FormData) {
   const profile = await requireAdmin();
   const supabase = await createClient();
 
+  // Siguiente número correlativo para este tenant
+  const { data: maxRow } = await supabase
+    .from('proveedores')
+    .select('numero')
+    .eq('tenant_id', profile.tenantId)
+    .order('numero', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const numero = (maxRow?.numero ?? 0) + 1;
+
   const { error } = await supabase.from('proveedores').insert({
     tenant_id: profile.tenantId,
+    numero,
     name: String(formData.get('name') ?? '').trim(),
     cuit: (formData.get('cuit') as string) || null,
     contact_name: (formData.get('contact_name') as string) || null,
@@ -230,6 +241,8 @@ export async function createComprobante(
     iva_adicional: number;
     otros_impuestos: number;
     total: number;
+    moneda: 'ARS' | 'USD';
+    tipo_cambio: number;
     notas: string;
     apply_to_factura_id?: string | null;
     items: {
@@ -246,8 +259,9 @@ export async function createComprobante(
   const profile = await requireAdmin();
   const supabase = await createClient();
 
-  // Factura: saldo positivo (debemos) | Nota de crédito: saldo negativo (nos deben)
-  const saldo = data.tipo === 'factura' ? data.total : -data.total;
+  // Saldo siempre en ARS (total × tipo_cambio). Para ARS tipo_cambio=1.
+  // Factura: positivo (debemos) | NC: negativo (nos deben)
+  const saldo = (data.tipo === 'factura' ? 1 : -1) * data.total * data.tipo_cambio;
 
   const { data: comp, error } = await supabase
     .from('proveedor_comprobantes')
@@ -258,6 +272,8 @@ export async function createComprobante(
       fecha: data.fecha,
       punto_venta: data.punto_venta,
       numero: data.numero,
+      moneda: data.moneda,
+      tipo_cambio: data.tipo_cambio,
       subtotal: data.subtotal,
       iva: data.iva,
       iva_adicional: data.iva_adicional,
