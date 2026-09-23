@@ -52,12 +52,12 @@ export function PagoForm({
 
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [notas, setNotas] = useState('');
-  const [impactaCaja, setImpactaCaja] = useState(true);
+  const [impactaCaja, setImpactaCaja] = useState(false);
 
   // Facturas seleccionadas — iniciadas con todas chequeadas
   const [selFacturas, setSelFacturas] = useState<Record<string, Seleccion>>(() =>
     Object.fromEntries(
-      facturas.map((c) => [c.id, { checked: false, monto: String(c.saldo) }]),
+      facturas.map((c) => [c.id, { checked: false, monto: '' }]),
     ),
   );
 
