@@ -383,15 +383,22 @@ export async function createPagoComprobante(
 
   if (error) return { error: error.message };
 
-  // Si impacta caja, registrar egresos en ledger
-  if (data.impacta_caja && data.payments.length > 0) {
-    const { data: shift } = await supabase
-      .from('caja_shifts')
-      .select('id')
-      .is('closed_at', null)
-      .order('opened_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  // Registrar egresos en ledger siempre que haya medios de pago (hay dinero
+  // real moviéndose). El trigger apply_account_taxes genera automáticamente
+  // las filas de impuesto/descuento de cada cuenta (ej. MP GL).
+  // impacta_caja controla solo si el egreso se liga al turno abierto (shift_id)
+  // o queda sin turno (shift_id = null → caja general, no afecta caja diaria).
+  if (data.payments.length > 0) {
+    const shift = data.impacta_caja
+      ? await supabase
+          .from('caja_shifts')
+          .select('id')
+          .is('closed_at', null)
+          .order('opened_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then((r) => r.data)
+      : null;
 
     const ledgerRows = data.payments.map((p) => ({
       tenant_id: profile.tenantId,
