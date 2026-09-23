@@ -231,6 +231,7 @@ export async function createComprobante(
     otros_impuestos: number;
     total: number;
     notas: string;
+    apply_to_factura_id?: string | null;
     items: {
       articulo_id: string | null;
       descripcion: string;
@@ -286,6 +287,34 @@ export async function createComprobante(
       })),
     );
     if (itemsError) return { error: itemsError.message };
+  }
+
+  // Si es NC y se indicó una factura pendiente a la que aplicar el crédito
+  if (data.tipo === 'nota_credito' && data.apply_to_factura_id) {
+    const { data: factura, error: facErr } = await supabase
+      .from('proveedor_comprobantes')
+      .select('saldo')
+      .eq('id', data.apply_to_factura_id)
+      .eq('tenant_id', profile.tenantId)
+      .single();
+
+    if (!facErr && factura && factura.saldo > 0) {
+      const applyAmount = Math.min(data.total, factura.saldo);
+      // NC saldo: -(total - applyAmount) — crédito remanente
+      const { error: ncErr } = await supabase
+        .from('proveedor_comprobantes')
+        .update({ saldo: -(data.total - applyAmount) })
+        .eq('id', comp.id)
+        .eq('tenant_id', profile.tenantId);
+      if (ncErr) return { error: ncErr.message };
+      // Factura saldo: saldo - applyAmount
+      const { error: facUpdErr } = await supabase
+        .from('proveedor_comprobantes')
+        .update({ saldo: factura.saldo - applyAmount })
+        .eq('id', data.apply_to_factura_id)
+        .eq('tenant_id', profile.tenantId);
+      if (facUpdErr) return { error: facUpdErr.message };
+    }
   }
 
   revalidatePath(`/panel/proveedores/${proveedorId}`);

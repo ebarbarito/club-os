@@ -25,17 +25,27 @@ export default async function NuevoComprobantePage({
 
   if (!proveedor) notFound();
 
-  const { data: articulos } = await supabase
-    .from('proveedor_articulos')
-    .select('id, code, description, unit')
-    .is('deleted_at', null)
-    .order('description', { ascending: true });
+  const [{ data: articulos }, { data: facturasPendientes }] = await Promise.all([
+    supabase
+      .from('proveedor_articulos')
+      .select('id, code, description, unit')
+      .is('deleted_at', null)
+      .order('description', { ascending: true }),
+    supabase
+      .from('proveedor_comprobantes')
+      .select('id, punto_venta, numero, fecha, saldo')
+      .eq('proveedor_id', id)
+      .eq('tipo', 'factura')
+      .gt('saldo', 0)
+      .order('fecha', { ascending: true }),
+  ]);
 
   return (
     <ComprobanteForm
       proveedorId={id}
       proveedorName={proveedor.name}
       articulos={articulos ?? []}
+      facturasPendientes={facturasPendientes ?? []}
     />
   );
 }

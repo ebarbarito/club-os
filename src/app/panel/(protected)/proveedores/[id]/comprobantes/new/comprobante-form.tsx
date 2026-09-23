@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { money } from '@/lib/format';
+import { money, fmtDate } from '@/lib/format';
 import { createComprobante } from '../../../actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -10,6 +10,7 @@ const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const cellCls = 'rounded-lg border border-line-2 px-2 py-1.5 text-sm outline-none focus:border-accent w-full';
 
 type Articulo = { id: string; code: string | null; description: string; unit: string | null };
+type FacturaPendiente = { id: string; punto_venta: string; numero: string; fecha: string; saldo: number };
 type LineItem = {
   articulo_id: string;
   descripcion: string;
@@ -33,10 +34,12 @@ export function ComprobanteForm({
   proveedorId,
   proveedorName,
   articulos,
+  facturasPendientes = [],
 }: {
   proveedorId: string;
   proveedorName: string;
   articulos: Articulo[];
+  facturasPendientes?: FacturaPendiente[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -51,6 +54,7 @@ export function ComprobanteForm({
   const [ivaAdicional, setIvaAdicional] = useState('');
   const [otrosImpuestos, setOtrosImpuestos] = useState('');
   const [notas, setNotas] = useState('');
+  const [applyToFacturaId, setApplyToFacturaId] = useState<string | null>(null);
 
   const subtotal = items.reduce((s, item) => s + calcItemTotal(item), 0);
   const ivaNum = Number(iva) || 0;
@@ -102,6 +106,7 @@ export function ComprobanteForm({
         otros_impuestos: otrosNum,
         total,
         notas,
+        apply_to_factura_id: tipo === 'nota_credito' ? applyToFacturaId : null,
         items: validItems.map((item, idx) => ({
           articulo_id: item.articulo_id || null,
           descripcion: item.descripcion.trim(),
@@ -132,7 +137,7 @@ export function ComprobanteForm({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setTipo('factura')}
+          onClick={() => { setTipo('factura'); setApplyToFacturaId(null); }}
           className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold ${
             tipo === 'factura' ? 'border-red bg-red/5 text-red' : 'border-line-2 text-text-soft hover:border-red/40'
           }`}
@@ -150,10 +155,63 @@ export function ComprobanteForm({
         </button>
       </div>
 
+      {/* Aplicar NC a factura pendiente */}
       {tipo === 'nota_credito' && (
-        <p className="text-xs text-accent bg-accent/5 rounded-lg px-3 py-2">
-          La nota de crédito genera un saldo a favor nuestro en la cuenta corriente del proveedor.
-        </p>
+        <div className="rounded-xl border border-line-2 bg-surface p-4 space-y-3">
+          <p className="text-xs font-semibold text-text-soft uppercase tracking-wide">
+            Aplicar a factura pendiente
+          </p>
+          {facturasPendientes.length === 0 ? (
+            <p className="text-sm text-text-soft">
+              No hay facturas pendientes. La nota de crédito quedará disponible como crédito para futuros pagos.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-transparent px-2 py-1.5 hover:bg-surface-2">
+                <input
+                  type="radio"
+                  name="apply_nc"
+                  checked={applyToFacturaId === null}
+                  onChange={() => setApplyToFacturaId(null)}
+                  className="accent-accent"
+                />
+                <span className="text-sm text-text-soft">No aplicar — queda como crédito disponible</span>
+              </label>
+              {facturasPendientes.map((f) => {
+                const nro = `${f.punto_venta}-${f.numero}`;
+                return (
+                  <label key={f.id} className={`flex items-center gap-3 cursor-pointer rounded-lg border px-2 py-1.5 hover:bg-surface-2 ${applyToFacturaId === f.id ? 'border-accent bg-accent/5' : 'border-transparent'}`}>
+                    <input
+                      type="radio"
+                      name="apply_nc"
+                      checked={applyToFacturaId === f.id}
+                      onChange={() => setApplyToFacturaId(f.id)}
+                      className="accent-accent"
+                    />
+                    <span className="font-mono text-xs text-text">{nro}</span>
+                    <span className="text-text-soft text-xs">{fmtDate(f.fecha)}</span>
+                    <span className="ml-auto text-red font-semibold tabular-nums text-sm">{money(f.saldo)}</span>
+                  </label>
+                );
+              })}
+              {applyToFacturaId && total > 0 && (() => {
+                const fac = facturasPendientes.find((f) => f.id === applyToFacturaId);
+                if (!fac) return null;
+                const applied = Math.min(total, fac.saldo);
+                const remainNC = total - applied;
+                const remainFac = fac.saldo - applied;
+                return (
+                  <div className="mt-2 rounded-lg bg-accent/5 border border-accent/20 px-3 py-2 text-xs space-y-1 text-text-soft">
+                    <p>Se aplicarán <span className="font-semibold text-accent">{money(applied)}</span> de la NC a esa factura.</p>
+                    {remainFac > 0 && <p>Saldo restante de la factura: <span className="font-semibold text-red">{money(remainFac)}</span></p>}
+                    {remainNC > 0 && <p>Crédito remanente de la NC: <span className="font-semibold text-accent">{money(remainNC)}</span></p>}
+                    {remainFac === 0 && remainNC === 0 && <p className="text-emerald-600 font-semibold">La factura queda saldada y la NC completamente aplicada.</p>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Datos del comprobante */}
