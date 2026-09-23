@@ -314,10 +314,10 @@ export async function createPagoComprobante(
   proveedorId: string,
   data: {
     fecha: string;
-    total: number;
+    total: number;             // total efectivo (cash) — excluye la parte cubierta por NC
     notas: string;
     impacta_caja: boolean;
-    items: { comprobante_id: string; monto: number }[];
+    items: { comprobante_id: string; monto: number; tipo: 'factura' | 'nota_credito' }[];
     payments: { account_id: string; amount: number; exchange_rate: number }[];
   },
 ) {

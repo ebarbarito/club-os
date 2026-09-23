@@ -57,6 +57,16 @@ export default async function ProveedorDetailPage({
 
   const saldoComprobantes = (comprobantes ?? []).reduce((s, c) => s + (c.saldo as number), 0);
 
+  // Hay facturas pendientes → habilita el botón de pago (aunque haya NC para aplicar)
+  const hasFacturasPendientes = (comprobantes ?? []).some(
+    (c) => c.tipo === 'factura' && c.saldo > 0,
+  );
+
+  // Hay NC disponibles para aplicar
+  const hasNCDisponibles = (comprobantes ?? []).some(
+    (c) => c.tipo === 'nota_credito' && c.saldo < 0,
+  );
+
   const { data: accounts } = await supabase
     .from('payment_accounts')
     .select('id, name, currency, exchange_rate, is_cash')
@@ -163,7 +173,13 @@ export default async function ProveedorDetailPage({
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-text">Comprobantes</h2>
           <div className="flex gap-2">
-            {saldoComprobantes > 0 && (
+            <Link
+              href={`/panel/proveedores/${id}/estado-cuenta`}
+              className="rounded-lg border border-line-2 text-text-soft text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+            >
+              Estado de cuenta
+            </Link>
+            {hasFacturasPendientes && (
               <Link
                 href={`/panel/proveedores/${id}/pagos/new`}
                 className="rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5 hover:bg-accent/90"
