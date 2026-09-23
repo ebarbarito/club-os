@@ -27,7 +27,7 @@ export default async function ProveedoresPage({
       .from('proveedores')
       .select('id, name, rubro, cuit, contact_name, phone, numero')
       .is('deleted_at', null)
-      .order('name', { ascending: true }),
+      .order('numero', { ascending: true }),
     supabase
       .from('proveedor_comprobantes')
       .select('proveedor_id, saldo'),
