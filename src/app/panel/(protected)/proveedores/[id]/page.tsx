@@ -121,7 +121,7 @@ export default async function ProveedorDetailPage({
             ? 'Sin deuda'
             : saldoComprobantes > 0
             ? money(saldoComprobantes)
-            : `${money(Math.abs(saldoComprobantes))} a favor`}
+            : money(Math.abs(saldoComprobantes))}
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export default async function ProveedorDetailPage({
                         {isFactura ? '' : '−'}{money(comp.total)}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
-                        {comp.saldo > 0 ? money(comp.saldo) : `${money(Math.abs(comp.saldo))} a favor`}
+                        {comp.saldo > 0 ? money(comp.saldo) : money(Math.abs(comp.saldo))}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <DeleteComprobanteButton id={comp.id} proveedorId={id} label={nro} />
