@@ -35,8 +35,9 @@ export default async function ProveedorDetailPage({
     .from('proveedor_comprobantes')
     .select('id, tipo, fecha, punto_venta, numero, subtotal, iva, total, saldo, notas, created_at')
     .eq('proveedor_id', id)
-    .order('fecha', { ascending: false })
-    .order('created_at', { ascending: false });
+    .neq('saldo', 0)
+    .order('fecha', { ascending: true })
+    .order('created_at', { ascending: true });
 
   const { data: pagos } = await supabase
     .from('proveedor_pagos')
@@ -127,7 +128,7 @@ export default async function ProveedorDetailPage({
       {/* Comprobantes */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-text">Comprobantes</h2>
+          <h2 className="font-semibold text-text">Pendientes</h2>
           <div className="flex gap-2">
             <Link
               href={`/panel/proveedores/${id}/estado-cuenta`}
@@ -154,10 +155,7 @@ export default async function ProveedorDetailPage({
 
         {(comprobantes ?? []).length === 0 ? (
           <div className="rounded-xl border border-line-2 bg-surface p-8 text-center text-text-soft text-sm">
-            No hay comprobantes registrados.{' '}
-            <Link href={`/panel/proveedores/${id}/comprobantes/new`} className="text-accent hover:underline">
-              Ingresar el primero
-            </Link>
+            Sin facturas adeudadas ni notas de crédito disponibles.
           </div>
         ) : (
           <div className="rounded-xl border border-line-2 overflow-hidden">
@@ -191,7 +189,7 @@ export default async function ProveedorDetailPage({
                         {isFactura ? '' : '−'}{money(comp.total)}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
-                        {comp.saldo === 0 ? 'Cancelado' : comp.saldo > 0 ? money(comp.saldo) : `${money(Math.abs(comp.saldo))} a favor`}
+                        {comp.saldo > 0 ? money(comp.saldo) : `${money(Math.abs(comp.saldo))} a favor`}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <DeleteComprobanteButton id={comp.id} proveedorId={id} label={nro} />
@@ -202,7 +200,7 @@ export default async function ProveedorDetailPage({
               </tbody>
               <tfoot>
                 <tr className="border-t border-line bg-surface-2 text-xs text-text-soft">
-                  <td className="px-4 py-2" colSpan={6}>{(comprobantes ?? []).length} comprobante{(comprobantes ?? []).length !== 1 ? 's' : ''}</td>
+                  <td className="px-4 py-2" colSpan={6}>{(comprobantes ?? []).length} pendiente{(comprobantes ?? []).length !== 1 ? 's' : ''}</td>
                 </tr>
               </tfoot>
             </table>
