@@ -6,9 +6,6 @@ import { ROLES } from '@/lib/roles';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { money, fmtDate } from '@/lib/format';
 import { ProveedorForm } from '../proveedor-form';
-import { MovimientoForm } from '../movimiento-form';
-import type { PaymentAccount } from '@/components/payment-split';
-import { DeleteMovimientoButton } from './delete-movimiento-button';
 import { DeleteProveedorButton } from './delete-proveedor-button';
 import { DeleteComprobanteButton } from './comprobantes/delete-comprobante-button';
 import { DeletePagoButton } from './pagos/delete-pago-button';
@@ -34,13 +31,6 @@ export default async function ProveedorDetailPage({
 
   if (!proveedor) notFound();
 
-  const { data: movimientos } = await supabase
-    .from('proveedor_movimientos')
-    .select('id, type, amount, exchange_rate, description, date, account_id, created_at, payment_accounts(name)')
-    .eq('proveedor_id', id)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false });
-
   const { data: comprobantes } = await supabase
     .from('proveedor_comprobantes')
     .select('id, tipo, fecha, punto_venta, numero, subtotal, iva, total, saldo, notas, created_at')
@@ -57,35 +47,9 @@ export default async function ProveedorDetailPage({
 
   const saldoComprobantes = (comprobantes ?? []).reduce((s, c) => s + (c.saldo as number), 0);
 
-  // Hay facturas pendientes → habilita el botón de pago (aunque haya NC para aplicar)
   const hasFacturasPendientes = (comprobantes ?? []).some(
     (c) => c.tipo === 'factura' && c.saldo > 0,
   );
-
-  // Hay NC disponibles para aplicar
-  const hasNCDisponibles = (comprobantes ?? []).some(
-    (c) => c.tipo === 'nota_credito' && c.saldo < 0,
-  );
-
-  const { data: accounts } = await supabase
-    .from('payment_accounts')
-    .select('id, name, currency, exchange_rate, is_cash')
-    .eq('active', true)
-    .order('name');
-
-  // Calcular saldos
-  let totalDeuda = 0;
-  let totalPagado = 0;
-  for (const mov of movimientos ?? []) {
-    const amountLocal = mov.amount * (mov.exchange_rate ?? 1);
-    if (mov.type === 'deuda') totalDeuda += amountLocal;
-    else totalPagado += amountLocal;
-  }
-  const saldo = totalDeuda - totalPagado;
-
-  function one<T>(v: T | T[] | null): T | null {
-    return Array.isArray(v) ? (v[0] ?? null) : v;
-  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -148,24 +112,16 @@ export default async function ProveedorDetailPage({
         </div>
       )}
 
-      {/* Saldo tiles */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-line-2 bg-surface p-4">
-          <p className="text-xs text-text-mute mb-1">Deuda (movimientos)</p>
-          <p className="text-lg font-semibold text-red">{money(totalDeuda)}</p>
-        </div>
-        <div className="rounded-xl border border-line-2 bg-surface p-4">
-          <p className="text-xs text-text-mute mb-1">Saldo comprobantes</p>
-          <p className={`text-lg font-semibold ${saldoComprobantes > 0 ? 'text-red' : 'text-text-soft'}`}>
-            {saldoComprobantes > 0 ? money(saldoComprobantes) : 'Sin deuda'}
-          </p>
-        </div>
-        <div className={`rounded-xl border p-4 ${saldo > 0 ? 'border-red/30 bg-red/5' : saldo < 0 ? 'border-green-600/30 bg-green-600/5' : 'border-line-2 bg-surface'}`}>
-          <p className="text-xs text-text-mute mb-1">Saldo mov. pendiente</p>
-          <p className={`text-lg font-bold ${saldo > 0 ? 'text-red' : saldo < 0 ? 'text-green-600' : 'text-text-soft'}`}>
-            {saldo === 0 ? 'Sin deuda' : saldo > 0 ? money(saldo) : `${money(Math.abs(saldo))} a favor`}
-          </p>
-        </div>
+      {/* Saldo tile */}
+      <div className={`rounded-xl border p-4 ${saldoComprobantes > 0 ? 'border-red/30 bg-red/5' : saldoComprobantes < 0 ? 'border-emerald-600/30 bg-emerald-600/5' : 'border-line-2 bg-surface'}`}>
+        <p className="text-xs text-text-mute mb-1">Saldo pendiente</p>
+        <p className={`text-2xl font-bold ${saldoComprobantes > 0 ? 'text-red' : saldoComprobantes < 0 ? 'text-emerald-600' : 'text-text-soft'}`}>
+          {saldoComprobantes === 0
+            ? 'Sin deuda'
+            : saldoComprobantes > 0
+            ? money(saldoComprobantes)
+            : `${money(Math.abs(saldoComprobantes))} a favor`}
+        </p>
       </div>
 
       {/* Comprobantes */}
@@ -298,88 +254,6 @@ export default async function ProveedorDetailPage({
           </div>
         </div>
       )}
-
-      {/* Movimientos */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-text">Movimientos manuales</h2>
-          <div className="flex gap-2">
-            <ModalTrigger label="+ Registrar deuda" title="Registrar deuda">
-              <MovimientoForm
-                proveedorId={id}
-                defaultType="deuda"
-                accounts={(accounts ?? []) as PaymentAccount[]}
-              />
-            </ModalTrigger>
-            <ModalTrigger label="+ Registrar pago" title="Registrar pago">
-              <MovimientoForm
-                proveedorId={id}
-                defaultType="pago"
-                accounts={(accounts ?? []) as PaymentAccount[]}
-              />
-            </ModalTrigger>
-          </div>
-        </div>
-
-        {(movimientos ?? []).length === 0 ? (
-          <div className="rounded-xl border border-line-2 bg-surface p-8 text-center text-text-soft text-sm">
-            No hay movimientos registrados.
-          </div>
-        ) : (
-          <div className="rounded-xl border border-line-2 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-surface-2 text-text-soft text-xs">
-                  <th className="px-4 py-3 text-left font-medium">Fecha</th>
-                  <th className="px-4 py-3 text-left font-medium">Tipo</th>
-                  <th className="px-4 py-3 text-left font-medium">Descripción</th>
-                  <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
-                  <th className="px-4 py-3 text-right font-medium">Importe</th>
-                  <th className="px-4 py-3 w-8" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {(movimientos ?? []).map((mov) => {
-                  const account = one(mov.payment_accounts as { name: string } | { name: string }[] | null);
-                  const amountLocal = mov.amount * (mov.exchange_rate ?? 1);
-                  const isDeuda = mov.type === 'deuda';
-                  return (
-                    <tr key={mov.id} className="hover:bg-surface-2/50">
-                      <td className="px-4 py-3 text-text-soft tabular-nums">
-                        {fmtDate(mov.date)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            isDeuda ? 'bg-red/10 text-red' : 'bg-accent/10 text-accent'
-                          }`}
-                        >
-                          {isDeuda ? 'Deuda' : 'Pago'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-text">{mov.description}</td>
-                      <td className="px-4 py-3 text-text-soft">
-                        {account?.name ?? (isDeuda ? '—' : 'Sin especificar')}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${isDeuda ? 'text-red' : 'text-green-600'}`}>
-                        {isDeuda ? '+' : '−'}{money(amountLocal)}
-                        {mov.exchange_rate !== 1 && (
-                          <span className="block text-xs text-text-mute font-normal">
-                            USD {mov.amount.toLocaleString('es-AR')} × {mov.exchange_rate}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <DeleteMovimientoButton movId={mov.id} proveedorId={id} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
