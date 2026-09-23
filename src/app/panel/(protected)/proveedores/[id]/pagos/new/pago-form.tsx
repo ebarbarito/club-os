@@ -57,7 +57,7 @@ export function PagoForm({
   // Facturas seleccionadas — iniciadas con todas chequeadas
   const [selFacturas, setSelFacturas] = useState<Record<string, Seleccion>>(() =>
     Object.fromEntries(
-      facturas.map((c) => [c.id, { checked: true, monto: String(c.saldo) }]),
+      facturas.map((c) => [c.id, { checked: false, monto: String(c.saldo) }]),
     ),
   );
 
