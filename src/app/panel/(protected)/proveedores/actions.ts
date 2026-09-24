@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { anularPorReceiptNumber } from '@/lib/anular-ledger';
 
 async function requireAdmin() {
   const profile = await getSessionProfile();
@@ -398,6 +399,9 @@ export async function createPagoComprobante(
           .then((r) => r.data)
       : null;
 
+    const { data: pagoReceiptNumber, error: receiptErr } = await supabase.rpc('next_receipt_number');
+    if (receiptErr) return { error: receiptErr.message };
+
     const ledgerRows = data.payments.map((p) => ({
       tenant_id: profile.tenantId,
       shift_id: shift?.id ?? null,
@@ -408,10 +412,19 @@ export async function createPagoComprobante(
       exchange_rate: p.exchange_rate || 1,
       amount_local: p.amount,
       account_id: p.account_id,
+      receipt_number: pagoReceiptNumber,
     }));
 
     const { error: ledgerError } = await supabase.from('ledger').insert(ledgerRows);
     if (ledgerError) return { error: ledgerError.message };
+
+    // Guardar el receipt_number en proveedor_pagos para poder anular después
+    await supabase
+      .from('proveedor_pagos')
+      .update({ receipt_number: pagoReceiptNumber })
+      .eq('id', pagoId)
+      .eq('tenant_id', profile.tenantId);
+
     revalidatePath('/panel/caja');
   }
 
@@ -419,11 +432,55 @@ export async function createPagoComprobante(
   return { id: pagoId };
 }
 
+// deletePagoComprobante kept as alias — old button imports this name
 export async function deletePagoComprobante(pagoId: string, proveedorId: string) {
+  return anularPagoProveedor(pagoId, proveedorId, 'Sin motivo (eliminación directa)');
+}
+
+export async function anularPagoProveedor(
+  pagoId: string,
+  proveedorId: string,
+  motivo: string = 'Sin motivo especificado',
+) {
   const profile = await requireAdmin();
   const supabase = await createClient();
 
-  // RPC restaura saldos y elimina el pago atómicamente
+  // Obtener datos del pago antes de eliminarlo
+  const { data: pago } = await supabase
+    .from('proveedor_pagos')
+    .select('id, total, fecha, receipt_number')
+    .eq('id', pagoId)
+    .eq('tenant_id', profile.tenantId)
+    .maybeSingle();
+
+  if (!pago) return { error: 'Pago no encontrado' };
+
+  // Si tiene receipt_number, revertir las filas de ledger
+  if (pago.receipt_number) {
+    const anulResult = await anularPorReceiptNumber(supabase, {
+      tenantId: profile.tenantId,
+      receiptNumber: pago.receipt_number,
+      motivo,
+      description: `Anulación de pago a proveedor: $${pago.total} (${pago.fecha})`,
+      entityType: 'pago_proveedor',
+      entityId: pago.id,
+      userId: profile.userId,
+    });
+    if (anulResult.error) return { error: anulResult.error };
+  } else {
+    // Pago viejo sin receipt_number: solo registrar en audit_log
+    await supabase.from('audit_log').insert({
+      tenant_id: profile.tenantId,
+      user_id: profile.userId,
+      entity_type: 'pago_proveedor',
+      entity_id: pago.id,
+      change_type: 'eliminacion',
+      description: `Anulación de pago a proveedor: $${pago.total} (${pago.fecha}) — sin filas de ledger vinculadas`,
+      reason: motivo,
+    });
+  }
+
+  // RPC restaura saldos de comprobantes y elimina el pago atómicamente
   const { error } = await supabase.rpc('eliminar_pago_proveedor', {
     p_pago_id: pagoId,
     p_tenant_id: profile.tenantId,
@@ -431,5 +488,6 @@ export async function deletePagoComprobante(pagoId: string, proveedorId: string)
 
   if (error) return { error: error.message };
   revalidatePath(`/panel/proveedores/${proveedorId}`);
+  revalidatePath('/panel/caja');
   return {};
 }

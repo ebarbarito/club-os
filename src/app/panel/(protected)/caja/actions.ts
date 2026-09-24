@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { anularPorReceiptNumber } from '@/lib/anular-ledger';
 
 async function requireAdminProfile() {
   const profile = await getSessionProfile();
@@ -423,5 +424,45 @@ export async function compraVentaDolares(formData: FormData) {
 
   revalidatePath('/panel/caja');
   revalidatePath('/panel/balance');
+  return {};
+}
+
+// ── Anulación de movimientos ──────────────────────────────────────────────────
+// Revierte contablemente un movimiento de caja identificado por receipt_number.
+// Inserta contrapartidas en ledger (category = 'Anulación'), marca las filas
+// originales como anulado = true y escribe en audit_log con el motivo.
+export async function anularMovimientoCaja(formData: FormData) {
+  const profile = await requireAdminProfile();
+  const supabase = await createClient();
+
+  const receiptNumber = Number(formData.get('receipt_number'));
+  const motivo = String(formData.get('motivo') ?? '').trim();
+  const concept = String(formData.get('concept') ?? '');
+
+  if (!receiptNumber) return { error: 'Número de recibo inválido' };
+  if (!motivo) return { error: 'Ingresá un motivo' };
+
+  // Buscar la primera fila para obtener el entity_id (usamos el id de la fila)
+  const { data: primera } = await supabase
+    .from('ledger')
+    .select('id')
+    .eq('tenant_id', profile.tenantId)
+    .eq('receipt_number', receiptNumber)
+    .limit(1)
+    .maybeSingle();
+
+  const result = await anularPorReceiptNumber(supabase, {
+    tenantId: profile.tenantId,
+    receiptNumber,
+    motivo,
+    description: `Anulación de movimiento de caja: "${concept}" (recibo #${receiptNumber})`,
+    entityType: 'movimiento_caja',
+    entityId: primera?.id ?? '00000000-0000-0000-0000-000000000000',
+    userId: profile.userId,
+  });
+
+  if (result.error) return { error: result.error };
+
+  revalidatePath('/panel/caja');
   return {};
 }

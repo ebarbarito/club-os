@@ -9,6 +9,7 @@ import { OpenShiftForm } from './open-shift-form';
 import { MovementForm, type EmployeeOption, type ConceptOption } from './movement-form';
 import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
+import { AnularMovimientoForm } from './anular-movimiento-form';
 import { ShiftSummary } from './shift-summary';
 import { TransferToDiariaForm } from './transfer-to-diaria-form';
 import { CompraVentaDolaresForm } from './compra-venta-dolares-form';
@@ -29,6 +30,7 @@ type LedgerRow = {
   created_at: string;
   source_shift_id: string | null;
   receipt_number: number | null;
+  anulado: boolean;
   account: Account | Account[] | null;
   dispensa: { member: { member_number: number; name: string } | { member_number: number; name: string }[] | null } | { member: { member_number: number; name: string } | { member_number: number; name: string }[] | null }[] | null;
 };
@@ -189,10 +191,11 @@ function DiariaTab({
   expectedUsd: number;
 }) {
   const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
+  const NO_VOID_CATEGORIES = new Set(['Cierre de caja', 'Envío a caja diaria', 'Impuesto', 'Anulación']);
   // Los descuentos de impuesto por cuenta (categoría "Impuesto") son ruido
   // contable para el operador de caja diaria — se ven en detalle en Caja
   // general, acá no aportan nada.
-  const groups = groupByReceipt(movements.filter((m) => m.category !== 'Impuesto'));
+  const groups = groupByReceipt(movements.filter((m) => m.category !== 'Impuesto' && !m.anulado));
 
   return (
     <div>
@@ -283,15 +286,26 @@ function DiariaTab({
                       <td className={`px-4 py-2.5 text-right font-semibold ${totalLocal >= 0 ? 'text-accent' : 'text-red'}`}>{money(totalLocal)}</td>
                       <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(first.created_at)}</td>
                       <td className="px-4 py-2.5 text-right">
-                        {editable && (
-                          <ModalTrigger
-                            label="Editar"
-                            className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                            title="Editar movimiento"
-                          >
-                            <EditMovementForm movement={first} accounts={accounts} />
-                          </ModalTrigger>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {editable && (
+                            <ModalTrigger
+                              label="Editar"
+                              className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                              title="Editar movimiento"
+                            >
+                              <EditMovementForm movement={first} accounts={accounts} />
+                            </ModalTrigger>
+                          )}
+                          {first.receipt_number != null && !NO_VOID_CATEGORIES.has(first.category) && (
+                            <ModalTrigger
+                              label="Anular"
+                              className="rounded-lg border border-red/40 text-red/70 text-xs font-semibold px-3 py-1.5 hover:border-red hover:text-red"
+                              title="Anular movimiento"
+                            >
+                              <AnularMovimientoForm receiptNumber={first.receipt_number} concept={first.concept} />
+                            </ModalTrigger>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -355,7 +369,7 @@ function GeneralTab({
     rows: LedgerRow[];
   };
   const grouped = new Map<string, GroupedRow>();
-  for (const m of movements) {
+  for (const m of movements.filter((m) => !m.anulado)) {
     const key = m.source_shift_id ?? (m.receipt_number != null ? `r${m.receipt_number}` : m.id);
     const signed = m.type === 'ingreso' ? m.amount_local : -m.amount_local;
     // Cantidad "cruda" en la moneda propia de la cuenta — para dolares es
@@ -380,6 +394,7 @@ function GeneralTab({
   }
   const rows = [...grouped.values()].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
+  const NO_VOID_CATEGORIES = new Set(['Cierre de caja', 'Envío a caja diaria', 'Impuesto', 'Anulación']);
 
   return (
     <div>
@@ -507,15 +522,26 @@ function GeneralTab({
                     );
                   })}
                   <td className="px-4 py-2.5 text-right">
-                    {!r.sourceShiftId && r.rows.length === 1 && !NO_EDIT_CATEGORIES.has(r.rows[0].category) && (
-                      <ModalTrigger
-                        label="Editar"
-                        className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                        title="Editar movimiento"
-                      >
-                        <EditMovementForm movement={r.rows[0]} accounts={accounts} />
-                      </ModalTrigger>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {!r.sourceShiftId && r.rows.length === 1 && !NO_EDIT_CATEGORIES.has(r.rows[0].category) && (
+                        <ModalTrigger
+                          label="Editar"
+                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                          title="Editar movimiento"
+                        >
+                          <EditMovementForm movement={r.rows[0]} accounts={accounts} />
+                        </ModalTrigger>
+                      )}
+                      {!r.sourceShiftId && r.rows[0].receipt_number != null && !NO_VOID_CATEGORIES.has(r.rows[0].category) && (
+                        <ModalTrigger
+                          label="Anular"
+                          className="rounded-lg border border-red/40 text-red/70 text-xs font-semibold px-3 py-1.5 hover:border-red hover:text-red"
+                          title="Anular movimiento"
+                        >
+                          <AnularMovimientoForm receiptNumber={r.rows[0].receipt_number!} concept={r.rows[0].concept} />
+                        </ModalTrigger>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
