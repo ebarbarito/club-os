@@ -11,6 +11,7 @@ import { CloseShiftForm } from './close-shift-form';
 import { EditMovementForm } from './edit-movement-form';
 import { ShiftSummary } from './shift-summary';
 import { TransferToDiariaForm } from './transfer-to-diaria-form';
+import { CompraVentaDolaresForm } from './compra-venta-dolares-form';
 import { PagoACuentaForm } from './pago-a-cuenta-form';
 import { groupByReceipt } from './group-by-receipt';
 import type { SearchableMember } from '@/components/member-search';
@@ -426,6 +427,15 @@ function GeneralTab({
                 title="Registrar movimiento"
               >
                 <MovementForm accounts={accounts} kind="general" employees={employees} concepts={concepts} />
+              </ModalTrigger>
+              <ModalTrigger
+                label="Compra/Venta USD"
+                className="rounded-lg border border-amber-500/60 text-amber-600 dark:text-amber-400 text-sm font-semibold px-3 py-1.5 hover:border-amber-500 hover:text-amber-500"
+                title="Compra / Venta de dólares"
+              >
+                <CompraVentaDolaresForm
+                  accounts={[cashAccount, ...otherAccounts].filter(Boolean) as typeof accounts}
+                />
               </ModalTrigger>
               <ModalTrigger
                 label="Enviar a caja diaria"

@@ -351,3 +351,77 @@ export async function getClosedShiftSummary(shiftId: string) {
 
   return { shift, movements: movements ?? [] };
 }
+
+// Compra o venta de dólares — solo impacta caja general.
+// Compra: egreso ARS en cuenta seleccionada + ingreso USD en cuenta de dólares.
+// Venta: egreso USD en cuenta de dólares + ingreso ARS en cuenta seleccionada.
+export async function compraVentaDolares(formData: FormData) {
+  const profile = await requireAdminProfile();
+  const supabase = await createClient();
+
+  const tipo = String(formData.get('tipo')); // 'compra' | 'venta'
+  const usdAmount = Number(formData.get('usd_amount') ?? 0);
+  const tipoCambio = Number(formData.get('tipo_cambio') ?? 1);
+  const arsAccountId = String(formData.get('ars_account_id'));
+
+  if (usdAmount <= 0) return { error: 'Ingresá la cantidad de dólares' };
+  if (tipoCambio <= 0) return { error: 'Ingresá el tipo de cambio' };
+  if (!arsAccountId) return { error: 'Seleccioná una cuenta' };
+
+  // Turno de caja general abierto
+  const { data: shift } = await supabase
+    .from('caja_shifts')
+    .select('id')
+    .eq('kind', 'general')
+    .is('closed_at', null)
+    .maybeSingle();
+  if (!shift) return { error: 'No hay un turno de caja general abierto' };
+
+  // Cuenta de dólares (currency != ARS y no es efectivo)
+  const { data: usdAccount } = await supabase
+    .from('payment_accounts')
+    .select('id')
+    .neq('currency', 'ARS')
+    .eq('is_cash', false)
+    .maybeSingle();
+  if (!usdAccount) return { error: 'No se encontró la cuenta de dólares configurada' };
+
+  const arsAmount = usdAmount * tipoCambio;
+  const concept =
+    tipo === 'compra'
+      ? `Compra USD ${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} @ $${tipoCambio}`
+      : `Venta USD ${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} @ $${tipoCambio}`;
+
+  const { data: receiptNumber, error: receiptError } = await supabase.rpc('next_receipt_number');
+  if (receiptError) return { error: receiptError.message };
+
+  const common = {
+    tenant_id: profile.tenantId,
+    shift_id: shift.id,
+    category: 'Compra/Venta USD',
+    concept,
+    receipt_number: receiptNumber,
+  };
+
+  const rows =
+    tipo === 'compra'
+      ? [
+          // Sale ARS de la cuenta elegida
+          { ...common, type: 'egreso' as const, account_id: arsAccountId, amount: arsAmount, exchange_rate: 1, amount_local: arsAmount },
+          // Entra USD a la caja
+          { ...common, type: 'ingreso' as const, account_id: usdAccount.id, amount: usdAmount, exchange_rate: tipoCambio, amount_local: arsAmount },
+        ]
+      : [
+          // Sale USD de la caja
+          { ...common, type: 'egreso' as const, account_id: usdAccount.id, amount: usdAmount, exchange_rate: tipoCambio, amount_local: arsAmount },
+          // Entra ARS a la cuenta elegida
+          { ...common, type: 'ingreso' as const, account_id: arsAccountId, amount: arsAmount, exchange_rate: 1, amount_local: arsAmount },
+        ];
+
+  const { error } = await supabase.from('ledger').insert(rows);
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/caja');
+  revalidatePath('/panel/balance');
+  return {};
+}
