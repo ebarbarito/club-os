@@ -47,7 +47,7 @@ export default async function ProveedorDetailPage({
     .order('created_at', { ascending: false });
 
   const saldoARS = (comprobantes ?? []).filter((c) => (c.moneda as string) === 'ARS').reduce((s, c) => s + (c.saldo as number), 0);
-  const saldoUSD = (comprobantes ?? []).filter((c) => (c.moneda as string) === 'USD').reduce((s, c) => s + (c.saldo as number), 0);
+  const saldoUSD = (comprobantes ?? []).filter((c) => (c.moneda as string) === 'USD').reduce((s, c) => s + (c.saldo as number) / ((c.tipo_cambio as number) || 1), 0);
 
   function fmtTotal(total: number, moneda: string): string {
     if (moneda === 'USD') {
@@ -214,7 +214,7 @@ export default async function ProveedorDetailPage({
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
                         {(comp.moneda as string) === 'USD'
-                          ? 'USD ' + Math.abs(comp.saldo as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          ? 'USD ' + (Math.abs(comp.saldo as number) / ((comp.tipo_cambio as number) || 1)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                           : comp.saldo > 0 ? money(comp.saldo as number) : money(Math.abs(comp.saldo as number))}
                       </td>
                       <td className="px-4 py-3 text-right">

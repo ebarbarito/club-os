@@ -30,7 +30,7 @@ export default async function ProveedoresPage({
       .order('numero', { ascending: true }),
     supabase
       .from('proveedor_comprobantes')
-      .select('proveedor_id, saldo, moneda'),
+      .select('proveedor_id, saldo, moneda, tipo_cambio'),
     activeTab === 'articulos'
       ? supabase
           .from('proveedor_articulos')
@@ -45,7 +45,8 @@ export default async function ProveedoresPage({
   const saldoUSD: Record<string, number> = {};
   for (const c of comprobantes ?? []) {
     if ((c.moneda as string) === 'USD') {
-      saldoUSD[c.proveedor_id] = (saldoUSD[c.proveedor_id] ?? 0) + (c.saldo as number);
+      const tc = (c.tipo_cambio as number) || 1;
+      saldoUSD[c.proveedor_id] = (saldoUSD[c.proveedor_id] ?? 0) + (c.saldo as number) / tc;
     } else {
       saldoARS[c.proveedor_id] = (saldoARS[c.proveedor_id] ?? 0) + (c.saldo as number);
     }
