@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
-import { money, fmtDateTime } from '@/lib/format';
+import { money } from '@/lib/format';
 import { MemberPicker } from './member-picker';
 import { ComprobantesTable } from './comprobantes-table';
 import { CuotaSocialTab } from './cuota-social-tab';
+import { HistorialPagos } from './historial-pagos';
+import type { HistorialEntry } from './historial-pagos';
 
 type Debtor = { id: string; name: string; dni: string; memberNumber: number | null; adeudado: number };
 
@@ -105,7 +107,7 @@ export default async function CtaCorrientePage({
   let selectedMemberName = '—';
   let saldoAFavorGeneral = 0;
   let saldoCuotaSocial = 0;
-  type HistorialEntry = { date: string; label: string; amount: number; voided: boolean };
+  // HistorialEntry imported from ./historial-pagos
   const historial: HistorialEntry[] = [];
 
   if (memberId && activeTab === 'buscar') {
@@ -154,7 +156,14 @@ export default async function CtaCorrientePage({
       const suffix = d.voided ? ' (anulada)' : d.esCuotaSocial ? (d.acreditadoAt ? ' (acreditada)' : ' (pendiente)') : '';
       historial.push({ date: d.created_at, label: `${d.label}${suffix}`, amount: d.amount, voided: d.voided });
       for (const p of d.payments) {
-        historial.push({ date: p.created_at, label: `Pago ${d.label} · rec${String(p.receipt_number).padStart(2, '0')} · ${p.account_name}`, amount: -p.amount_local, voided: false });
+        historial.push({
+          date: p.created_at,
+          label: `Pago ${d.label} · rec${String(p.receipt_number).padStart(2, '0')} · ${p.account_name}`,
+          amount: -p.amount_local,
+          voided: false,
+          receiptNumber: p.receipt_number,
+          dispensaId: d.id,
+        });
       }
     }
     for (const c of creditRows ?? []) {
@@ -321,26 +330,7 @@ export default async function CtaCorrientePage({
             saldoAFavorGeneral={saldoAFavorGeneral}
           />
 
-          {historial.length > 0 && (
-            <details className="rounded-xl border border-line bg-surface">
-              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
-                Historial de movimientos ({historial.length})
-              </summary>
-              <div className="border-t border-line divide-y divide-line">
-                {historial.map((h, i) => (
-                  <div key={i} className={`flex justify-between px-4 py-2 text-sm ${h.voided ? 'opacity-50' : ''}`}>
-                    <span className="text-text-soft">
-                      {fmtDateTime(h.date)} · {h.label}
-                    </span>
-                    <span className={`font-medium ${h.amount >= 0 ? 'text-text' : 'text-accent'}`}>
-                      {h.amount >= 0 ? '+' : ''}
-                      {money(h.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
+          <HistorialPagos entries={historial} />
         </div>
       )}
     </div>
