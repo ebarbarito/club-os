@@ -6,6 +6,21 @@ import { money, fmtDate } from '@/lib/format';
 import { PaymentSplitEditor, newPaymentLine, type PaymentAccount, type PaymentLine } from '@/components/payment-split';
 import { createPagoComprobante } from '../../../actions';
 
+// Formatea en USD
+function fmtUSD(n: number) {
+  return 'USD ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// Saldo mostrado al usuario (en la moneda original del comprobante)
+function displaySaldo(comp: ComprobantePendiente) {
+  return comp.moneda === 'USD' ? comp.saldo / (comp.tipo_cambio || 1) : comp.saldo;
+}
+// Monto visual → monto que se guarda en saldo (misma unidad que comp.saldo)
+function montoToSend(montoDisplay: number, comp: ComprobantePendiente) {
+  // Para datos históricos USD: saldo está en ARS, tipo_cambio > 1 → multiplicar
+  // Para datos nuevos USD: saldo en USD, tipo_cambio = 1 → sin cambio
+  return comp.moneda === 'USD' ? montoDisplay * (comp.tipo_cambio || 1) : montoDisplay;
+}
+
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 
@@ -16,7 +31,9 @@ type ComprobantePendiente = {
   punto_venta: string;
   numero: string;
   total: number;
-  saldo: number;  // facturas: positivo | NCs: negativo
+  saldo: number;      // en la moneda original del comprobante
+  moneda: 'ARS' | 'USD';
+  tipo_cambio: number;
 };
 
 type Seleccion = {
@@ -70,12 +87,19 @@ export function PagoForm({
 
   // ── Totales ─────────────────────────────────────────────────────────────────
 
-  const totalFacturas = useMemo(
-    () =>
-      Object.values(selFacturas)
-        .filter((s: Seleccion) => s.checked)
-        .reduce((sum: number, s: Seleccion) => sum + (Number(s.monto) || 0), 0),
-    [selFacturas],
+  // Totales en ARS (facturas ARS checked)
+  const totalFacturasARS = useMemo(
+    () => facturas
+      .filter((c) => c.moneda === 'ARS' && selFacturas[c.id]?.checked)
+      .reduce((sum, c) => sum + (Number(selFacturas[c.id].monto) || 0), 0),
+    [selFacturas, facturas],
+  );
+  // Totales en USD (facturas USD checked, display en USD)
+  const totalFacturasUSD = useMemo(
+    () => facturas
+      .filter((c) => c.moneda === 'USD' && selFacturas[c.id]?.checked)
+      .reduce((sum, c) => sum + (Number(selFacturas[c.id].monto) || 0), 0),
+    [selFacturas, facturas],
   );
 
   const totalNCs = useMemo(
@@ -86,8 +110,10 @@ export function PagoForm({
     [selNCs],
   );
 
-  // Lo que debe pagarse en efectivo/transferencia
-  const totalEfectivo = Math.max(0, totalFacturas - totalNCs);
+  // Compat: totalFacturas en ARS (para validación del pago en efectivo ARS)
+  const totalFacturas = totalFacturasARS;
+  // Lo que debe pagarse en efectivo/transferencia (solo ARS)
+  const totalEfectivo = Math.max(0, totalFacturasARS - totalNCs);
 
   const totalPagos = payments.reduce(
     (sum: number, l: PaymentLine) => sum + (Number(l.amount) || 0) * (Number(l.exchangeRate) || 1),
@@ -140,7 +166,11 @@ export function PagoForm({
 
     const facturaItems = facturas
       .filter((c) => selFacturas[c.id]?.checked)
-      .map((c) => ({ comprobante_id: c.id, monto: Number(selFacturas[c.id].monto) || 0, tipo: 'factura' as const }))
+      .map((c) => ({
+        comprobante_id: c.id,
+        monto: montoToSend(Number(selFacturas[c.id].monto) || 0, c),
+        tipo: 'factura' as const,
+      }))
       .filter((item) => item.monto > 0);
 
     const ncItems = notasCredito
@@ -278,20 +308,21 @@ export function PagoForm({
                     <td className="px-4 py-3 text-text-soft tabular-nums">{fmtDate(comp.fecha)}</td>
                     <td className="px-4 py-3 font-mono text-xs text-text">{nro}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-red font-medium">
-                      {money(comp.total)}
+                      {comp.moneda === 'USD' ? fmtUSD(comp.total) : money(comp.total)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold text-red">
-                      {money(comp.saldo)}
+                      {comp.moneda === 'USD' ? fmtUSD(displaySaldo(comp)) : money(comp.saldo)}
                     </td>
                     <td className="px-4 py-3">
                       <input
                         type="number"
                         min="0"
-                        max={comp.saldo}
+                        max={displaySaldo(comp)}
                         step="0.01"
                         value={sel.monto}
                         onChange={(e) => setMontoFactura(comp.id, e.target.value)}
                         disabled={!sel.checked}
+                        placeholder={comp.moneda === 'USD' ? 'USD' : ''}
                         className="w-full rounded-lg border border-line-2 px-2 py-1 text-sm outline-none focus:border-accent text-right tabular-nums disabled:opacity-40"
                       />
                     </td>
@@ -304,7 +335,10 @@ export function PagoForm({
                 <td className="px-4 py-2" colSpan={4} />
                 <td className="px-4 py-2 text-right text-text-soft text-xs">Total facturas</td>
                 <td className="px-4 py-2 text-right tabular-nums text-red">
-                  {money(totalFacturas)}
+                  <span className="flex flex-col items-end gap-0.5">
+                    {totalFacturasARS > 0 && <span>{money(totalFacturasARS)}</span>}
+                    {totalFacturasUSD > 0 && <span>{fmtUSD(totalFacturasUSD)}</span>}
+                  </span>
                 </td>
               </tr>
             </tfoot>
@@ -392,16 +426,26 @@ export function PagoForm({
       )}
 
       {/* Resumen antes de pago */}
-      {(totalFacturas > 0 || totalNCs > 0) && (
-        <div className="rounded-xl border border-line-2 bg-surface-2 px-4 py-3 flex items-center justify-between text-sm">
-          <span className="text-text-soft">
-            {totalNCs > 0
-              ? `Facturas ${money(totalFacturas)} − NC ${money(totalNCs)} =`
-              : 'Total a pagar en efectivo:'}
-          </span>
-          <span className={`text-lg font-bold tabular-nums ${totalEfectivo > 0 ? 'text-text' : 'text-emerald-600'}`}>
-            {totalEfectivo > 0 ? money(totalEfectivo) : `${money(Math.abs(totalFacturas - totalNCs))} a favor`}
-          </span>
+      {(totalFacturasARS > 0 || totalFacturasUSD > 0 || totalNCs > 0) && (
+        <div className="rounded-xl border border-line-2 bg-surface-2 px-4 py-3 space-y-1 text-sm">
+          {totalFacturasARS > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-text-soft">
+                {totalNCs > 0 ? `ARS: ${money(totalFacturasARS)} − NC ${money(totalNCs)} =` : 'Total a pagar (ARS):'}
+              </span>
+              <span className={`text-lg font-bold tabular-nums ${totalEfectivo > 0 ? 'text-text' : 'text-emerald-600'}`}>
+                {totalEfectivo > 0 ? money(totalEfectivo) : `${money(Math.abs(totalEfectivo))} a favor`}
+              </span>
+            </div>
+          )}
+          {totalFacturasUSD > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-text-soft">Total a pagar (USD):</span>
+              <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                {fmtUSD(totalFacturasUSD)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -471,8 +515,8 @@ export function PagoForm({
         >
           {pending
             ? 'Guardando…'
-            : totalFacturas > 0
-            ? `Registrar pago${totalEfectivo > 0 ? ` − ${money(totalEfectivo)} efectivo` : ' (cubierto por NC)'}`
+            : (totalFacturasARS > 0 || totalFacturasUSD > 0)
+            ? `Registrar pago${[totalEfectivo > 0 ? money(totalEfectivo) : '', totalFacturasUSD > 0 ? fmtUSD(totalFacturasUSD) : ''].filter(Boolean).map(s => ` − ${s}`).join('')}`
             : 'Registrar pago'}
         </button>
       </div>

@@ -29,7 +29,7 @@ export default async function NuevoPagoPage({
   // Facturas con saldo > 0 (deuda pendiente)
   const { data: facturas } = await supabase
     .from('proveedor_comprobantes')
-    .select('id, tipo, fecha, punto_venta, numero, total, saldo')
+    .select('id, tipo, fecha, punto_venta, numero, total, saldo, moneda, tipo_cambio')
     .eq('proveedor_id', id)
     .eq('tipo', 'factura')
     .gt('saldo', 0)
@@ -38,7 +38,7 @@ export default async function NuevoPagoPage({
   // Notas de crédito con saldo < 0 (crédito disponible del proveedor)
   const { data: notasCredito } = await supabase
     .from('proveedor_comprobantes')
-    .select('id, tipo, fecha, punto_venta, numero, total, saldo')
+    .select('id, tipo, fecha, punto_venta, numero, total, saldo, moneda, tipo_cambio')
     .eq('proveedor_id', id)
     .eq('tipo', 'nota_credito')
     .lt('saldo', 0)
@@ -58,6 +58,8 @@ export default async function NuevoPagoPage({
     numero: string;
     total: number;
     saldo: number;
+    moneda: 'ARS' | 'USD';
+    tipo_cambio: number;
   };
 
   return (
