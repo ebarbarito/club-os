@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { compraVentaDolares } from '../../actions';
+import { compraVentaDolares } from './actions';
 
 type Account = { id: string; name: string; is_cash: boolean; currency: string };
 
