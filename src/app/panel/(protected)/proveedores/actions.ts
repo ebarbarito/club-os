@@ -242,7 +242,6 @@ export async function createComprobante(
     otros_impuestos: number;
     total: number;
     moneda: 'ARS' | 'USD';
-    tipo_cambio: number;
     notas: string;
     apply_to_factura_id?: string | null;
     items: {
@@ -259,9 +258,9 @@ export async function createComprobante(
   const profile = await requireAdmin();
   const supabase = await createClient();
 
-  // Saldo siempre en ARS (total × tipo_cambio). Para ARS tipo_cambio=1.
+  // Saldo en la moneda original del comprobante (USD o ARS).
   // Factura: positivo (debemos) | NC: negativo (nos deben)
-  const saldo = (data.tipo === 'factura' ? 1 : -1) * data.total * data.tipo_cambio;
+  const saldo = (data.tipo === 'factura' ? 1 : -1) * data.total;
 
   const { data: comp, error } = await supabase
     .from('proveedor_comprobantes')
@@ -273,7 +272,6 @@ export async function createComprobante(
       punto_venta: data.punto_venta,
       numero: data.numero,
       moneda: data.moneda,
-      tipo_cambio: data.tipo_cambio,
       subtotal: data.subtotal,
       iva: data.iva,
       iva_adicional: data.iva_adicional,

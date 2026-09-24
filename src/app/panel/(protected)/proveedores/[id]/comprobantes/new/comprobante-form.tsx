@@ -47,7 +47,6 @@ export function ComprobanteForm({
 
   const [tipo, setTipo] = useState<'factura' | 'nota_credito'>('factura');
   const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS');
-  const [tipoCambio, setTipoCambio] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [puntoVenta, setPuntoVenta] = useState('0001');
   const [numero, setNumero] = useState('');
@@ -91,7 +90,6 @@ export function ComprobanteForm({
     setError(null);
 
     if (!numero.trim()) { setError('Ingresá el número de comprobante'); return; }
-    if (moneda === 'USD' && !(Number(tipoCambio) > 0)) { setError('Ingresá el tipo de cambio para facturas en dólares'); return; }
 
     const validItems = items.filter((item) => item.descripcion.trim() && (Number(item.cantidad) || 0) > 0);
     if (validItems.length === 0) { setError('Ingresá al menos un renglón con descripción y cantidad'); return; }
@@ -101,8 +99,7 @@ export function ComprobanteForm({
       const res = await createComprobante(proveedorId, {
         tipo,
         moneda,
-        tipo_cambio: moneda === 'USD' ? (Number(tipoCambio) || 1) : 1,
-        fecha,
+          fecha,
         punto_venta: puntoVenta.padStart(4, '0'),
         numero: numero.trim().padStart(8, '0'),
         subtotal,
@@ -179,21 +176,7 @@ export function ComprobanteForm({
             USD
           </button>
         </div>
-        {moneda === 'USD' && (
-          <div className="flex items-center gap-2 ml-2">
-            <span className="text-xs text-text-soft">Tipo de cambio:</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={tipoCambio}
-              onChange={(e) => setTipoCambio(e.target.value)}
-              className="w-28 rounded-lg border border-line-2 px-2 py-1 text-sm outline-none focus:border-accent"
-              placeholder="1000"
-            />
-            <span className="text-xs text-text-mute">ARS/USD</span>
-          </div>
-        )}
+
       </div>
 
       {/* Aplicar NC a factura pendiente */}
@@ -433,9 +416,6 @@ export function ComprobanteForm({
               <span>Total</span>
               <span className={`tabular-nums ${tipo === 'factura' ? 'text-red' : 'text-accent'}`}>
                 {moneda === 'USD' ? `USD ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : money(total)}
-                {moneda === 'USD' && Number(tipoCambio) > 0 && (
-                  <span className="text-xs font-normal text-text-mute ml-2">≈ {money(total * Number(tipoCambio))} ARS</span>
-                )}
               </span>
             </div>
           </div>

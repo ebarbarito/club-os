@@ -11,6 +11,7 @@ export type ProveedorRow = {
   rubro: string | null;
   cuit: string | null;
   saldo: number;
+  saldoUSD: number;
 };
 
 export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }) {
@@ -27,7 +28,8 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
     );
   }, [proveedores, query]);
 
-  const totalSaldo = proveedores.reduce((s, p) => s + p.saldo, 0);
+  const totalSaldoARS = proveedores.reduce((s, p) => s + p.saldo, 0);
+  const totalSaldoUSD = proveedores.reduce((s, p) => s + (p.saldoUSD ?? 0), 0);
 
   return (
     <div className="space-y-3">
@@ -79,14 +81,21 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
                     {p.rubro ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {p.saldo > 0 ? (
-                      <span className="font-semibold text-red">{money(p.saldo)}</span>
-                    ) : p.saldo < 0 ? (
-                      <span className="font-semibold text-emerald-600">
-                        {money(Math.abs(p.saldo))} a favor
-                      </span>
-                    ) : (
+                    {(p.saldo === 0 && (p.saldoUSD ?? 0) === 0) ? (
                       <span className="text-text-mute">Sin deuda</span>
+                    ) : (
+                      <span className="flex flex-col gap-0.5 items-end">
+                        {p.saldo !== 0 && (
+                          <span className={`font-semibold ${p.saldo > 0 ? 'text-red' : 'text-emerald-600'}`}>
+                            {p.saldo > 0 ? money(p.saldo) : money(Math.abs(p.saldo))}
+                          </span>
+                        )}
+                        {(p.saldoUSD ?? 0) !== 0 && (
+                          <span className={`font-semibold text-sm ${(p.saldoUSD ?? 0) > 0 ? 'text-red' : 'text-emerald-600'}`}>
+                            {'USD ' + Math.abs(p.saldoUSD ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -101,14 +110,21 @@ export function ProveedorPicker({ proveedores }: { proveedores: ProveedorRow[] }
                       : `${filtered.length} de ${proveedores.length}`}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {totalSaldo > 0 ? (
-                      <span className="text-red">Total: {money(totalSaldo)}</span>
-                    ) : totalSaldo < 0 ? (
-                      <span className="text-emerald-600">
-                        Total: {money(Math.abs(totalSaldo))} a favor
-                      </span>
-                    ) : (
+                    {(totalSaldoARS === 0 && totalSaldoUSD === 0) ? (
                       <span className="text-text-mute">Sin deuda total</span>
+                    ) : (
+                      <span className="flex flex-col gap-0.5 items-end">
+                        {totalSaldoARS !== 0 && (
+                          <span className={totalSaldoARS > 0 ? 'text-red' : 'text-emerald-600'}>
+                            {totalSaldoARS > 0 ? money(totalSaldoARS) : money(Math.abs(totalSaldoARS))} ARS
+                          </span>
+                        )}
+                        {totalSaldoUSD !== 0 && (
+                          <span className={totalSaldoUSD > 0 ? 'text-red' : 'text-emerald-600'}>
+                            {'USD ' + Math.abs(totalSaldoUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </span>
                     )}
                   </td>
                 </tr>

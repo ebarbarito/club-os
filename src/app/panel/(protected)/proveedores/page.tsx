@@ -30,7 +30,7 @@ export default async function ProveedoresPage({
       .order('numero', { ascending: true }),
     supabase
       .from('proveedor_comprobantes')
-      .select('proveedor_id, saldo'),
+      .select('proveedor_id, saldo, moneda'),
     activeTab === 'articulos'
       ? supabase
           .from('proveedor_articulos')
@@ -40,10 +40,15 @@ export default async function ProveedoresPage({
       : Promise.resolve({ data: [] }),
   ]);
 
-  // Saldo neto por proveedor (facturas pendientes − NCs disponibles)
-  const saldoMap: Record<string, number> = {};
+  // Saldo por proveedor, separado por moneda
+  const saldoARS: Record<string, number> = {};
+  const saldoUSD: Record<string, number> = {};
   for (const c of comprobantes ?? []) {
-    saldoMap[c.proveedor_id] = (saldoMap[c.proveedor_id] ?? 0) + c.saldo;
+    if ((c.moneda as string) === 'USD') {
+      saldoUSD[c.proveedor_id] = (saldoUSD[c.proveedor_id] ?? 0) + (c.saldo as number);
+    } else {
+      saldoARS[c.proveedor_id] = (saldoARS[c.proveedor_id] ?? 0) + (c.saldo as number);
+    }
   }
 
   const rows = (proveedores ?? []).map((p) => ({
@@ -52,7 +57,8 @@ export default async function ProveedoresPage({
     name: p.name,
     rubro: p.rubro ?? null,
     cuit: p.cuit ?? null,
-    saldo: saldoMap[p.id] ?? 0,
+    saldo: saldoARS[p.id] ?? 0,
+    saldoUSD: saldoUSD[p.id] ?? 0,
   }));
 
   return (

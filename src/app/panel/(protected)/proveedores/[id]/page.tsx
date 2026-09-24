@@ -46,7 +46,8 @@ export default async function ProveedorDetailPage({
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
 
-  const saldoComprobantes = (comprobantes ?? []).reduce((s, c) => s + (c.saldo as number), 0);
+  const saldoARS = (comprobantes ?? []).filter((c) => (c.moneda as string) === 'ARS').reduce((s, c) => s + (c.saldo as number), 0);
+  const saldoUSD = (comprobantes ?? []).filter((c) => (c.moneda as string) === 'USD').reduce((s, c) => s + (c.saldo as number), 0);
 
   function fmtTotal(total: number, moneda: string): string {
     if (moneda === 'USD') {
@@ -121,16 +122,32 @@ export default async function ProveedorDetailPage({
       )}
 
       {/* Saldo tile */}
-      <div className={`rounded-xl border p-4 ${saldoComprobantes > 0 ? 'border-red/30 bg-red/5' : saldoComprobantes < 0 ? 'border-emerald-600/30 bg-emerald-600/5' : 'border-line-2 bg-surface'}`}>
-        <p className="text-xs text-text-mute mb-1">Saldo pendiente</p>
-        <p className={`text-2xl font-bold ${saldoComprobantes > 0 ? 'text-red' : saldoComprobantes < 0 ? 'text-emerald-600' : 'text-text-soft'}`}>
-          {saldoComprobantes === 0
-            ? 'Sin deuda'
-            : saldoComprobantes > 0
-            ? money(saldoComprobantes)
-            : money(Math.abs(saldoComprobantes))}
-        </p>
-      </div>
+      {/* Saldo tile: ARS y USD por separado */}
+      {saldoARS === 0 && saldoUSD === 0 ? (
+        <div className="rounded-xl border border-line-2 bg-surface p-4">
+          <p className="text-xs text-text-mute mb-1">Saldo pendiente</p>
+          <p className="text-2xl font-bold text-text-soft">Sin deuda</p>
+        </div>
+      ) : (
+        <div className="flex gap-3 flex-wrap">
+          {saldoARS !== 0 && (
+            <div className={`flex-1 min-w-[140px] rounded-xl border p-4 ${saldoARS > 0 ? 'border-red/30 bg-red/5' : 'border-emerald-600/30 bg-emerald-600/5'}`}>
+              <p className="text-xs text-text-mute mb-1">Saldo ARS pendiente</p>
+              <p className={`text-2xl font-bold ${saldoARS > 0 ? 'text-red' : 'text-emerald-600'}`}>
+                {saldoARS > 0 ? money(saldoARS) : money(Math.abs(saldoARS))}
+              </p>
+            </div>
+          )}
+          {saldoUSD !== 0 && (
+            <div className={`flex-1 min-w-[140px] rounded-xl border p-4 ${saldoUSD > 0 ? 'border-red/30 bg-red/5' : 'border-emerald-600/30 bg-emerald-600/5'}`}>
+              <p className="text-xs text-text-mute mb-1">Saldo USD pendiente</p>
+              <p className={`text-2xl font-bold ${saldoUSD > 0 ? 'text-red' : 'text-emerald-600'}`}>
+                {'USD ' + Math.abs(saldoUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Comprobantes */}
       <div>
@@ -194,12 +211,11 @@ export default async function ProveedorDetailPage({
                       <td className="px-4 py-3 text-text font-mono text-xs">{nro}</td>
                       <td className={`px-4 py-3 text-right font-semibold tabular-nums ${isFactura ? 'text-red' : 'text-accent'}`}>
                         {isFactura ? '' : '−'}{fmtTotal(comp.total, comp.moneda as string)}
-                        {(comp.moneda as string) === 'USD' && (
-                          <span className="ml-1 text-[10px] font-normal bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded px-1">USD</span>
-                        )}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums ${comp.saldo > 0 ? 'text-red font-semibold' : comp.saldo < 0 ? 'text-accent font-semibold' : 'text-text-mute'}`}>
-                        {comp.saldo > 0 ? money(comp.saldo) : money(Math.abs(comp.saldo))}
+                        {(comp.moneda as string) === 'USD'
+                          ? 'USD ' + Math.abs(comp.saldo as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          : comp.saldo > 0 ? money(comp.saldo as number) : money(Math.abs(comp.saldo as number))}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <DeleteComprobanteButton id={comp.id} proveedorId={id} label={nro} />
