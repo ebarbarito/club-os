@@ -12,6 +12,60 @@ async function requireAdmin() {
   return profile;
 }
 
+// ── Helper: balance disponible de una cuenta en un turno dado ────────────────
+// Suma el saldo inicial del turno + los movimientos de ledger de ese turno
+// para esa cuenta. Para cuentas en moneda extranjera usa `amount` (divisas);
+// para ARS usa `amount_local` (pesos).
+async function getAvailableBalance(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  accountId: string,
+  shiftId: string,
+): Promise<{ balance: number; currency: string; name: string }> {
+  const [{ data: account }, { data: shift }, { data: ledgerRows }] = await Promise.all([
+    supabase.from('payment_accounts').select('name, currency').eq('id', accountId).single(),
+    supabase.from('caja_shifts').select('opening_cash, opening_usd').eq('id', shiftId).single(),
+    supabase
+      .from('ledger')
+      .select('type, amount, amount_local')
+      .eq('account_id', accountId)
+      .eq('shift_id', shiftId)
+      .eq('tenant_id', tenantId)
+      .eq('anulado', false),
+  ]);
+
+  const isForeign = account?.currency && account.currency !== 'ARS';
+  const openingBalance = isForeign ? (shift?.opening_usd ?? 0) : (shift?.opening_cash ?? 0);
+  const field = isForeign ? 'amount' : 'amount_local';
+
+  const ledgerNet = ((ledgerRows ?? []) as any[]).reduce(
+    (sum: number, r: any) => sum + (r.type === 'ingreso' ? (r[field] ?? 0) : -(r[field] ?? 0)),
+    0,
+  );
+
+  return {
+    balance: openingBalance + ledgerNet,
+    currency: account?.currency ?? 'ARS',
+    name: account?.name ?? 'cuenta',
+  };
+}
+
+// ── Helper: obtener el turno abierto por kind ────────────────────────────────
+async function getOpenShift(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  kind: 'diaria' | 'general',
+) {
+  const { data } = await supabase
+    .from('caja_shifts')
+    .select('id')
+    .eq('kind', kind)
+    .is('closed_at', null)
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
 export async function createProveedor(formData: FormData) {
   const profile = await requireAdmin();
   const supabase = await createClient();
@@ -119,23 +173,40 @@ export async function addMovimiento(
 
   if (error) return { error: error.message };
 
-  // Si es un pago y se pide impactar caja, registrar egreso(s) en ledger
-  // enlazados al turno abierto actual (si hay uno).
-  if (data.type === 'pago' && data.impacta_caja) {
-    const payments = data.payments && data.payments.length > 0
-      ? data.payments
-      : accountId
-      ? [{ account_id: accountId, amount: data.amount, exchange_rate: exchangeRate }]
-      : [];
+  // Si es un pago, registrar egreso en ledger.
+  // impacta_caja=true  → turno DIARIA  (afecta el arqueo del día)
+  // impacta_caja=false → turno GENERAL (queda en caja general, no en el turno diario)
+  // En ambos casos el movimiento es visible en caja; la distinción es solo
+  // en qué turno aparece, no si aparece o no.
+  if (data.type === 'pago') {
+    const payments =
+      data.payments && data.payments.length > 0
+        ? data.payments
+        : accountId
+        ? [{ account_id: accountId, amount: data.amount, exchange_rate: exchangeRate }]
+        : [];
 
     if (payments.length > 0) {
-      const { data: shift } = await supabase
-        .from('caja_shifts')
-        .select('id')
-        .is('closed_at', null)
-        .order('opened_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const kind: 'diaria' | 'general' = data.impacta_caja ? 'diaria' : 'general';
+      const shift = await getOpenShift(supabase, kind);
+
+      // Validar saldo disponible por cuenta (solo si el turno está abierto)
+      if (shift?.id) {
+        for (const p of payments) {
+          const paymentInAccountCurrency = p.amount / (p.exchange_rate || 1);
+          const { balance, currency, name } = await getAvailableBalance(
+            supabase,
+            profile.tenantId,
+            p.account_id,
+            shift.id,
+          );
+          if (paymentInAccountCurrency > balance + 0.01) {
+            return {
+              error: `Saldo insuficiente en ${name}: disponible ${balance.toFixed(2)} ${currency}, requerido ${paymentInAccountCurrency.toFixed(2)} ${currency}`,
+            };
+          }
+        }
+      }
 
       const ledgerRows = payments.map((p) => ({
         tenant_id: profile.tenantId,
@@ -143,9 +214,9 @@ export async function addMovimiento(
         type: 'egreso' as const,
         category: 'Proveedores',
         concept: data.description,
-        amount: p.amount / (p.exchange_rate || 1),   // monto en moneda de la cuenta
+        amount: p.amount / (p.exchange_rate || 1),
         exchange_rate: p.exchange_rate || 1,
-        amount_local: p.amount,                       // ya viene en pesos
+        amount_local: p.amount,
         account_id: p.account_id,
       }));
 
@@ -315,14 +386,12 @@ export async function createComprobante(
 
     if (!facErr && factura && factura.saldo > 0) {
       const applyAmount = Math.min(data.total, factura.saldo);
-      // NC saldo: -(total - applyAmount) — crédito remanente
       const { error: ncErr } = await supabase
         .from('proveedor_comprobantes')
         .update({ saldo: -(data.total - applyAmount) })
         .eq('id', comp.id)
         .eq('tenant_id', profile.tenantId);
       if (ncErr) return { error: ncErr.message };
-      // Factura saldo: saldo - applyAmount
       const { error: facUpdErr } = await supabase
         .from('proveedor_comprobantes')
         .update({ saldo: factura.saldo - applyAmount })
@@ -340,7 +409,6 @@ export async function deleteComprobante(comprobanteId: string, proveedorId: stri
   const profile = await requireAdmin();
   const supabase = await createClient();
 
-  // Los items se eliminan en cascada por FK
   const { error } = await supabase
     .from('proveedor_comprobantes')
     .delete()
@@ -382,22 +450,36 @@ export async function createPagoComprobante(
 
   if (error) return { error: error.message };
 
-  // Registrar egresos en ledger siempre que haya medios de pago (hay dinero
-  // real moviéndose). El trigger apply_account_taxes genera automáticamente
-  // las filas de impuesto/descuento de cada cuenta (ej. MP GL).
-  // impacta_caja controla solo si el egreso se liga al turno abierto (shift_id)
-  // o queda sin turno (shift_id = null → caja general, no afecta caja diaria).
+  // Registrar egresos en ledger siempre que haya medios de pago reales.
+  // impacta_caja=true  → turno DIARIA  (afecta el arqueo del día)
+  // impacta_caja=false → turno GENERAL (queda en caja general, no en el turno diario)
+  // En ambos casos el movimiento es visible en caja.
   if (data.payments.length > 0) {
-    const shift = data.impacta_caja
-      ? await supabase
-          .from('caja_shifts')
-          .select('id')
-          .is('closed_at', null)
-          .order('opened_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then((r) => r.data)
-      : null;
+    const kind: 'diaria' | 'general' = data.impacta_caja ? 'diaria' : 'general';
+    const shift = await getOpenShift(supabase, kind);
+
+    // Validar saldo disponible por cuenta (solo si el turno está abierto)
+    if (shift?.id) {
+      for (const p of data.payments) {
+        const paymentInAccountCurrency = p.amount / (p.exchange_rate || 1);
+        const { balance, currency, name } = await getAvailableBalance(
+          supabase,
+          profile.tenantId,
+          p.account_id,
+          shift.id,
+        );
+        if (paymentInAccountCurrency > balance + 0.01) {
+          // Revertir el pago ya registrado en el RPC antes de devolver error
+          await supabase.rpc('eliminar_pago_proveedor', {
+            p_pago_id: pagoId,
+            p_tenant_id: profile.tenantId,
+          });
+          return {
+            error: `Saldo insuficiente en ${name}: disponible ${balance.toFixed(2)} ${currency}, requerido ${paymentInAccountCurrency.toFixed(2)} ${currency}`,
+          };
+        }
+      }
+    }
 
     const { data: pagoReceiptNumber, error: receiptErr } = await supabase.rpc('next_receipt_number');
     if (receiptErr) return { error: receiptErr.message };
