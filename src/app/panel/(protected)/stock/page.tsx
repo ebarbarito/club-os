@@ -7,6 +7,30 @@ import { AdjustGeneralStockForm } from './adjust-general-stock-form';
 import { AdjustDispensaStockForm } from './adjust-dispensa-stock-form';
 import { StockMovements } from './stock-movements';
 import { DispensaHistory } from './dispensa-history';
+import { HideZeroToggle } from './hide-zero-toggle';
+
+type SortKey = 'articulo' | 'dispensa' | 'general' | 'total';
+
+function SortTh({
+  href,
+  active,
+  dir,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  dir: 'asc' | 'desc';
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="px-4 py-2.5 font-medium">
+      <Link href={href} className={`inline-flex items-center gap-1 hover:text-text ${active ? 'text-text' : ''}`}>
+        {children}
+        <span className="text-xs">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </Link>
+    </th>
+  );
+}
 
 function levelTextColor(dispensaGrams: number, generalGrams: number): string {
   if (dispensaGrams > 0) return 'text-text-soft';
@@ -17,11 +41,14 @@ function levelTextColor(dispensaGrams: number, generalGrams: number): string {
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; sort?: string; dir?: string; zeros?: string }>;
 }) {
   const profile = await getSessionProfile();
-  const { tab } = await searchParams;
+  const { tab, sort, dir, zeros } = await searchParams;
   const activeTab = tab === 'general' && profile?.role === 'admin' ? 'general' : 'dispensa';
+  const sortKey: SortKey = (['articulo', 'dispensa', 'general', 'total'] as const).find((k) => k === sort) ?? 'articulo';
+  const sortDir: 'asc' | 'desc' = dir === 'desc' ? 'desc' : 'asc';
+  const hideZero = zeros !== '1';
 
   const supabase = await createClient();
   const [{ data: dispensaRows }, { data: generalRows }] = await Promise.all([
@@ -47,10 +74,34 @@ export default async function StockPage({
 
   // Genéticas primero (orden alfabético), después el resto de los artículos
   // (también alfabético) — así se ven agrupadas en vez de mezcladas.
-  const strains = [...strainMap.values()].sort((a, b) => {
-    if (a.item_type !== b.item_type) return a.item_type === 'genetica' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
+  const qty = (id: string, key: SortKey) => {
+    const d = dispensaByStrain.get(id) ?? 0;
+    const g = generalByStrain.get(id) ?? 0;
+    return key === 'dispensa' ? d : key === 'general' ? g : d + g;
+  };
+  const strains = [...strainMap.values()]
+    .filter((s) => !hideZero || qty(s.id, activeTab === 'dispensa' ? 'dispensa' : 'total') > 0)
+    .sort((a, b) => {
+      let cmp: number;
+      if (sortKey === 'articulo') {
+        cmp = a.item_type !== b.item_type ? (a.item_type === 'genetica' ? -1 : 1) : a.name.localeCompare(b.name);
+      } else {
+        cmp = qty(a.id, sortKey) - qty(b.id, sortKey) || a.name.localeCompare(b.name);
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+
+  function hrefFor(key: SortKey) {
+    const nextDir = sortKey === key && sortDir === 'asc' ? 'desc' : 'asc';
+    const q = new URLSearchParams();
+    if (activeTab === 'general') q.set('tab', 'general');
+    q.set('sort', key);
+    q.set('dir', nextDir);
+    if (!hideZero) q.set('zeros', '1');
+    return `/panel/stock?${q.toString()}`;
+  }
+
+  const th = (k: SortKey) => ({ href: hrefFor(k), active: sortKey === k, dir: sortDir });
 
   return (
     <div>
@@ -78,13 +129,17 @@ export default async function StockPage({
         </div>
       )}
 
+      <div className="mb-3">
+        <HideZeroToggle hidden={hideZero} />
+      </div>
+
       {activeTab === 'dispensa' ? (
         <div className="rounded-xl border border-line bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
-                <th className="px-4 py-2.5 font-medium">Artículo</th>
-                <th className="px-4 py-2.5 font-medium">Disponible</th>
+                <SortTh {...th('articulo')}>Artículo</SortTh>
+                <SortTh {...th('dispensa')}>Disponible</SortTh>
                 {profile?.role === 'admin' && <th className="px-4 py-2.5 font-medium"></th>}
               </tr>
             </thead>
@@ -131,7 +186,7 @@ export default async function StockPage({
               {strains.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-10 text-center text-text-mute">
-                    Sin artículos cargados todavía.
+                    {hideZero ? 'No hay artículos con stock.' : 'Sin artículos cargados todavía.'}
                   </td>
                 </tr>
               )}
@@ -143,10 +198,10 @@ export default async function StockPage({
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-text-soft text-left">
               <tr>
-                <th className="px-4 py-2.5 font-medium">Artículo</th>
-                <th className="px-4 py-2.5 font-medium">Disp. sala dispensa</th>
-                <th className="px-4 py-2.5 font-medium">Disp. sala general</th>
-                <th className="px-4 py-2.5 font-medium">Total</th>
+                <SortTh {...th('articulo')}>Artículo</SortTh>
+                <SortTh {...th('dispensa')}>Disp. sala dispensa</SortTh>
+                <SortTh {...th('general')}>Disp. sala general</SortTh>
+                <SortTh {...th('total')}>Total</SortTh>
                 <th className="px-4 py-2.5 font-medium"></th>
               </tr>
             </thead>
@@ -198,7 +253,7 @@ export default async function StockPage({
               {strains.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-text-mute">
-                    Sin artículos cargados todavía.
+                    {hideZero ? 'No hay artículos con stock.' : 'Sin artículos cargados todavía.'}
                   </td>
                 </tr>
               )}
