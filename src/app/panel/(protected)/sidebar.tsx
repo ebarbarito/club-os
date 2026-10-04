@@ -27,12 +27,12 @@ function SidebarContent({
 }) {
   return (
     <div className="bg-green-900 text-white flex flex-col h-full">
-      <div className="h-[72px] flex items-center px-4 border-b border-white/10">
+      <div className="h-36 flex items-center justify-center p-5 border-b border-white/10">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt={tenantName} className="h-12 w-auto object-contain" />
+          <img src={logoUrl} alt={tenantName} className="max-h-full max-w-full object-contain" />
         ) : (
-          <span className="font-display font-semibold truncate">{tenantName}</span>
+          <span className="font-display font-semibold truncate text-center">{tenantName}</span>
         )}
       </div>
 
@@ -109,7 +109,7 @@ export function Sidebar({
         </button>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt={tenantName} className="h-8 w-auto object-contain" />
+          <img src={logoUrl} alt={tenantName} className="h-10 w-auto object-contain" />
         ) : (
           <span className="font-display font-semibold text-sm">{tenantName}</span>
         )}
