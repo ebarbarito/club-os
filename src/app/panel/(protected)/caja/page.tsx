@@ -13,6 +13,7 @@ import { AnularMovimientoForm } from './anular-movimiento-form';
 import { ShiftSummary } from './shift-summary';
 import { TransferToDiariaForm } from './transfer-to-diaria-form';
 import { CompraVentaDolaresForm } from './compra-venta-dolares-form';
+import { TransferEntreCuentasForm } from './transfer-entre-cuentas-form';
 import { PagoACuentaForm } from './pago-a-cuenta-form';
 import { groupByReceipt } from './group-by-receipt';
 import type { SearchableMember } from '@/components/member-search';
@@ -450,6 +451,15 @@ function GeneralTab({
               >
                 <CompraVentaDolaresForm
                   accounts={[cashAccount, ...otherAccounts].filter(Boolean) as typeof accounts}
+                />
+              </ModalTrigger>
+              <ModalTrigger
+                label="Mover entre cuentas"
+                className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                title="Mover saldo entre cuentas"
+              >
+                <TransferEntreCuentasForm
+                  accounts={[cashAccount, ...otherAccounts, usdAccount].filter(Boolean) as Account[]}
                 />
               </ModalTrigger>
               <ModalTrigger

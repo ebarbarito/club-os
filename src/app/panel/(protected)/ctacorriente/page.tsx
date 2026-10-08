@@ -8,6 +8,9 @@ import { ComprobantesTable } from './comprobantes-table';
 import { CuotaSocialTab } from './cuota-social-tab';
 import { HistorialPagos } from './historial-pagos';
 import type { HistorialEntry } from './historial-pagos';
+import { CuotasPendientesPanel } from './cuotas-pendientes-panel';
+import type { PendingCuotaCargo } from './cuotas-pendientes-panel';
+import type { PaymentAccount } from '@/components/payment-split';
 
 type Debtor = { id: string; name: string; dni: string; memberNumber: number | null; adeudado: number };
 
@@ -109,9 +112,10 @@ export default async function CtaCorrientePage({
   let saldoCuotaSocial = 0;
   // HistorialEntry imported from ./historial-pagos
   const historial: HistorialEntry[] = [];
+  let pendingCuotas: PendingCuotaCargo[] = [];
 
   if (memberId && activeTab === 'buscar') {
-    const [{ data: member }, { data: dispensas }, { data: creditRows }] = await Promise.all([
+    const [{ data: member }, { data: dispensas }, { data: creditRows }, { data: cuotaCharges }] = await Promise.all([
       supabase.from('members').select('name').eq('id', memberId).maybeSingle(),
       supabase
         .from('dispensas')
@@ -121,9 +125,16 @@ export default async function CtaCorrientePage({
         .eq('member_id', memberId)
         .order('created_at', { ascending: true }),
       supabase.from('member_credits').select('amount, description, created_at, kind').eq('member_id', memberId),
+      supabase.from('cuota_social_charges').select('id, periodo, amount, paid_amount').eq('member_id', memberId).is('paid_at', null).order('periodo'),
     ]);
 
     selectedMemberName = member?.name ?? '—';
+    pendingCuotas = (cuotaCharges ?? []).map((c) => ({
+      id: c.id,
+      periodo: c.periodo,
+      amount: c.amount,
+      paid_amount: c.paid_amount ?? 0,
+    }));
     saldoAFavorGeneral = (creditRows ?? []).filter((r) => r.kind === 'general').reduce((s, r) => s + r.amount, 0);
     saldoCuotaSocial = (creditRows ?? []).filter((r) => r.kind === 'cuota_social').reduce((s, r) => s + r.amount, 0);
 
@@ -319,6 +330,12 @@ export default async function CtaCorrientePage({
               )}
             </div>
           )}
+
+          <CuotasPendientesPanel
+            memberId={memberId}
+            cargos={pendingCuotas}
+            accounts={(accounts ?? []) as PaymentAccount[]}
+          />
 
           <ComprobantesTable
             comprobantes={comprobantes}

@@ -149,3 +149,17 @@ export async function anularPagoDispensa(receiptNumber: number, dispensaId: stri
   revalidatePath('/panel/caja');
   return {};
 }
+
+export async function cobrarCuotasSocialesDesdeCtaCte(formData: FormData) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('cobrar_cuotas_sociales_paralelo', {
+    p_member_id: String(formData.get('member_id')),
+    p_cobros: JSON.parse(String(formData.get('cobros') ?? '[]')),
+    p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
+  });
+  if (error) return { error: error.message };
+  revalidatePath('/panel/ctacorriente');
+  revalidatePath('/panel/dispensas');
+  revalidatePath('/panel/caja');
+  return {};
+}

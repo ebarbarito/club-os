@@ -466,3 +466,84 @@ export async function anularMovimientoCaja(formData: FormData) {
   revalidatePath('/panel/caja');
   return {};
 }
+
+// ── Transferencia entre cuentas ───────────────────────────────────────────────
+// Registra el movimiento contable de mover saldo de una cuenta a otra dentro
+// de la caja general (ej: efectivo → Mercado Pago, o viceversa).
+// Si ambas cuentas son ARS el importe es el mismo. Si difieren en moneda
+// (una es USD) el usuario ingresa el tipo de cambio y el importe en la moneda
+// de origen; el sistema convierte para registrar el amount_local en ARS.
+export async function transferirEntreCuentas(formData: FormData) {
+  const profile = await requireAdminProfile();
+  const supabase = await createClient();
+
+  const origenId = String(formData.get('origen_id') ?? '');
+  const destinoId = String(formData.get('destino_id') ?? '');
+  const amount = Number(formData.get('amount') ?? 0);
+  const exchangeRate = Number(formData.get('exchange_rate') ?? 1) || 1;
+  const concept = String(formData.get('concept') ?? '').trim();
+
+  if (!origenId || !destinoId) return { error: 'Seleccioná las dos cuentas' };
+  if (origenId === destinoId) return { error: 'Las cuentas origen y destino deben ser distintas' };
+  if (amount <= 0) return { error: 'Ingresá un importe mayor a cero' };
+
+  const { data: shift } = await supabase
+    .from('caja_shifts')
+    .select('id')
+    .eq('kind', 'general')
+    .is('closed_at', null)
+    .maybeSingle();
+  if (!shift) return { error: 'No hay un turno de caja general abierto' };
+
+  // Verificar que ambas cuentas existen y obtener sus monedas
+  const { data: accts } = await supabase
+    .from('payment_accounts')
+    .select('id, name, currency, exchange_rate')
+    .in('id', [origenId, destinoId]);
+  const origen = (accts ?? []).find((a) => a.id === origenId);
+  const destino = (accts ?? []).find((a) => a.id === destinoId);
+  if (!origen || !destino) return { error: 'Cuenta no encontrada' };
+
+  const { data: receiptNumber, error: receiptError } = await supabase.rpc('next_receipt_number');
+  if (receiptError) return { error: receiptError.message };
+
+  // Para cuentas en la misma moneda, amount_local es igual al amount.
+  // Si la cuenta origen es USD, el usuario ingresa USD y el exchange_rate
+  // convierte a ARS para el amount_local.
+  const amountLocal = amount * exchangeRate;
+  const conceptoFinal = concept || `Transferencia ${origen.name} → ${destino.name}`;
+
+  const common = {
+    tenant_id: profile.tenantId,
+    shift_id: shift.id,
+    category: 'Transferencia entre cuentas',
+    concept: conceptoFinal,
+    receipt_number: receiptNumber,
+  };
+
+  const { error } = await supabase.from('ledger').insert([
+    // Sale de origen
+    {
+      ...common,
+      type: 'egreso',
+      account_id: origenId,
+      amount,
+      exchange_rate: exchangeRate,
+      amount_local: amountLocal,
+    },
+    // Entra a destino
+    {
+      ...common,
+      type: 'ingreso',
+      account_id: destinoId,
+      amount,
+      exchange_rate: exchangeRate,
+      amount_local: amountLocal,
+    },
+  ]);
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/caja');
+  revalidatePath('/panel/balance');
+  return {};
+}
