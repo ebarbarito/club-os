@@ -79,7 +79,7 @@ function SidebarContent({
       {showCambiarPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowCambiarPassword(false)} />
-          <div className="relative bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+          <div className="relative bg-surface text-foreground rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
             <h2 className="font-display text-lg font-bold text-text mb-4">Cambiar contraseña</h2>
             <CambiarPasswordForm onSuccess={() => { setShowCambiarPassword(false); }} />
             <button
