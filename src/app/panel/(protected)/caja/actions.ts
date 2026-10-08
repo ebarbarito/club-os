@@ -474,7 +474,8 @@ export async function anularMovimientoCaja(formData: FormData) {
 // (una es USD) el usuario ingresa el tipo de cambio y el importe en la moneda
 // de origen; el sistema convierte para registrar el amount_local en ARS.
 export async function transferirEntreCuentas(formData: FormData) {
-  const profile = await requireAdminProfile();
+  const kind = String(formData.get('kind') ?? 'general');
+  const profile = await requireCajaAccess(kind);
   const supabase = await createClient();
 
   const origenId = String(formData.get('origen_id') ?? '');
@@ -490,10 +491,10 @@ export async function transferirEntreCuentas(formData: FormData) {
   const { data: shift } = await supabase
     .from('caja_shifts')
     .select('id')
-    .eq('kind', 'general')
+    .eq('kind', kind)
     .is('closed_at', null)
     .maybeSingle();
-  if (!shift) return { error: 'No hay un turno de caja general abierto' };
+  if (!shift) return { error: `No hay un turno de caja ${kind} abierto` };
 
   // Verificar que ambas cuentas existen y obtener sus monedas
   const { data: accts } = await supabase

@@ -43,7 +43,22 @@ export function PaymentSplitEditor({
 
   function setAccount(i: number, accountId: string) {
     const account = accounts.find((a) => a.id === accountId);
-    updateLine(i, { accountId, exchangeRate: String(account?.exchange_rate ?? 1) });
+    const newRate = Number(account?.exchange_rate ?? 1) || 1;
+    const line = lines[i];
+    const currentAmount = Number(line.amount);
+    const oldRate = Number(line.exchangeRate) || 1;
+
+    // Convertir el monto al pasar entre cuentas con diferente moneda:
+    // se calcula el equivalente en pesos con la cotización anterior y luego
+    // se divide por la nueva cotización para obtener el monto en la nueva moneda.
+    let newAmount = line.amount;
+    if (currentAmount > 0) {
+      const localAmount = currentAmount * oldRate;
+      const converted = localAmount / newRate;
+      newAmount = String(Math.round(converted * 100) / 100);
+    }
+
+    updateLine(i, { accountId, exchangeRate: String(account?.exchange_rate ?? 1), amount: newAmount });
   }
 
   function addLine() {

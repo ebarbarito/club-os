@@ -6,7 +6,7 @@ import { money } from '@/lib/format';
 
 type Account = { id: string; name: string; is_cash: boolean; currency: string; exchange_rate: number };
 
-export function TransferEntreCuentasForm({ accounts }: { accounts: Account[] }) {
+export function TransferEntreCuentasForm({ accounts, kind = 'general' }: { accounts: Account[]; kind?: 'diaria' | 'general' }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -39,6 +39,7 @@ export function TransferEntreCuentasForm({ accounts }: { accounts: Account[] }) 
     if (needsExchange && tc <= 0) { setError('Ingresá el tipo de cambio'); return; }
 
     const fd = new FormData();
+    fd.set('kind', kind);
     fd.set('origen_id', origenId);
     fd.set('destino_id', destinoId);
     fd.set('amount', String(amt));

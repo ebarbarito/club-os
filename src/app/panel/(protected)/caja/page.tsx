@@ -144,6 +144,7 @@ export default async function CajaPage({
           usdAccount={usdAccount}
           expectedCash={diariaCash}
           expectedUsd={diariaUsd}
+          isAdmin={isAdmin}
         />
       ) : (
         <GeneralTab
@@ -178,6 +179,7 @@ function DiariaTab({
   usdAccount,
   expectedCash,
   expectedUsd,
+  isAdmin,
 }: {
   shift: { id: string; opening_cash: number; opening_usd: number } | null;
   movements: LedgerRow[];
@@ -190,6 +192,7 @@ function DiariaTab({
   usdAccount: Account | undefined;
   expectedCash: number;
   expectedUsd: number;
+  isAdmin: boolean;
 }) {
   const NO_EDIT_CATEGORIES = new Set(['Dispensa', 'Cuenta corriente', 'Cierre de caja', 'Envío a caja diaria', 'Impuesto']);
   const NO_VOID_CATEGORIES = new Set(['Cierre de caja', 'Envío a caja diaria', 'Impuesto', 'Anulación']);
@@ -197,6 +200,7 @@ function DiariaTab({
   // contable para el operador de caja diaria — se ven en detalle en Caja
   // general, acá no aportan nada.
   const groups = groupByReceipt(movements.filter((m) => m.category !== 'Impuesto' && !m.anulado));
+  const otherAccounts = accounts.filter((a) => !a.is_cash && a.id !== usdAccount?.id && !a.is_virtual);
 
   return (
     <div>
@@ -235,6 +239,18 @@ function DiariaTab({
               >
                 <PagoACuentaForm members={members} accounts={realAccounts} />
               </ModalTrigger>
+              {isAdmin && (
+                <ModalTrigger
+                  label="Mover entre cuentas"
+                  className="rounded-lg border border-line-2 text-sm font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                  title="Mover saldo entre cuentas"
+                >
+                  <TransferEntreCuentasForm
+                    accounts={[cashAccount, ...otherAccounts, usdAccount].filter(Boolean) as Account[]}
+                    kind="diaria"
+                  />
+                </ModalTrigger>
+              )}
               <ModalTrigger
                 label="Cerrar caja (arqueo)"
                 className="ml-auto rounded-lg bg-accent text-white text-sm font-semibold px-3 py-1.5"
