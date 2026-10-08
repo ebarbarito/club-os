@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
@@ -11,6 +11,17 @@ export function LoginForm({ tenantName, logoUrl }: { tenantName: string | null; 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savedUsers, setSavedUsers] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('club-os-saved-users');
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[];
+        if (Array.isArray(parsed)) setSavedUsers(parsed);
+      }
+    } catch {}
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,6 +36,14 @@ export function LoginForm({ tenantName, logoUrl }: { tenantName: string | null; 
       setLoading(false);
       return;
     }
+
+    try {
+      const stored = localStorage.getItem('club-os-saved-users');
+      const existing: string[] = stored ? (JSON.parse(stored) as string[]) : [];
+      const updated = [email, ...existing.filter((e) => e !== email)].slice(0, 5);
+      localStorage.setItem('club-os-saved-users', JSON.stringify(updated));
+    } catch {}
+    try { sessionStorage.setItem('pwa-session', '1'); } catch {}
 
     router.replace('/panel');
     router.refresh();
@@ -46,6 +65,20 @@ export function LoginForm({ tenantName, logoUrl }: { tenantName: string | null; 
         <h1 className="font-display text-xl font-bold text-text mb-1 text-center">{logoUrl ? 'Ingresar' : (tenantName ?? 'Club OS')}</h1>
         <p className="text-text-soft text-sm mb-6 text-center">Ingresá con tu cuenta.</p>
 
+        {savedUsers.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {savedUsers.map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => setEmail(u)}
+                className="text-xs rounded-full px-3 py-1 border border-line-2 bg-green-900/8 text-text hover:bg-green-900/15 transition-colors"
+              >
+                {u.split('@')[0]}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="block text-sm font-medium text-text mb-1" htmlFor="email">
           Email
         </label>
