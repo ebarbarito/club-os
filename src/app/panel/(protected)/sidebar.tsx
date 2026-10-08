@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { TITLES, type ViewId } from '@/lib/roles';
 import type { SessionProfile } from '@/lib/auth/get-session-profile';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { CambiarPasswordForm } from './cambiar-password-form';
 
 function SidebarContent({
   tenantName,
@@ -25,6 +26,7 @@ function SidebarContent({
   onNavigate?: () => void;
   onLogout: () => void;
 }) {
+  const [showCambiarPassword, setShowCambiarPassword] = useState(false);
   return (
     <div className="bg-green-900 text-white flex flex-col h-full">
       <div className="h-36 flex items-center justify-center p-5 border-b border-white/10">
@@ -66,10 +68,29 @@ function SidebarContent({
         <div className="text-sm font-medium">{profile.name}</div>
         <div className="text-xs text-white/60 mb-1 capitalize">{profile.role}</div>
         <ThemeToggle />
+        <button onClick={() => setShowCambiarPassword(true)} className="block text-xs text-white/70 hover:text-white underline">
+          Cambiar contraseña
+        </button>
         <button onClick={onLogout} className="block text-xs text-white/70 hover:text-white underline">
           Cambiar perfil / salir
         </button>
       </div>
+
+      {showCambiarPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCambiarPassword(false)} />
+          <div className="relative bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h2 className="font-display text-lg font-bold text-text mb-4">Cambiar contraseña</h2>
+            <CambiarPasswordForm onSuccess={() => { setShowCambiarPassword(false); }} />
+            <button
+              onClick={() => setShowCambiarPassword(false)}
+              className="mt-3 w-full text-sm text-text-soft hover:text-text"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
