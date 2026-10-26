@@ -8,7 +8,7 @@ const MEMBER_KEY = 'club_os_member_v1';
 
 export type CartLine = { strainId: string; name: string; pricePerGram: number; grams: number };
 
-type MemberState = { id: string; status: 'pending' | 'valid' | 'rejected'; name: string } | null;
+type MemberState = { id: string; status: 'preinscripto' | 'pending' | 'valid' | 'rejected'; name: string } | null;
 
 type StoreValue = {
   cart: CartLine[];

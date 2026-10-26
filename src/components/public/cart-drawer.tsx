@@ -61,7 +61,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 Necesitás darte de alta como socio para poder confirmar una reserva.
               </p>
             )}
-            {member && member.status === 'pending' && (
+            {member && (member.status === 'pending' || member.status === 'preinscripto') && (
               <p className="text-amber-tx bg-amber-bg rounded-lg p-3 text-sm mb-4">
                 Tu alta está en evaluación — todavía no podés confirmar reservas.
               </p>

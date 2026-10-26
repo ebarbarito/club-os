@@ -6,6 +6,8 @@ import { Badge } from '@/components/badge';
 import { MEMBER_STATUS } from '@/lib/status-meta';
 import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
+import { ADICIONALES, ENTREGAS, PLANES, labelDe } from '@/lib/alta/opciones';
+import { EnviarEtapa2 } from './enviar-etapa2';
 
 const REPR_LABEL: Record<string, string> = {
   vigente: 'REPROCANN vigente',
@@ -34,7 +36,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { data: member } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
   if (!member) notFound();
 
-  const [{ data: documents }, { data: cuotaSocialRows }, { data: creditRows }] = await Promise.all([
+  const [{ data: documents }, { data: cuotaSocialRows }, { data: creditRows }, { data: tenant }] = await Promise.all([
     supabase.from('member_documents').select('id, label, storage_path').eq('member_id', id),
     supabase
       .from('dispensas')
@@ -43,6 +45,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       .eq('es_cuota_social', true)
       .order('created_at', { ascending: false }),
     supabase.from('member_credits').select('amount').eq('member_id', id).eq('kind', 'cuota_social'),
+    supabase.from('tenants').select('name').eq('id', member.tenant_id).single(),
   ]);
   const saldoCuotaSocial = (creditRows ?? []).reduce((s, r) => s + r.amount, 0);
 
@@ -80,6 +83,15 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         </div>
         <Badge label={meta.label} color={meta.color} />
       </div>
+
+      {member.status === 'preinscripto' && (
+        <EnviarEtapa2
+          memberId={id}
+          phone={member.phone}
+          tenantName={tenant?.name ?? 'el club'}
+          enviadaAt={member.etapa2_enviada_at ? fmtDateTime(member.etapa2_enviada_at) : null}
+        />
+      )}
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <p className="text-xs font-semibold text-text-mute uppercase mb-3">Datos personales</p>
@@ -122,6 +134,27 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </div>
         </dl>
       </div>
+
+      {(member.plan_solicitado || member.entrega_preferida) && (
+        <div className="rounded-xl border border-line bg-surface p-5 mb-4">
+          <p className="text-xs font-semibold text-text-mute uppercase mb-3">Pedido del socio (formulario de adhesión)</p>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div><dt className="text-text-mute">Plan</dt><dd>{labelDe(PLANES, member.plan_solicitado) ?? '—'}</dd></div>
+            <div><dt className="text-text-mute">Retiro / envío</dt><dd>{labelDe(ENTREGAS, member.entrega_preferida) ?? '—'}</dd></div>
+            <div className="col-span-2">
+              <dt className="text-text-mute">Adicionales</dt>
+              <dd>
+                {(member.adicionales_solicitados ?? []).length > 0
+                  ? (member.adicionales_solicitados as string[]).map((a) => labelDe(ADICIONALES, a)).join(', ')
+                  : 'Ninguno'}
+              </dd>
+            </div>
+            {member.etapa2_completada_at && (
+              <div className="col-span-2 text-text-mute text-xs">Completado el {fmtDateTime(member.etapa2_completada_at)}</div>
+            )}
+          </dl>
+        </div>
+      )}
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <div className="flex items-center justify-between mb-3">
@@ -180,7 +213,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         )}
       </div>
 
-      {(member.status === 'pending' || member.status === 'draft') && (
+      {(member.status === 'pending' || member.status === 'draft' || member.status === 'preinscripto') && (
         <div className="flex gap-2">
           <form action={reject}>
             <button className="rounded-lg border border-red text-red font-semibold text-sm px-4 py-2">

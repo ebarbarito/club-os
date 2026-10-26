@@ -73,6 +73,7 @@ export function EditMemberForm({ member }: { member: Member }) {
         <label className={labelCls}>Estado</label>
         <select name="status" defaultValue={member.status} className={inputCls}>
           <option value="draft">Borrador</option>
+          <option value="preinscripto">Pre-inscripto</option>
           <option value="pending">En evaluación</option>
           <option value="valid">Válido</option>
           <option value="rejected">Rechazado</option>

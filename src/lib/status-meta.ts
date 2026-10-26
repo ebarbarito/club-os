@@ -1,5 +1,6 @@
 export const MEMBER_STATUS = {
   draft: { label: 'Borrador', color: 'gray' },
+  preinscripto: { label: 'Pre-inscripto', color: 'blue' },
   pending: { label: 'En evaluación', color: 'amber' },
   valid: { label: 'Válido', color: 'green' },
   rejected: { label: 'Rechazado', color: 'red' },

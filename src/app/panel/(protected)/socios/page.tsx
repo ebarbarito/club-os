@@ -9,6 +9,7 @@ import { SociosTable } from './socios-table';
 
 const TABS = [
   { key: 'todos', label: 'Todos' },
+  { key: 'preinscripto', label: 'Pre-inscriptos' },
   { key: 'pending', label: 'En evaluación' },
   { key: 'valid', label: 'Válidos' },
   { key: 'draft', label: 'Borradores' },

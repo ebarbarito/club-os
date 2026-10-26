@@ -5,14 +5,18 @@ import { headers } from 'next/headers';
 import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
 
-// Documentos de alta: bucket PRIVADO (no público como "media") — DNI y
-// constancia REPROCANN son datos sensibles, se sirven solo vía signed
-// URL generada server-side para un admin autenticado (ver Socios/[id]).
-const DOCUMENT_FIELDS: { field: string; label: string }[] = [
+// Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
+// constancia REPROCANN e indicación médica son datos sensibles, se sirven
+// solo vía signed URL generada server-side para un admin autenticado (ver
+// Socios/[id]). La etapa 1 solo admite la constancia REPROCANN; el resto
+// se pide en la etapa 2.
+const DOCUMENT_FIELDS_ETAPA2: { field: string; label: string }[] = [
   { field: 'dni_frente', label: 'DNI (frente)' },
   { field: 'dni_dorso', label: 'DNI (dorso)' },
   { field: 'reprocann_doc', label: 'Constancia REPROCANN' },
+  { field: 'indicacion_medica', label: 'Indicación médica' },
 ];
 
 // El tenant se resuelve server-side a partir del Host (vía proxy.ts,
@@ -34,25 +38,91 @@ function isAdult(birth: string): boolean {
   return age >= 18;
 }
 
+// Sube los adjuntos que vinieron en el form y los registra como
+// documentos del socio. Un upload fallido no bloquea el alta.
+async function guardarDocumentos(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  memberId: string,
+  formData: FormData,
+  fields: { field: string; label: string }[],
+) {
+  for (const { field, label } of fields) {
+    const file = formData.get(field);
+    if (!(file instanceof File) || file.size === 0) continue;
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${tenantId}/${memberId}/${field}-${randomUUID()}.${ext}`;
+    const { error: uploadError } = await admin.storage
+      .from('documentos')
+      .upload(path, file, { contentType: file.type || 'image/jpeg' });
+    if (uploadError) continue;
+
+    await admin.from('member_documents').insert({
+      tenant_id: tenantId,
+      member_id: memberId,
+      storage_path: path,
+      label,
+    });
+  }
+}
+
+// La firma viaja como PNG data URL en un input hidden (ver SignaturePad)
+// -- se decodifica y se guarda como un documento más, mismo circuito que
+// DNI/REPROCANN.
+async function guardarFirma(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  memberId: string,
+  firmaDataUrl: string,
+) {
+  if (!firmaDataUrl.startsWith('data:image/png;base64,')) return;
+  const buffer = Buffer.from(firmaDataUrl.slice('data:image/png;base64,'.length), 'base64');
+  const path = `${tenantId}/${memberId}/firma-${randomUUID()}.png`;
+  const { error: uploadError } = await admin.storage
+    .from('documentos')
+    .upload(path, buffer, { contentType: 'image/png' });
+  if (uploadError) return;
+  await admin.from('member_documents').insert({
+    tenant_id: tenantId,
+    member_id: memberId,
+    storage_path: path,
+    label: 'Firma del solicitante',
+  });
+}
+
+function str(formData: FormData, key: string): string | null {
+  const v = formData.get(key);
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+}
+
+// ETAPA 1 — Pre-inscripción (link público /alta-socio). Datos personales,
+// categoría y REPROCANN propio. Si no tiene REPROCANN queda asentado en
+// `reprocann` ('tramite' | 'no') y se completa en la etapa 2.
 export async function createMemberPublic(formData: FormData) {
   const tenant = await getRequestTenant();
   if (!tenant) return { error: 'Club no encontrado' };
 
   const birth = String(formData.get('birth') ?? '');
-  const categoriaSocio = (formData.get('categoria_socio') as string) || null;
+  const categoriaSocio = str(formData, 'categoria_socio');
   // "Adherente — Menor de edad" es la única categoría que puede ser
-  // menor de 18 -- el resto sigue exigiendo mayoría de edad. La captura
-  // de datos del tutor/representante legal queda pendiente (sección 3
-  // del formulario todavía no definida).
+  // menor de 18 -- el resto sigue exigiendo mayoría de edad.
   if (!birth || (categoriaSocio !== 'adherente_menor' && !isAdult(birth))) {
     return { error: 'Tenés que ser mayor de 18 años para asociarte' };
   }
 
-  const consienteEstatuto = formData.get('consiente_estatuto') === 'on';
-  const consienteDatos = formData.get('consiente_datos') === 'on';
-  const consienteVeracidad = formData.get('consiente_veracidad') === 'on';
-  if (!consienteEstatuto || !consienteDatos || !consienteVeracidad) {
-    return { error: 'Tenés que aceptar las 3 declaraciones de consentimiento' };
+  // En la etapa 1 ya se juntan datos personales (y el estado REPROCANN,
+  // que es dato de salud): el consentimiento de la Ley 25.326 va acá. El
+  // del estatuto y el de veracidad se firman en la etapa 2.
+  if (formData.get('consiente_datos') !== 'on') {
+    return { error: 'Tenés que aceptar el tratamiento de tus datos personales' };
+  }
+
+  const reprocann = str(formData, 'reprocann') ?? 'no';
+  if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
+  const tieneReprocann = reprocann === 'vigente';
+  if (tieneReprocann && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
+    return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
   }
 
   const admin = createAdminClient();
@@ -60,83 +130,154 @@ export async function createMemberPublic(formData: FormData) {
     .from('members')
     .insert({
       tenant_id: tenant.id,
-      name: String(formData.get('name') ?? ''),
-      dni: String(formData.get('dni') ?? ''),
+      name: String(formData.get('name') ?? '').trim(),
+      dni: String(formData.get('dni') ?? '').trim(),
       birth,
-      phone: (formData.get('phone') as string) || null,
-      email: (formData.get('email') as string) || null,
-      zona: (formData.get('zona') as string) || null,
-      address: (formData.get('address') as string) || null,
-      nacionalidad: (formData.get('nacionalidad') as string) || null,
-      estado_civil: (formData.get('estado_civil') as string) || null,
-      cuil_cuit: (formData.get('cuil_cuit') as string) || null,
-      localidad: (formData.get('localidad') as string) || null,
-      provincia: (formData.get('provincia') as string) || null,
-      codigo_postal: (formData.get('codigo_postal') as string) || null,
+      phone: str(formData, 'phone'),
+      email: str(formData, 'email'),
+      zona: str(formData, 'zona'),
+      address: str(formData, 'address'),
+      nacionalidad: str(formData, 'nacionalidad'),
+      estado_civil: str(formData, 'estado_civil'),
+      cuil_cuit: str(formData, 'cuil_cuit'),
+      localidad: str(formData, 'localidad'),
+      provincia: str(formData, 'provincia'),
+      codigo_postal: str(formData, 'codigo_postal'),
       categoria_socio: categoriaSocio,
-      reprocann: (formData.get('reprocann') as string) || 'no',
-      repr_num: (formData.get('repr_num') as string) || null,
-      repr_exp: (formData.get('repr_exp') as string) || null,
-      doctor: (formData.get('doctor') as string) || null,
-      especialidad_institucion: (formData.get('especialidad_institucion') as string) || null,
-      matricula: (formData.get('matricula') as string) || null,
-      modalidad: (formData.get('modalidad') as string) || null,
-      patologia: (formData.get('patologia') as string) || null,
-      producto_prescripto: (formData.get('producto_prescripto') as string) || null,
-      dosis_mensual: formData.get('dosis_mensual') ? Number(formData.get('dosis_mensual')) : null,
-      dosis_unidad: (formData.get('dosis_unidad') as string) || null,
-      consiente_estatuto: consienteEstatuto,
-      consiente_datos: consienteDatos,
-      consiente_veracidad: consienteVeracidad,
-      status: 'pending',
+      reprocann,
+      reprocann_type: tieneReprocann ? str(formData, 'reprocann_type') : null,
+      repr_num: tieneReprocann ? str(formData, 'repr_num') : null,
+      repr_exp: tieneReprocann ? str(formData, 'repr_exp') : null,
+      consiente_datos: true,
+      status: 'preinscripto',
     })
     .select('id')
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    // unique (tenant_id, dni): ya se pre-inscribió antes (o ya es socio).
+    if (error.code === '23505') {
+      return { error: 'Ya hay una solicitud con ese DNI en el club. Escribinos por WhatsApp y lo vemos.' };
+    }
+    return { error: 'No pudimos enviar tu solicitud. Probá de nuevo en unos minutos.' };
+  }
   const memberId = data.id as string;
 
-  for (const { field, label } of DOCUMENT_FIELDS) {
-    const file = formData.get(field);
-    if (!(file instanceof File) || file.size === 0) continue;
-
-    const ext = file.name.split('.').pop() || 'jpg';
-    const path = `${tenant.id}/${memberId}/${field}-${randomUUID()}.${ext}`;
-    const { error: uploadError } = await admin.storage
-      .from('documentos')
-      .upload(path, file, { contentType: file.type || 'image/jpeg' });
-    if (uploadError) continue; // no bloquea el alta si falla la subida de un documento
-
-    await admin.from('member_documents').insert({
-      tenant_id: tenant.id,
-      member_id: memberId,
-      storage_path: path,
-      label,
-    });
-  }
-
-  // La firma viaja como PNG data URL en un input hidden (ver
-  // SignaturePad) -- se decodifica y se guarda como un documento más,
-  // mismo circuito que DNI/REPROCANN.
-  const firmaDataUrl = String(formData.get('firma_data_url') ?? '');
-  if (firmaDataUrl.startsWith('data:image/png;base64,')) {
-    const base64 = firmaDataUrl.slice('data:image/png;base64,'.length);
-    const buffer = Buffer.from(base64, 'base64');
-    const path = `${tenant.id}/${memberId}/firma-${randomUUID()}.png`;
-    const { error: uploadError } = await admin.storage
-      .from('documentos')
-      .upload(path, buffer, { contentType: 'image/png' });
-    if (!uploadError) {
-      await admin.from('member_documents').insert({
-        tenant_id: tenant.id,
-        member_id: memberId,
-        storage_path: path,
-        label: 'Firma del solicitante',
-      });
-    }
+  if (tieneReprocann) {
+    await guardarDocumentos(admin, tenant.id, memberId, formData, [
+      { field: 'reprocann_doc', label: 'Constancia REPROCANN' },
+    ]);
   }
 
   return { memberId };
+}
+
+// ETAPA 2 — Formulario de adhesión. El link es personal: el token lo
+// genera el club desde la ficha del socio (ver socios/actions.ts) y solo
+// sirve mientras el socio siga pre-inscripto. Se valida contra el tenant
+// del Host igual que todo lo demás de este archivo.
+async function memberPorToken(token: string) {
+  const tenant = await getRequestTenant();
+  if (!tenant || !token) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('members')
+    .select('id, name, reprocann, reprocann_type, repr_num, repr_exp, categoria_socio')
+    .eq('tenant_id', tenant.id)
+    .eq('etapa2_token', token)
+    .eq('status', 'preinscripto')
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!data) return null;
+  return { tenant, member: data };
+}
+
+// Lo mínimo para armar la pantalla: el link de la etapa 2 no expone más
+// datos personales que el nombre (si se reenvía por error, no filtra la
+// ficha completa).
+export async function getEtapa2(token: string) {
+  const res = await memberPorToken(token);
+  if (!res) return null;
+  return {
+    tenantName: res.tenant.name,
+    nombre: res.member.name as string,
+    reprocann: res.member.reprocann as 'vigente' | 'tramite' | 'no',
+  };
+}
+
+export async function completarEtapa2(token: string, formData: FormData) {
+  const res = await memberPorToken(token);
+  if (!res) return { error: 'Este link ya no es válido. Pedile al club uno nuevo por WhatsApp.' };
+  const { tenant, member } = res;
+
+  if (formData.get('consiente_estatuto') !== 'on' || formData.get('consiente_veracidad') !== 'on') {
+    return { error: 'Tenés que aceptar las declaraciones del final' };
+  }
+  const firma = String(formData.get('firma_data_url') ?? '');
+  if (!firma.startsWith('data:image/png;base64,')) return { error: 'Falta tu firma' };
+
+  const plan = str(formData, 'plan_solicitado');
+  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan' };
+  const entrega = str(formData, 'entrega_preferida');
+  if (!entrega || !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío' };
+  const adicionales = formData
+    .getAll('adicionales_solicitados')
+    .map(String)
+    .filter((a) => ADICIONALES.some((o) => o.value === a));
+
+  const dosis = str(formData, 'dosis_mensual');
+  if (!str(formData, 'doctor') || !str(formData, 'patologia') || !str(formData, 'producto_prescripto') || !dosis) {
+    return { error: 'Completá los datos de tu indicación médica' };
+  }
+
+  // REPROCANN: si en la etapa 1 quedó pendiente, se actualiza acá. Si ya
+  // estaba vigente no se toca (lo cargó en la etapa 1 y el club lo revisó).
+  const reprocannUpdate: Record<string, string | null> = {};
+  if (member.reprocann !== 'vigente') {
+    const reprocann = str(formData, 'reprocann') ?? member.reprocann;
+    if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
+    if (reprocann === 'vigente' && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
+      return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
+    }
+    reprocannUpdate.reprocann = reprocann;
+    if (reprocann === 'vigente') {
+      reprocannUpdate.reprocann_type = str(formData, 'reprocann_type');
+      reprocannUpdate.repr_num = str(formData, 'repr_num');
+      reprocannUpdate.repr_exp = str(formData, 'repr_exp');
+    }
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('members')
+    .update({
+      ...reprocannUpdate,
+      doctor: str(formData, 'doctor'),
+      especialidad_institucion: str(formData, 'especialidad_institucion'),
+      matricula: str(formData, 'matricula'),
+      patologia: str(formData, 'patologia'),
+      producto_prescripto: str(formData, 'producto_prescripto'),
+      dosis_mensual: Number(dosis),
+      dosis_unidad: str(formData, 'dosis_unidad'),
+      plan_solicitado: plan,
+      adicionales_solicitados: adicionales,
+      entrega_preferida: entrega,
+      consiente_estatuto: true,
+      consiente_veracidad: true,
+      status: 'pending',
+      etapa2_completada_at: new Date().toISOString(),
+      // El link se quema al usarlo: no se puede volver a pisar la ficha.
+      etapa2_token: null,
+    })
+    .eq('id', member.id)
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'preinscripto');
+  if (error) return { error: 'No pudimos guardar tu formulario. Probá de nuevo en unos minutos.' };
+
+  await guardarDocumentos(admin, tenant.id, member.id, formData, DOCUMENT_FIELDS_ETAPA2);
+  await guardarFirma(admin, tenant.id, member.id, firma);
+
+  return {};
 }
 
 export async function checkMemberStatus(memberId: string) {

@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
+import { CopiarMensajeAlta } from './copiar-mensaje-alta';
 import { PlanDeCuentas } from './plan-de-cuentas';
 import { GenerarCuotasForm } from './generar-cuotas-form';
 
@@ -15,12 +17,17 @@ export default async function ConfiguracionPage() {
 
   const supabase = await createClient();
   const [{ data: tenant }, { data: conceptRows }, { count: memberCount }] = await Promise.all([
-    supabase.from('tenants').select('slug, public_site_enabled').eq('id', profile.tenantId).single(),
+    supabase.from('tenants').select('slug, name, public_site_enabled').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
     supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null),
   ]);
 
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
+  // Sin dominio propio configurado (publicUrlForSlug == null) el sitio se
+  // sirve en el mismo host que el panel.
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const origin = publicUrl ?? `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
 
   return (
     <div>
@@ -53,6 +60,17 @@ export default async function ConfiguracionPage() {
               Como estás logueado en el panel de este club, este link te va a mostrar el sitio aunque esté oculto para
               el público.
             </p>
+          </div>
+        )}
+
+        {tenant && (
+          <div className="border-t border-line pt-4">
+            <CopiarMensajeAlta clubName={tenant.name} altaUrl={`${origin}/alta-socio`} />
+            {!tenant.public_site_enabled && (
+              <p className="text-amber-tx text-xs mt-2">
+                Ojo: con el sitio público oculto, el link de pre-inscripción tampoco funciona para los socios.
+              </p>
+            )}
           </div>
         )}
       </div>

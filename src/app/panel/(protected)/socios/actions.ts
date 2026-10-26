@@ -1,6 +1,9 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 
@@ -51,11 +54,54 @@ export async function createMember(formData: FormData, submitAs: 'draft' | 'pend
 
 export async function setMemberStatus(memberId: string, status: 'valid' | 'rejected') {
   const supabase = await createClient();
-  const { error } = await supabase.from('members').update({ status }).eq('id', memberId);
+  // Al validar o rechazar, un link de etapa 2 pendiente deja de servir.
+  const { error } = await supabase.from('members').update({ status, etapa2_token: null }).eq('id', memberId);
   if (error) return { error: error.message };
   revalidatePath('/panel/socios');
   revalidatePath(`/panel/socios/${memberId}`);
   return {};
+}
+
+// Arma (o reutiliza) el link personal de la etapa 2 del alta para un
+// socio pre-inscripto. El token se genera recién acá, cuando el club ya
+// revisó la pre-inscripción, y se reutiliza si se reenvía (no invalida un
+// link que el socio ya tenga abierto).
+export async function generarLinkEtapa2(memberId: string) {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== 'admin') return { error: 'Solo un admin puede enviar la etapa 2' };
+
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from('members')
+    .select('id, status, etapa2_token')
+    .eq('id', memberId)
+    .eq('tenant_id', profile.tenantId)
+    .maybeSingle();
+  if (!member) return { error: 'Socio no encontrado' };
+  if (member.status !== 'preinscripto') return { error: 'El socio no está pre-inscripto' };
+
+  let token = member.etapa2_token as string | null;
+  if (!token) token = randomBytes(24).toString('base64url');
+
+  const { error } = await supabase
+    .from('members')
+    .update({ etapa2_token: token, etapa2_enviada_at: new Date().toISOString() })
+    .eq('id', memberId)
+    .eq('tenant_id', profile.tenantId);
+  if (error) return { error: error.message };
+
+  const { data: tenant } = await supabase.from('tenants').select('slug').eq('id', profile.tenantId).single();
+  const base = (tenant && publicUrlForSlug(tenant.slug)) ?? (await requestOrigin());
+
+  revalidatePath(`/panel/socios/${memberId}`);
+  return { url: `${base}/alta-socio/completar/${token}` };
+}
+
+async function requestOrigin() {
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}`;
 }
 
 export async function updateMember(memberId: string, formData: FormData) {

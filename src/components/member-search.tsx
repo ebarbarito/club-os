@@ -5,7 +5,7 @@ import { money } from '@/lib/format';
 
 export type SearchableMember = { id: string; name: string; dni: string; member_number: number; adeudado?: number; status?: string };
 
-const MEMBER_STATUS_WARN_LABEL: Record<string, string> = { draft: 'Borrador', pending: 'En evaluación', rejected: 'Rechazado' };
+const MEMBER_STATUS_WARN_LABEL: Record<string, string> = { draft: 'Borrador', preinscripto: 'Pre-inscripto', pending: 'En evaluación', rejected: 'Rechazado' };
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 

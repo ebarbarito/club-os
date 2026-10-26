@@ -1,34 +1,31 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { createMemberPublic } from '@/lib/public/actions';
-import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pad';
+import { CATEGORIAS_SOCIO } from '@/lib/alta/opciones';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const req = <span className="text-red">*</span>;
 
-const CATEGORIAS = [
-  { value: 'activo', title: 'Socio Activo', desc: 'Adulto mayor de 18 años, uso medicinal con REPROCANN.' },
-  { value: 'autocultivador', title: 'Socio Autocultivador', desc: 'Inscripto en REPROCANN como autocultivador. Cede parcela al club.' },
-  { value: 'adherente_menor', title: 'Socio Adherente — Menor de edad', desc: 'Requiere representante legal o tutor responsable.' },
-  { value: 'adherente', title: 'Socio Adherente', desc: 'Familiar o cuidador de paciente medicinal. Sin REPROCANN propio.' },
-];
+const REPROCANN_OPCIONES = [
+  { value: 'vigente', title: 'Sí, tengo REPROCANN', desc: 'Cargá los datos de tu credencial.' },
+  { value: 'tramite', title: 'Está en trámite', desc: 'Lo completás en la segunda parte.' },
+  { value: 'no', title: 'No tengo', desc: 'Te ayudamos a tramitarlo. Lo completás en la segunda parte.' },
+] as const;
 
+// ETAPA 1 — Pre-inscripción. Lo médico, el plan, los consentimientos
+// restantes y la firma van en la etapa 2 (/alta-socio/completar/<token>),
+// que el club manda por WhatsApp después de revisar estos datos.
 export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [categoria, setCategoria] = useState('activo');
-  const sigRef = useRef<SignaturePadHandle>(null);
+  const [reprocann, setReprocann] = useState<string>('vigente');
 
   function submit(formData: FormData) {
     setError(null);
-    if (sigRef.current?.isEmpty()) {
-      setError('Falta la firma del solicitante');
-      return;
-    }
-    formData.set('firma_data_url', sigRef.current?.getDataUrl() ?? '');
     startTransition(async () => {
       const res = await createMemberPublic(formData);
       if (res?.error) {
@@ -36,15 +33,17 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         return;
       }
       setDone(true);
+      window.scrollTo({ top: 0 });
     });
   }
 
   if (done) {
     return (
       <div className="max-w-xl mx-auto text-center py-16 px-4">
-        <p className="font-display text-2xl font-bold text-text mb-2">¡Listo!</p>
+        <p className="font-display text-2xl font-bold text-text mb-2">¡Recibimos tu pre-inscripción!</p>
         <p className="text-text-soft">
-          Tu solicitud de alta en {tenantName} quedó en evaluación. Te vamos a avisar por email cuando el club la valide.
+          El equipo de {tenantName} va a revisar tus datos y te va a escribir por WhatsApp para elegir tu plan y
+          mandarte la segunda parte: indicación médica y firma de la documentación.
         </p>
       </div>
     );
@@ -53,21 +52,22 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   return (
     <form action={submit} className="max-w-2xl mx-auto px-4 py-10 space-y-5">
       <div>
-        <h1 className="font-display text-2xl font-bold text-text">Alta de socio/a</h1>
+        <p className="text-xs font-semibold text-text-mute uppercase tracking-wide">Paso 1 de 2</p>
+        <h1 className="font-display text-2xl font-bold text-text">Pre-inscripción</h1>
         <p className="text-text-soft">{tenantName}</p>
       </div>
 
       <section className="rounded-xl border border-line bg-surface p-5">
         <h2 className="font-display font-bold text-accent mb-1">1. Datos personales</h2>
         <p className="text-text-mute text-sm mb-4">Completá tal como figuran en tu DNI.</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
             <label className={labelCls}>Apellido y nombre {req}</label>
-            <input name="name" required className={inputCls} />
+            <input name="name" required autoComplete="name" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>DNI / Pasaporte {req}</label>
-            <input name="dni" required className={inputCls} />
+            <input name="dni" required inputMode="numeric" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Fecha de nacimiento {req}</label>
@@ -83,11 +83,11 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           </div>
           <div>
             <label className={labelCls}>CUIL/CUIT {req}</label>
-            <input name="cuil_cuit" required className={inputCls} />
+            <input name="cuil_cuit" required inputMode="numeric" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Domicilio real {req}</label>
-            <input name="address" required className={inputCls} />
+            <input name="address" required autoComplete="street-address" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Localidad {req}</label>
@@ -99,19 +99,15 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           </div>
           <div>
             <label className={labelCls}>Código postal</label>
-            <input name="codigo_postal" className={inputCls} />
+            <input name="codigo_postal" inputMode="numeric" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Teléfono / WhatsApp {req}</label>
-            <input name="phone" required className={inputCls} />
+            <input name="phone" type="tel" required autoComplete="tel" className={inputCls} />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className={labelCls}>Correo electrónico {req}</label>
-            <input name="email" type="email" required className={inputCls} />
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>Zona</label>
-            <input name="zona" className={inputCls} />
+            <input name="email" type="email" required autoComplete="email" className={inputCls} />
           </div>
         </div>
       </section>
@@ -120,7 +116,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         <h2 className="font-display font-bold text-accent mb-1">2. Categoría de socio solicitada</h2>
         <p className="text-text-mute text-sm mb-4">Marcá la que corresponde a tu situación.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {CATEGORIAS.map((c) => (
+          {CATEGORIAS_SOCIO.map((c) => (
             <label
               key={c.value}
               className={`rounded-lg border p-3 cursor-pointer ${categoria === c.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
@@ -150,108 +146,71 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-1">3. Información médica y REPROCANN</h2>
-        <p className="text-text-mute text-sm mb-4">Completá según corresponda a tu categoría.</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>¿Posee inscripción en REPROCANN?</label>
-            <select name="reprocann" className={inputCls} defaultValue="no">
-              <option value="vigente">Vigente</option>
-              <option value="tramite">En trámite</option>
-              <option value="no">Sin REPROCANN</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Categoría REPROCANN</label>
-            <select name="reprocann_type" className={inputCls} defaultValue="">
-              <option value="">Sin especificar</option>
-              <option value="paciente">Paciente</option>
-              <option value="autocultivador">Autocultivador</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>N° de credencial REPROCANN</label>
-            <input name="repr_num" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Fecha de vencimiento credencial</label>
-            <input name="repr_exp" type="date" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Médico tratante {req}</label>
-            <input name="doctor" required className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Especialidad / Institución</label>
-            <input name="especialidad_institucion" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Diagnóstico / patología principal {req}</label>
-            <input name="patologia" required className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Producto prescripto {req}</label>
-            <input name="producto_prescripto" required className={inputCls} />
-          </div>
-          <div className="col-span-2 grid grid-cols-[1fr_7rem] gap-2 items-end">
+        <h2 className="font-display font-bold text-accent mb-1">3. REPROCANN</h2>
+        <p className="text-text-mute text-sm mb-4">¿Tenés tu credencial de REPROCANN?</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {REPROCANN_OPCIONES.map((o) => (
+            <label
+              key={o.value}
+              className={`rounded-lg border p-3 cursor-pointer ${reprocann === o.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
+            >
+              <div className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="reprocann"
+                  value={o.value}
+                  checked={reprocann === o.value}
+                  onChange={() => setReprocann(o.value)}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-semibold text-text text-sm">{o.title}</p>
+                  <p className="text-text-soft text-xs">{o.desc}</p>
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {reprocann === 'vigente' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div>
-              <label className={labelCls}>Dosis mensual indicada {req}</label>
-              <input name="dosis_mensual" type="number" min="0" step="0.01" required className={inputCls} />
+              <label className={labelCls}>Categoría REPROCANN</label>
+              <select name="reprocann_type" className={inputCls} defaultValue="paciente">
+                <option value="paciente">Paciente</option>
+                <option value="autocultivador">Autocultivador</option>
+              </select>
             </div>
-            <select name="dosis_unidad" className={inputCls} defaultValue="g">
-              <option value="g">g</option>
-              <option value="ml">ml</option>
-            </select>
+            <div>
+              <label className={labelCls}>N° de credencial {req}</label>
+              <input name="repr_num" required className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Fecha de vencimiento {req}</label>
+              <input name="repr_exp" type="date" required className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Foto de la credencial (opcional)</label>
+              <input name="reprocann_doc" type="file" accept="image/*,.pdf" className={`${inputCls} p-1.5`} />
+            </div>
           </div>
-        </div>
-        <p className="text-text-mute text-xs mt-4">
-          Recordá tener a mano para adjuntar por WhatsApp/email: DNI (frente y dorso), credencial REPROCANN vigente y receta
-          médica con cantidades prescriptas.
-        </p>
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className={labelCls}>DNI (frente) — opcional acá</label>
-            <input name="dni_frente" type="file" accept="image/*,.pdf" className={`${inputCls} p-1.5`} />
-          </div>
-          <div>
-            <label className={labelCls}>DNI (dorso) — opcional acá</label>
-            <input name="dni_dorso" type="file" accept="image/*,.pdf" className={`${inputCls} p-1.5`} />
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>Constancia REPROCANN — opcional acá</label>
-            <input name="reprocann_doc" type="file" accept="image/*,.pdf" className={`${inputCls} p-1.5`} />
-          </div>
-        </div>
+        ) : (
+          <p className="text-amber-tx text-xs bg-amber-bg rounded-lg px-3 py-2 mt-4">
+            Queda asentado como pendiente. El club te acompaña con el trámite y lo completás en la segunda parte del
+            formulario.
+          </p>
+        )}
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-3">4. Declaración y consentimiento</h2>
-        <div className="space-y-3 text-sm text-text-soft">
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="consiente_estatuto" required className="mt-0.5" />
-            Declaro conocer y aceptar el Estatuto y Reglamento Interno de la Asociación {tenantName}, comprometiéndome a
-            cumplir las obligaciones que de ellos surjan, en el marco de la Ley N° 27.350 y sus normas complementarias.
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="consiente_datos" required className="mt-0.5" />
-            En cumplimiento de la Ley N° 25.326, presto consentimiento expreso, libre e informado para el tratamiento de
-            mis datos personales y datos sensibles de salud por parte de la Asociación, con fines de gestión
-            administrativa de la membresía, seguimiento del cultivo y dispensación, comunicaciones institucionales y
-            cumplimiento de obligaciones legales.
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="consiente_veracidad" required className="mt-0.5" />
-            Declaro que toda la información aportada es veraz y completa, y que el cannabis obtenido será utilizado
-            exclusivamente con fines medicinales o terapéuticos.
-          </label>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-1">5. Firma</h2>
-        <p className="text-text-mute text-sm mb-3">Firmá con el dedo (en el celular) o con el mouse.</p>
-        <label className={labelCls}>Firma del solicitante</label>
-        <SignaturePad ref={sigRef} hiddenInputName="firma_data_url" />
+        <h2 className="font-display font-bold text-accent mb-3">4. Tus datos</h2>
+        <label className="flex items-start gap-2 text-sm text-text-soft">
+          <input type="checkbox" name="consiente_datos" required className="mt-0.5" />
+          En cumplimiento de la Ley N° 25.326, presto consentimiento expreso, libre e informado para el tratamiento de mis
+          datos personales y datos sensibles de salud por parte de la Asociación, con fines de gestión administrativa de la
+          membresía, seguimiento del cultivo y dispensación, comunicaciones institucionales y cumplimiento de obligaciones
+          legales.
+        </label>
       </section>
 
       {error && <p className="text-red text-sm">{error}</p>}
@@ -261,7 +220,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         disabled={pending}
         className="w-full rounded-lg bg-accent text-white font-semibold py-3 disabled:opacity-60"
       >
-        {pending ? 'Enviando…' : 'Generar mi solicitud'}
+        {pending ? 'Enviando…' : 'Enviar pre-inscripción'}
       </button>
     </form>
   );
