@@ -6,7 +6,7 @@ import { Badge } from '@/components/badge';
 import { MEMBER_STATUS } from '@/lib/status-meta';
 import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
-import { ADICIONALES, ENTREGAS, PLANES, labelDe } from '@/lib/alta/opciones';
+import { ADICIONALES, ENTREGAS, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
 import { MensajesSocio } from './mensajes-socio';
 import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plantilla } from '@/lib/alta/mensajes';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
@@ -153,6 +153,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div><dt className="text-text-mute">Tipo</dt><dd>{member.reprocann_type ? REPR_TYPE_LABEL[member.reprocann_type] : '—'}</dd></div>
           <div><dt className="text-text-mute">Estado</dt><dd>{REPR_LABEL[member.reprocann]}</dd></div>
+          {member.reprocann !== 'vigente' && member.tramite_reprocann && (
+            <div>
+              <dt className="text-text-mute">Trámite</dt>
+              <dd className={member.tramite_reprocann === 'acompanado' ? 'font-semibold text-accent' : ''}>
+                {labelDe(TRAMITES_REPROCANN, member.tramite_reprocann)}
+              </dd>
+            </div>
+          )}
           <div><dt className="text-text-mute">Modalidad</dt><dd>{member.modalidad ? MOD_LABEL[member.modalidad] : '—'}</dd></div>
           <div><dt className="text-text-mute">N° registro</dt><dd>{member.repr_num ?? '—'}</dd></div>
           <div><dt className="text-text-mute">Vencimiento</dt><dd>{fmtDate(member.repr_exp)}</dd></div>

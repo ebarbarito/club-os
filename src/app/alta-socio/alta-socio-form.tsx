@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { createMemberPublic } from '@/lib/public/actions';
 import { PlanSelector } from '@/components/alta/plan-selector';
+import { TRAMITES_REPROCANN } from '@/lib/alta/opciones';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -10,8 +11,8 @@ const req = <span className="text-red">*</span>;
 
 const REPROCANN_OPCIONES = [
   { value: 'vigente', title: 'Sí, tengo REPROCANN', desc: 'Cargá los datos de tu credencial.' },
-  { value: 'tramite', title: 'Está en trámite', desc: 'Lo completás en la segunda parte.' },
-  { value: 'no', title: 'No tengo', desc: 'Te ayudamos a tramitarlo. Lo completás en la segunda parte.' },
+  { value: 'tramite', title: 'Está en trámite', desc: 'Ya lo inicié, falta la aprobación.' },
+  { value: 'no', title: 'No tengo', desc: 'Todavía no lo empecé.' },
 ] as const;
 
 // ETAPA 1 — Pre-inscripción. Lo médico, el plan, los consentimientos
@@ -24,11 +25,16 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [plan, setPlan] = useState('');
   const [adicionales, setAdicionales] = useState<string[]>([]);
   const [reprocann, setReprocann] = useState<string>('vigente');
+  const [tramite, setTramite] = useState('');
 
   function submit(formData: FormData) {
     setError(null);
     if (!plan) {
       setError('Elegí un plan');
+      return;
+    }
+    if (reprocann !== 'vigente' && !tramite) {
+      setError('Contanos cómo vas a tramitar tu REPROCANN');
       return;
     }
     startTransition(async () => {
@@ -50,6 +56,11 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           El equipo de {tenantName} va a revisar tus datos y te va a escribir por WhatsApp para mandarte la segunda
           parte: indicación médica y firma de la documentación.
         </p>
+        {reprocann !== 'vigente' && tramite === 'acompanado' && (
+          <p className="text-text-soft mt-3">
+            Para tu REPROCANN, el equipo de <strong>CLINICANN</strong> te va a contactar a la brevedad.
+          </p>
+        )}
       </div>
     );
   }
@@ -180,10 +191,41 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
             </div>
           </div>
         ) : (
-          <p className="text-amber-tx text-xs bg-amber-bg rounded-lg px-3 py-2 mt-4">
-            Queda asentado como pendiente. El club te acompaña con el trámite y lo completás en la segunda parte del
-            formulario.
-          </p>
+          <div className="mt-4">
+            <p className="text-sm font-medium text-text mb-2">¿Cómo querés hacer el trámite? {req}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {TRAMITES_REPROCANN.map((t) => (
+                <label
+                  key={t.value}
+                  className={`rounded-lg border p-3 cursor-pointer ${tramite === t.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="tramite_reprocann"
+                      value={t.value}
+                      checked={tramite === t.value}
+                      onChange={() => setTramite(t.value)}
+                      className="mt-1"
+                    />
+                    <p className="font-semibold text-text text-sm">{t.title}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {TRAMITES_REPROCANN.filter((t) => t.value === tramite).map((t) => (
+              <div key={t.value} className="rounded-lg bg-surface-2 border border-line-2 px-4 py-3 mt-3">
+                <ul className="list-disc pl-4 space-y-1.5 text-sm text-text-soft">
+                  {t.info.map((linea, i) => (
+                    <li key={i}>{linea.replaceAll('[CLUB]', tenantName)}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="text-text-mute text-xs mt-3">
+              Queda asentado como pendiente: lo completás en la segunda parte del formulario.
+            </p>
+          </div>
         )}
       </section>
 

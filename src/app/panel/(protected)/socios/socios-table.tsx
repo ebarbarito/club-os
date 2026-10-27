@@ -9,13 +9,17 @@ import { fmtDate } from '@/lib/format';
 import { EditMemberForm } from './edit-member-form';
 import { DeleteMemberForm } from './delete-member-form';
 import { EnviarSegundaParte } from './enviar-segunda-parte';
-import { ADICIONALES, PLANES, labelDe } from '@/lib/alta/opciones';
+import { ADICIONALES, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
 
 const REPROCANN_LABEL: Record<string, string> = { vigente: 'Vigente', tramite: 'En trámite', no: 'Sin REPROCANN' };
 const REPROCANN_TYPE_LABEL: Record<string, string> = { autocultivador: 'Autocultivador', paciente: 'Paciente' };
 
-function reprocannCell(reprocann: string, type: string | null): string {
+function reprocannCell(reprocann: string, type: string | null, tramite?: string | null): string {
   const status = REPROCANN_LABEL[reprocann] ?? reprocann;
+  if (reprocann !== 'vigente' && tramite) {
+    const t = TRAMITES_REPROCANN.find((x) => x.value === tramite);
+    return `${status} · ${t?.corto ?? tramite}`;
+  }
   if (!type) return status;
   return `${REPROCANN_TYPE_LABEL[type] ?? type} · ${status}`;
 }
@@ -58,6 +62,7 @@ type Member = {
   factura_automatica: boolean;
   cuota_social_bonificada: boolean;
   plan_solicitado?: string | null;
+  tramite_reprocann?: string | null;
   adicionales_solicitados?: string[] | null;
 };
 
@@ -122,7 +127,7 @@ export function SociosTable({
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft max-w-[220px] truncate" title={m.address ?? m.zona ?? ''}>
                   {m.address ?? m.zona ?? '—'}
                 </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{reprocannCell(m.reprocann, m.reprocann_type)}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{reprocannCell(m.reprocann, m.reprocann_type, m.tramite_reprocann)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{planCell(m.plan_solicitado, m.adicionales_solicitados)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{fmtDate(m.alta_date)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap">

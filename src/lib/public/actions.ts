@@ -130,6 +130,10 @@ export async function createMemberPublic(formData: FormData) {
   const reprocann = str(formData, 'reprocann') ?? 'no';
   if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
   const tieneReprocann = reprocann === 'vigente';
+  const tramite = str(formData, 'tramite_reprocann');
+  if (!tieneReprocann && (!tramite || !['propio', 'acompanado'].includes(tramite))) {
+    return { error: 'Contanos cómo vas a tramitar tu REPROCANN' };
+  }
   if (tieneReprocann && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
     return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
   }
@@ -166,6 +170,7 @@ export async function createMemberPublic(formData: FormData) {
       reprocann_type: tieneReprocann ? str(formData, 'reprocann_type') : null,
       repr_num: tieneReprocann ? str(formData, 'repr_num') : null,
       repr_exp: tieneReprocann ? str(formData, 'repr_exp') : null,
+      tramite_reprocann: tieneReprocann ? null : tramite,
       consiente_datos: true,
       status: 'preinscripto',
     })

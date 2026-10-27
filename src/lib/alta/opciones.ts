@@ -39,6 +39,35 @@ export function labelDe(list: readonly { value: string; title: string }[], value
   return list.find((o) => o.value === value)?.title ?? value;
 }
 
+// Pre-inscripción sin REPROCANN: cómo lo va a tramitar. Requisitos según
+// la Res. 3132/2024 (Ministerio de Salud) y el instructivo oficial de
+// REPROCANN (feb. 2025). Revisar si cambia la normativa.
+export const TRAMITES_REPROCANN = [
+  {
+    value: 'propio',
+    title: 'Lo tramito por mi cuenta',
+    corto: 'Por su cuenta',
+    info: [
+      'El trámite es gratuito y se hace online desde Mi Argentina, eligiendo el rol "Paciente".',
+      'Necesitás la indicación de un médico inscripto en REPROCANN (matriculado en REFEPS y con formación en cannabis medicinal). El médico carga la indicación y firma el consentimiento informado.',
+      'Al registrarte, en "Tipo de cultivo" elegí "Otro": así te vinculás con [CLUB] como organización cultivadora. El sistema te da un código de vinculación: pasáselo a tu médico y a nosotros.',
+      'La autorización dura 1 año y hay que renovarla antes de que venza.',
+      'Para menores de edad, el trámite lo hace la madre, el padre o el tutor desde "Mis personas a cargo".',
+      'Cuando te aprueben, cargás los datos de tu credencial en la segunda parte del formulario.',
+    ],
+  },
+  {
+    value: 'acompanado',
+    title: 'Quiero que me acompañen con el trámite',
+    corto: 'Acompañado (Clinicann)',
+    info: [
+      'Trabajamos con CLINICANN, nuestra institución médica aliada.',
+      'Te van a contactar a la brevedad para coordinar la consulta médica y acompañarte en todo el trámite de REPROCANN.',
+      'El trámite de REPROCANN es gratuito; solo la consulta médica tiene costo (te lo informan al contactarte).',
+    ],
+  },
+] as const;
+
 // Los textos de los mensajes de WhatsApp están en ./mensajes.ts.
 
 // wa.me necesita el número en formato internacional sin '+' ni espacios.
