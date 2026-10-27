@@ -104,12 +104,20 @@ export async function createMemberPublic(formData: FormData) {
   if (!tenant) return { error: 'Club no encontrado' };
 
   const birth = String(formData.get('birth') ?? '');
-  const categoriaSocio = str(formData, 'categoria_socio');
-  // "Adherente — Menor de edad" es la única categoría que puede ser
-  // menor de 18 -- el resto sigue exigiendo mayoría de edad.
-  if (!birth || (categoriaSocio !== 'adherente_menor' && !isAdult(birth))) {
+  // La pre-inscripción ya no pide categoría de socio (la reemplazó el plan,
+  // según la "Propuesta para pacientes"): sin la categoría "Adherente —
+  // Menor", todos tienen que ser mayores de edad. Un menor se gestiona a
+  // mano desde el panel.
+  if (!birth || !isAdult(birth)) {
     return { error: 'Tenés que ser mayor de 18 años para asociarte' };
   }
+
+  const plan = str(formData, 'plan_solicitado');
+  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan' };
+  const adicionales = formData
+    .getAll('adicionales_solicitados')
+    .map(String)
+    .filter((a) => ADICIONALES.some((o) => o.value === a));
 
   // En la etapa 1 ya se juntan datos personales (y el estado REPROCANN,
   // que es dato de salud): el consentimiento de la Ley 25.326 va acá. El
@@ -143,7 +151,8 @@ export async function createMemberPublic(formData: FormData) {
       localidad: str(formData, 'localidad'),
       provincia: str(formData, 'provincia'),
       codigo_postal: str(formData, 'codigo_postal'),
-      categoria_socio: categoriaSocio,
+      plan_solicitado: plan,
+      adicionales_solicitados: adicionales,
       reprocann,
       reprocann_type: tieneReprocann ? str(formData, 'reprocann_type') : null,
       repr_num: tieneReprocann ? str(formData, 'repr_num') : null,
@@ -182,7 +191,7 @@ async function memberPorToken(token: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from('members')
-    .select('id, name, reprocann, reprocann_type, repr_num, repr_exp, categoria_socio')
+    .select('id, name, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
     .eq('tenant_id', tenant.id)
     .eq('etapa2_token', token)
     .eq('status', 'preinscripto')
@@ -202,6 +211,10 @@ export async function getEtapa2(token: string) {
     tenantName: res.tenant.name,
     nombre: res.member.name as string,
     reprocann: res.member.reprocann as 'vigente' | 'tramite' | 'no',
+    // Lo que eligió en la pre-inscripción: se precarga para que lo confirme
+    // (o lo ajuste) ya con la indicación médica en la mano.
+    plan: (res.member.plan_solicitado as string | null) ?? '',
+    adicionales: (res.member.adicionales_solicitados as string[] | null) ?? [],
   };
 }
 

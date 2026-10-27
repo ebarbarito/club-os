@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from 'react';
 import { completarEtapa2 } from '@/lib/public/actions';
 import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pad';
-import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
+import { ENTREGAS } from '@/lib/alta/opciones';
+import { PlanSelector } from '@/components/alta/plan-selector';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -45,24 +46,24 @@ export function Etapa2Form({
   tenantName,
   nombre,
   reprocannPendiente,
+  planInicial,
+  adicionalesIniciales,
 }: {
   token: string;
   tenantName: string;
   nombre: string;
   reprocannPendiente: boolean;
+  planInicial: string;
+  adicionalesIniciales: string[];
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [reprocann, setReprocann] = useState('vigente');
-  const [plan, setPlan] = useState('');
-  const [adicionales, setAdicionales] = useState<string[]>([]);
+  const [plan, setPlan] = useState(planInicial);
+  const [adicionales, setAdicionales] = useState<string[]>(adicionalesIniciales);
   const [entrega, setEntrega] = useState('');
   const sigRef = useRef<SignaturePadHandle>(null);
-
-  function toggleAdicional(value: string) {
-    setAdicionales((prev) => (prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]));
-  }
 
   function submit(formData: FormData) {
     setError(null);
@@ -195,34 +196,17 @@ export function Etapa2Form({
 
       <section className="rounded-xl border border-line bg-surface p-5">
         <h2 className="font-display font-bold text-accent mb-1">{2 + o}. Plan</h2>
-        <p className="text-text-mute text-sm mb-4">Elegí el plan que corresponde a tu indicación médica.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PLANES.map((p) => (
-            <OptionCard
-              key={p.value}
-              name="plan_solicitado"
-              value={p.value}
-              checked={plan === p.value}
-              onChange={() => setPlan(p.value)}
-              title={p.title}
-              desc={p.desc}
-            />
-          ))}
-        </div>
-        <p className="text-xs font-medium text-text-soft mt-4 mb-2">Adicionales (opcional, según tu indicación)</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {ADICIONALES.map((a) => (
-            <OptionCard
-              key={a.value}
-              type="checkbox"
-              name="adicionales_solicitados"
-              value={a.value}
-              checked={adicionales.includes(a.value)}
-              onChange={() => toggleAdicional(a.value)}
-              title={a.title}
-            />
-          ))}
-        </div>
+        <p className="text-text-mute text-sm mb-4">
+          {planInicial
+            ? 'Es el que elegiste en la pre-inscripción. Confirmalo o cambialo según tu indicación médica.'
+            : 'Elegí el plan que corresponde a tu indicación médica.'}
+        </p>
+        <PlanSelector
+          plan={plan}
+          onPlanChange={setPlan}
+          adicionales={adicionales}
+          onAdicionalesChange={setAdicionales}
+        />
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">

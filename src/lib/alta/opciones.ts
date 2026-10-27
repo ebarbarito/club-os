@@ -3,8 +3,10 @@
 // Planes, adicionales y formas de entrega salen de la "Propuesta para
 // pacientes" de Green Level. Por ahora viven acá (no hay tabla de planes
 // por club): si otro club usa el alta en dos etapas, esto pasa a ser
-// configuración por tenant. Sin precios a propósito — los valores cambian
-// seguido y los informa el club por WhatsApp.
+// configuración por tenant.
+//
+// PRECIOS: son los de la propuesta vigente (octubre 2026). Cuando cambien,
+// se actualizan acá — es el único lugar donde están.
 
 export const CATEGORIAS_SOCIO = [
   { value: 'activo', title: 'Socio Activo', desc: 'Adulto mayor de 18 años, uso medicinal con REPROCANN.' },
@@ -14,16 +16,16 @@ export const CATEGORIAS_SOCIO = [
 ] as const;
 
 export const PLANES = [
-  { value: 'flores_10', title: 'Flores 10', desc: '10 g de flores secas por mes' },
-  { value: 'flores_20', title: 'Flores 20', desc: '20 g de flores secas por mes' },
-  { value: 'flores_40', title: 'Flores 40', desc: '40 g de flores secas por mes' },
-  { value: 'medicinal', title: 'Medicinal', desc: '1 aceite de 30 ml y 1 crema por mes, sin flores' },
+  { value: 'flores_10', title: 'Flores 10', desc: '10 g de flores secas por mes', precio: '$120.000' },
+  { value: 'flores_20', title: 'Flores 20', desc: '20 g de flores secas por mes', precio: '$220.000' },
+  { value: 'flores_40', title: 'Flores 40', desc: '40 g de flores secas por mes', precio: '$420.000' },
+  { value: 'medicinal', title: 'Medicinal', desc: 'Aceite + crema: 1 aceite de 30 ml y 1 crema por mes. Sin flores.', precio: '$60.000' },
 ] as const;
 
 export const ADICIONALES = [
-  { value: 'aceite_10', title: 'Aceite 10 ml' },
-  { value: 'aceite_30', title: 'Aceite 30 ml' },
-  { value: 'crema', title: 'Crema' },
+  { value: 'aceite_10', title: 'Aceite 10 ml', precio: '$20.000' },
+  { value: 'aceite_30', title: 'Aceite 30 ml', precio: '$50.000' },
+  { value: 'crema', title: 'Crema', precio: '$15.000' },
 ] as const;
 
 export const ENTREGAS = [
@@ -52,13 +54,13 @@ Para empezar tu incorporación, completá este formulario (te lleva unos 5 minut
 
 *Cómo completarlo:*
 1️⃣ *Datos personales:* cargalos tal como figuran en tu DNI.
-2️⃣ *Categoría:* elegí la que corresponde a tu situación. Si dudás entre dos, escribinos antes.
+2️⃣ *Plan:* elegí el que corresponde a tu indicación médica (y los adicionales si los necesitás). Si dudás, escribinos antes.
 3️⃣ *REPROCANN:*
    • Si ya lo tenés: cargá el número y la fecha de vencimiento.
    • Si está en trámite o no lo tenés: marcá esa opción y listo. Te ayudamos a tramitarlo.
 4️⃣ Aceptá el uso de tus datos y tocá *Enviar*.
 
-Cuando lo recibamos te escribimos por acá para elegir tu plan y mandarte la segunda parte: indicación médica y firma de la documentación.
+Cuando lo recibamos te escribimos por acá para mandarte la segunda parte: indicación médica y firma de la documentación.
 
 Cualquier duda, respondé este mensaje 🙌`;
 }
@@ -78,7 +80,7 @@ Para terminar tu incorporación, completá la segunda parte (es personal, no la 
 • Tu credencial REPROCANN (si ya la tenés)
 • Foto de tu DNI, frente y dorso
 
-Ahí elegís tu plan y la forma de retiro o envío, aceptás el estatuto y firmás con el dedo desde el celular.
+Ahí confirmás tu plan y la forma de retiro o envío, aceptás el estatuto y firmás con el dedo desde el celular.
 
 Cualquier duda, respondé este mensaje 🙌`;
 }

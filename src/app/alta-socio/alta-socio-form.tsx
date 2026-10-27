@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { createMemberPublic } from '@/lib/public/actions';
-import { CATEGORIAS_SOCIO } from '@/lib/alta/opciones';
+import { PlanSelector } from '@/components/alta/plan-selector';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -21,11 +21,16 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [categoria, setCategoria] = useState('activo');
+  const [plan, setPlan] = useState('');
+  const [adicionales, setAdicionales] = useState<string[]>([]);
   const [reprocann, setReprocann] = useState<string>('vigente');
 
   function submit(formData: FormData) {
     setError(null);
+    if (!plan) {
+      setError('Elegí un plan');
+      return;
+    }
     startTransition(async () => {
       const res = await createMemberPublic(formData);
       if (res?.error) {
@@ -42,8 +47,8 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
       <div className="max-w-xl mx-auto text-center py-16 px-4">
         <p className="font-display text-2xl font-bold text-text mb-2">¡Recibimos tu pre-inscripción!</p>
         <p className="text-text-soft">
-          El equipo de {tenantName} va a revisar tus datos y te va a escribir por WhatsApp para elegir tu plan y
-          mandarte la segunda parte: indicación médica y firma de la documentación.
+          El equipo de {tenantName} va a revisar tus datos y te va a escribir por WhatsApp para mandarte la segunda
+          parte: indicación médica y firma de la documentación.
         </p>
       </div>
     );
@@ -113,36 +118,12 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-1">2. Categoría de socio solicitada</h2>
-        <p className="text-text-mute text-sm mb-4">Marcá la que corresponde a tu situación.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {CATEGORIAS_SOCIO.map((c) => (
-            <label
-              key={c.value}
-              className={`rounded-lg border p-3 cursor-pointer ${categoria === c.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
-            >
-              <div className="flex items-start gap-2">
-                <input
-                  type="radio"
-                  name="categoria_socio"
-                  value={c.value}
-                  checked={categoria === c.value}
-                  onChange={() => setCategoria(c.value)}
-                  className="mt-1"
-                />
-                <div>
-                  <p className="font-semibold text-text text-sm">{c.title}</p>
-                  <p className="text-text-soft text-xs">{c.desc}</p>
-                </div>
-              </div>
-            </label>
-          ))}
-        </div>
-        {categoria === 'adherente_menor' && (
-          <p className="text-amber-tx text-xs bg-amber-bg rounded-lg px-3 py-2 mt-3">
-            Los datos del representante legal/tutor se coordinan directamente con el club luego del envío de esta solicitud.
-          </p>
-        )}
+        <h2 className="font-display font-bold text-accent mb-1">2. Plan mensual</h2>
+        <p className="text-text-mute text-sm mb-4">
+          Elegí el plan que corresponde a tu indicación médica. Si todavía no la tenés, elegí el que pensás que vas a
+          necesitar: lo confirmás en la segunda parte.
+        </p>
+        <PlanSelector plan={plan} onPlanChange={setPlan} adicionales={adicionales} onAdicionalesChange={setAdicionales} />
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
