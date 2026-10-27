@@ -9,8 +9,8 @@ export type MensajeFicha = { id: string; titulo: string; texto: string };
 
 const LINK_ETAPA2 = '[LINK SEGUNDA PARTE]';
 
-// Mensajes de la guía que corresponden al estado del socio, ya completados
-// con sus datos. El texto es editable para completar lo que no tiene dato
+// Mensaje que corresponde al estado del socio (segunda parte o bienvenida),
+// ya completado con sus datos. El texto es editable para completar lo que no tiene dato
 // (ej. [DÍA Y HORA] de un turno) antes de mandarlo. Si el mensaje lleva el
 // link personal de la segunda parte, se genera recién al enviar o copiar.
 export function MensajesSocio({
@@ -93,9 +93,11 @@ export function MensajesSocio({
 
   return (
     <div className="rounded-xl border border-accent/40 bg-surface p-5 mb-4">
-      <p className="text-xs font-semibold text-text-mute uppercase mb-3">Mensajes de WhatsApp</p>
+      <p className="text-xs font-semibold text-text-mute uppercase mb-3">
+        Mensaje de WhatsApp{mensajes.length === 1 ? ` · ${mensajes[0].titulo}` : ''}
+      </p>
 
-      <label className="block text-xs font-medium text-text-soft mb-1">Mensaje</label>
+      {mensajes.length > 1 && (
       <select
         value={seleccion}
         onChange={(e) => {
@@ -107,11 +109,12 @@ export function MensajesSocio({
       >
         {mensajes.map((m, i) => (
           <option key={m.id} value={m.id}>
-            {m.id} · {m.titulo}
+            {m.titulo}
             {i === 0 ? ' (sugerido)' : ''}
           </option>
         ))}
       </select>
+      )}
 
       <textarea
         value={texto}

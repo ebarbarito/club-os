@@ -35,7 +35,7 @@ export default async function ConfiguracionPage() {
   const datosMensajes = parseDatosMensajes(tenant?.datos_mensajes);
   const documentosPropios = parseDocumentos(tenant?.documentos_adhesion);
   const mensajeAlta = tenant
-    ? rellenar(plantilla('2.1')!.texto, {
+    ? rellenar(plantilla('preinscripcion')!.texto, {
         club: tenant.name,
         operador: profile.name.trim().split(/\s+/)[0],
         datos: datosMensajes,
@@ -94,11 +94,8 @@ export default async function ConfiguracionPage() {
       <div className="max-w-2xl rounded-xl border border-line bg-surface p-5 mb-6">
         <p className="text-xs font-semibold text-text-mute uppercase mb-1">Datos para mensajes</p>
         <p className="text-text-soft text-sm mb-4">
-          Completan solos los mensajes de WhatsApp para socios (dirección, horarios, valor de la consulta…). Lo que
-          quede vacío aparece entre corchetes para completarlo a mano.{' '}
-          <a href="/panel/socios/mensajes" className="text-accent font-medium hover:underline">
-            Ver todos los mensajes →
-          </a>
+          Se usan en el mensaje de bienvenida que se manda al validar un socio. Lo que quede vacío aparece entre
+          corchetes para completarlo a mano.
         </p>
         <DatosMensajesForm datos={datosMensajes} />
       </div>

@@ -37,8 +37,7 @@ export default async function SociosPage({
   if (activeTab !== 'todos') query = query.eq('status', activeTab);
   const { data: members } = await query;
 
-  // Mensaje de la segunda parte (guía 2.3 si tiene REPROCANN, 3.6 si lo
-  // acaba de conseguir) para el botón "Enviar 2ª parte" de cada
+  // Mensaje de la segunda parte para el botón "Enviar 2ª parte" de cada
   // pre-inscripto. El link personal se genera recién al tocar el botón.
   const preinscriptos = (members ?? []).filter((m) => m.status === 'preinscripto');
   const segundaParte: Record<string, { texto: string; enviadaAt: string | null }> = {};
@@ -55,7 +54,7 @@ export default async function SociosPage({
       `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
     const datos = parseDatosMensajes(tenant?.datos_mensajes);
     for (const m of preinscriptos) {
-      const p = plantilla(m.reprocann === 'vigente' ? '2.3' : '3.6')!;
+      const p = plantilla('segunda-parte')!;
       segundaParte[m.id] = {
         texto: rellenar(p.texto, {
           club: tenant?.name ?? 'el club',
@@ -82,12 +81,6 @@ export default async function SociosPage({
           <p className="text-text-soft">Altas, validaciones y padrón</p>
         </div>
         <div className="flex gap-2">
-          <Link
-            href="/panel/socios/mensajes"
-            className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
-          >
-            Mensajes
-          </Link>
           <Link
             href="/panel/socios/export"
             className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"

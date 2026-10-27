@@ -70,7 +70,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   const meta = MEMBER_STATUS[member.status as keyof typeof MEMBER_STATUS];
 
-  // Mensajes de la guía para el estado actual del socio, ya completados.
+  // Mensaje de WhatsApp que corresponde al estado del socio, ya completado.
   const profile = await getSessionProfile();
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
@@ -89,15 +89,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       reprExp: (member.repr_exp as string | null) ?? null,
     },
   };
-  const mensajes = mensajesParaEstado({
-    status: member.status,
-    reprocann: member.reprocann,
-    etapa2Enviada: !!member.etapa2_enviada_at,
-    tieneVencimiento: !!member.repr_exp,
-  })
+  const mensajes = mensajesParaEstado(member.status)
     .map((id) => plantilla(id))
     .filter((p): p is Plantilla => p != null)
-    .map((p) => ({ id: p.id, titulo: p.titulo, texto: rellenar(p.textoFicha ?? p.texto, ctxMensajes) }));
+    .map((p) => ({ id: p.id, titulo: p.titulo, texto: rellenar(p.texto, ctxMensajes) }));
 
   async function validate() {
     'use server';

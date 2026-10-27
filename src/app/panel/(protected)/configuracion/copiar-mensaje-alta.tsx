@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 
-// Copia el mensaje 2.1 de la guía (envío de la pre-inscripción) con el link
-// ya puesto, para pegarlo en WhatsApp.
+// Copia el mensaje de pre-inscripción con el link ya puesto, para pegarlo
+// en WhatsApp.
 export function CopiarMensajeAlta({ mensaje, altaUrl }: { mensaje: string; altaUrl: string }) {
   const [estado, setEstado] = useState<'idle' | 'copiado' | 'error'>('idle');
   const [verMensaje, setVerMensaje] = useState(false);
