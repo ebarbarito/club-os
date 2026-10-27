@@ -40,7 +40,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { data: member } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
   if (!member) notFound();
 
-  const [{ data: documents }, { data: cuotaSocialRows }, { data: creditRows }, { data: tenant }] = await Promise.all([
+  const [{ data: documents }, { data: cuotaSocialRows }, { data: creditRows }, { data: tenant }, { data: aceptaciones }] = await Promise.all([
     supabase.from('member_documents').select('id, label, storage_path').eq('member_id', id),
     supabase
       .from('dispensas')
@@ -50,6 +50,11 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       .order('created_at', { ascending: false }),
     supabase.from('member_credits').select('amount').eq('member_id', id).eq('kind', 'cuota_social'),
     supabase.from('tenants').select('name, slug, datos_mensajes').eq('id', member.tenant_id).single(),
+    supabase
+      .from('member_aceptaciones')
+      .select('id, documento_titulo, documento_texto, aceptado_at, ip')
+      .eq('member_id', id)
+      .order('orden'),
   ]);
   const saldoCuotaSocial = (creditRows ?? []).reduce((s, r) => s + r.amount, 0);
 
@@ -224,6 +229,29 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </div>
         )}
       </div>
+
+      {(aceptaciones ?? []).length > 0 && (
+        <div className="rounded-xl border border-line bg-surface p-5 mb-4">
+          <p className="text-xs font-semibold text-text-mute uppercase mb-3">Documentación firmada</p>
+          <div className="space-y-2">
+            {(aceptaciones ?? []).map((a) => (
+              <details key={a.id} className="rounded-lg border border-line-2">
+                <summary className="cursor-pointer px-3 py-2 text-sm flex flex-wrap justify-between gap-2">
+                  <span className="font-medium text-text">✓ {a.documento_titulo}</span>
+                  <span className="text-text-mute text-xs">
+                    Leído y aceptado el {fmtDateTime(a.aceptado_at)}
+                    {a.ip ? ` · IP ${a.ip}` : ''}
+                  </span>
+                </summary>
+                <div className="max-h-80 overflow-y-auto px-4 py-3 border-t border-line-2 text-sm text-text-soft whitespace-pre-wrap">
+                  {a.documento_texto}
+                </div>
+              </details>
+            ))}
+          </div>
+          <p className="text-text-mute text-xs mt-2">La firma del socio está en Documentación, abajo.</p>
+        </div>
+      )}
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <p className="text-xs font-semibold text-text-mute uppercase mb-3">Documentación</p>

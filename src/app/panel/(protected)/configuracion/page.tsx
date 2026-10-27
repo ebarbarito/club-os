@@ -8,6 +8,8 @@ import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
 import { CopiarMensajeAlta } from './copiar-mensaje-alta';
 import { DatosMensajesForm } from './datos-mensajes-form';
+import { DocumentosForm } from './documentos-form';
+import { DOCUMENTOS_POR_DEFECTO, parseDocumentos } from '@/lib/alta/documentos';
 import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { PlanDeCuentas } from './plan-de-cuentas';
 import { GenerarCuotasForm } from './generar-cuotas-form';
@@ -19,7 +21,7 @@ export default async function ConfiguracionPage() {
 
   const supabase = await createClient();
   const [{ data: tenant }, { data: conceptRows }, { count: memberCount }] = await Promise.all([
-    supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes').eq('id', profile.tenantId).single(),
+    supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes, documentos_adhesion').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
     supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null),
   ]);
@@ -31,6 +33,7 @@ export default async function ConfiguracionPage() {
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
   const origin = publicUrl ?? `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
   const datosMensajes = parseDatosMensajes(tenant?.datos_mensajes);
+  const documentosPropios = parseDocumentos(tenant?.documentos_adhesion);
   const mensajeAlta = tenant
     ? rellenar(plantilla('2.1')!.texto, {
         club: tenant.name,
@@ -98,6 +101,19 @@ export default async function ConfiguracionPage() {
           </a>
         </p>
         <DatosMensajesForm datos={datosMensajes} />
+      </div>
+
+      {/* Documentos que firma el socio en la segunda parte */}
+      <div className="max-w-3xl rounded-xl border border-line bg-surface p-5 mb-6">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-1">Documentos para firmar</p>
+        <p className="text-text-soft text-sm mb-4">
+          Los lee el socio en la segunda parte del alta: tiene que deslizar hasta el final de cada uno para habilitar
+          &quot;Leí y acepto&quot;, y después firma. Queda guardado el texto exacto que aceptó, con fecha y hora.
+        </p>
+        <DocumentosForm
+          documentos={documentosPropios.length > 0 ? documentosPropios : DOCUMENTOS_POR_DEFECTO}
+          usandoPorDefecto={documentosPropios.length === 0}
+        />
       </div>
 
       {/* Cuotas sociales */}

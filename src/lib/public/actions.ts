@@ -6,6 +6,7 @@ import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
+import { documentosVigentes, personalizarDocumento } from '@/lib/alta/documentos';
 
 // Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
 // constancia REPROCANN e indicación médica son datos sensibles, se sirven
@@ -199,7 +200,7 @@ async function memberPorToken(token: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from('members')
-    .select('id, name, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
+    .select('id, name, dni, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
     .eq('tenant_id', tenant.id)
     .eq('etapa2_token', token)
     .eq('status', 'preinscripto')
@@ -207,6 +208,19 @@ async function memberPorToken(token: string) {
     .maybeSingle();
   if (!data) return null;
   return { tenant, member: data };
+}
+
+// Documentos a firmar, ya personalizados con los datos del socio. Se
+// arman siempre del lado del servidor (nunca con texto que mande el
+// navegador): lo que se guarda como aceptado es exactamente esto.
+async function documentosParaFirmar(tenant: { id: string; name: string }, member: { name: string; dni: string }) {
+  const admin = createAdminClient();
+  const { data } = await admin.from('tenants').select('documentos_adhesion').eq('id', tenant.id).single();
+  const fecha = new Date();
+  return documentosVigentes(data?.documentos_adhesion).map((d) => ({
+    titulo: d.titulo,
+    texto: personalizarDocumento(d.texto, { club: tenant.name, nombreCompleto: member.name, dni: member.dni, fecha }),
+  }));
 }
 
 // Lo mínimo para armar la pantalla: el link de la etapa 2 no expone más
@@ -223,6 +237,7 @@ export async function getEtapa2(token: string) {
     // (o lo ajuste) ya con la indicación médica en la mano.
     plan: (res.member.plan_solicitado as string | null) ?? '',
     adicionales: (res.member.adicionales_solicitados as string[] | null) ?? [],
+    documentos: await documentosParaFirmar(res.tenant, res.member as { name: string; dni: string }),
   };
 }
 
@@ -231,8 +246,11 @@ export async function completarEtapa2(token: string, formData: FormData) {
   if (!res) return { error: 'Este link ya no es válido. Pedile al club uno nuevo por WhatsApp.' };
   const { tenant, member } = res;
 
-  if (formData.get('consiente_estatuto') !== 'on' || formData.get('consiente_veracidad') !== 'on') {
-    return { error: 'Tenés que aceptar las declaraciones del final' };
+  // Cada documento tiene que venir aceptado ("Leí y acepto"), en el mismo
+  // orden en que se mostró.
+  const documentos = await documentosParaFirmar(tenant, member as { name: string; dni: string });
+  if (documentos.some((_, i) => formData.get(`acepta_doc_${i}`) !== 'on')) {
+    return { error: 'Tenés que leer y aceptar todos los documentos' };
   }
   const firma = String(formData.get('firma_data_url') ?? '');
   if (!firma.startsWith('data:image/png;base64,')) return { error: 'Falta tu firma' };
@@ -294,6 +312,22 @@ export async function completarEtapa2(token: string, formData: FormData) {
     .eq('tenant_id', tenant.id)
     .eq('status', 'preinscripto');
   if (error) return { error: 'No pudimos guardar tu formulario. Probá de nuevo en unos minutos.' };
+
+  // Constancia de lo aceptado: texto exacto, fecha, IP y navegador.
+  const h = await headers();
+  const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null;
+  const userAgent = h.get('user-agent')?.slice(0, 500) || null;
+  await admin.from('member_aceptaciones').insert(
+    documentos.map((d, i) => ({
+      tenant_id: tenant.id,
+      member_id: member.id,
+      orden: i,
+      documento_titulo: d.titulo,
+      documento_texto: d.texto,
+      ip,
+      user_agent: userAgent,
+    })),
+  );
 
   await guardarDocumentos(admin, tenant.id, member.id, formData, DOCUMENT_FIELDS_ETAPA2);
   await guardarFirma(admin, tenant.id, member.id, firma);

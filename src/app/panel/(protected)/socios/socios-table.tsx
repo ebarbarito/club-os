@@ -8,6 +8,8 @@ import { MEMBER_STATUS } from '@/lib/status-meta';
 import { fmtDate } from '@/lib/format';
 import { EditMemberForm } from './edit-member-form';
 import { DeleteMemberForm } from './delete-member-form';
+import { EnviarSegundaParte } from './enviar-segunda-parte';
+import { ADICIONALES, PLANES, labelDe } from '@/lib/alta/opciones';
 
 const REPROCANN_LABEL: Record<string, string> = { vigente: 'Vigente', tramite: 'En trámite', no: 'Sin REPROCANN' };
 const REPROCANN_TYPE_LABEL: Record<string, string> = { autocultivador: 'Autocultivador', paciente: 'Paciente' };
@@ -55,9 +57,23 @@ type Member = {
   cuota_social: number | null;
   factura_automatica: boolean;
   cuota_social_bonificada: boolean;
+  plan_solicitado?: string | null;
+  adicionales_solicitados?: string[] | null;
 };
 
-export function SociosTable({ members }: { members: Member[] }) {
+function planCell(plan: string | null | undefined, adicionales: string[] | null | undefined): string {
+  if (!plan) return '—';
+  const extras = (adicionales ?? []).map((a) => labelDe(ADICIONALES, a)).filter(Boolean);
+  return [labelDe(PLANES, plan), ...extras].join(' + ');
+}
+
+export function SociosTable({
+  members,
+  segundaParte = {},
+}: {
+  members: Member[];
+  segundaParte?: Record<string, { texto: string; enviadaAt: string | null }>;
+}) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -87,6 +103,7 @@ export function SociosTable({ members }: { members: Member[] }) {
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">DNI</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">Domicilio</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">REPROCANN</th>
+              <th className="px-4 py-2.5 font-medium whitespace-nowrap">Plan</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">Alta</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap">Estado</th>
               <th className="px-4 py-2.5 font-medium whitespace-nowrap"></th>
@@ -106,12 +123,21 @@ export function SociosTable({ members }: { members: Member[] }) {
                   {m.address ?? m.zona ?? '—'}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{reprocannCell(m.reprocann, m.reprocann_type)}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{planCell(m.plan_solicitado, m.adicionales_solicitados)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{fmtDate(m.alta_date)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap">
                   <Badge label={MEMBER_STATUS[m.status as keyof typeof MEMBER_STATUS].label} color={MEMBER_STATUS[m.status as keyof typeof MEMBER_STATUS].color} />
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-end items-start">
+                    {segundaParte[m.id] && (
+                      <EnviarSegundaParte
+                        memberId={m.id}
+                        phone={m.phone}
+                        texto={segundaParte[m.id].texto}
+                        enviadaAt={segundaParte[m.id].enviadaAt}
+                      />
+                    )}
                     <ModalTrigger
                       label="Editar"
                       className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
@@ -133,7 +159,7 @@ export function SociosTable({ members }: { members: Member[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-text-mute">
+                <td colSpan={9} className="px-4 py-10 text-center text-text-mute">
                   Sin socios en esta vista.
                 </td>
               </tr>

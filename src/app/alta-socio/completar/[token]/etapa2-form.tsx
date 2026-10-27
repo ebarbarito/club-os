@@ -5,6 +5,7 @@ import { completarEtapa2 } from '@/lib/public/actions';
 import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pad';
 import { ENTREGAS } from '@/lib/alta/opciones';
 import { PlanSelector } from '@/components/alta/plan-selector';
+import { DocumentoScroll } from './documento-scroll';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -48,6 +49,7 @@ export function Etapa2Form({
   reprocannPendiente,
   planInicial,
   adicionalesIniciales,
+  documentos,
 }: {
   token: string;
   tenantName: string;
@@ -55,6 +57,7 @@ export function Etapa2Form({
   reprocannPendiente: boolean;
   planInicial: string;
   adicionalesIniciales: string[];
+  documentos: { titulo: string; texto: string }[];
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +67,13 @@ export function Etapa2Form({
   const [adicionales, setAdicionales] = useState<string[]>(adicionalesIniciales);
   const [entrega, setEntrega] = useState('');
   const sigRef = useRef<SignaturePadHandle>(null);
+  const [aceptados, setAceptados] = useState<boolean[]>(() => documentos.map(() => false));
 
   function submit(formData: FormData) {
     setError(null);
     if (!plan) return setError('Elegí un plan');
     if (!entrega) return setError('Elegí retiro o envío');
+    if (aceptados.some((a) => !a)) return setError('Tenés que leer y aceptar todos los documentos');
     if (sigRef.current?.isEmpty()) return setError('Falta tu firma');
     formData.set('firma_data_url', sigRef.current?.getDataUrl() ?? '');
     startTransition(async () => {
@@ -243,18 +248,21 @@ export function Etapa2Form({
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-3">{5 + o}. Declaración y consentimiento</h2>
-        <div className="space-y-3 text-sm text-text-soft">
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="consiente_estatuto" required className="mt-0.5" />
-            Declaro conocer y aceptar el Estatuto y Reglamento Interno de la Asociación {tenantName}, comprometiéndome a
-            cumplir las obligaciones que de ellos surjan, en el marco de la Ley N° 27.350 y sus normas complementarias.
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" name="consiente_veracidad" required className="mt-0.5" />
-            Declaro que toda la información aportada es veraz y completa, y que el cannabis obtenido será utilizado
-            exclusivamente con fines medicinales o terapéuticos.
-          </label>
+        <h2 className="font-display font-bold text-accent mb-1">{5 + o}. Documentación</h2>
+        <p className="text-text-mute text-sm mb-4">
+          Leé cada documento hasta el final y marcá &quot;Leí y acepto&quot;. Después firmás abajo.
+        </p>
+        <div className="space-y-4">
+          {documentos.map((d, i) => (
+            <DocumentoScroll
+              key={i}
+              index={i}
+              titulo={d.titulo}
+              texto={d.texto}
+              aceptado={aceptados[i] ?? false}
+              onAceptadoChange={(v) => setAceptados((prev) => prev.map((x, j) => (j === i ? v : x)))}
+            />
+          ))}
         </div>
       </section>
 

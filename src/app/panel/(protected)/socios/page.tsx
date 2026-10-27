@@ -6,6 +6,10 @@ import { ROLES } from '@/lib/roles';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { CreateMemberForm } from './create-member-form';
 import { SociosTable } from './socios-table';
+import { headers } from 'next/headers';
+import { publicUrlForSlug } from '@/lib/tenant/resolve';
+import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
+import { fmtDateTime } from '@/lib/format';
 
 const TABS = [
   { key: 'todos', label: 'Todos' },
@@ -32,6 +36,43 @@ export default async function SociosPage({
   let query = supabase.from('members').select('*').is('deleted_at', null).order('member_number', { ascending: true, nullsFirst: false });
   if (activeTab !== 'todos') query = query.eq('status', activeTab);
   const { data: members } = await query;
+
+  // Mensaje de la segunda parte (guía 2.3 si tiene REPROCANN, 3.6 si lo
+  // acaba de conseguir) para el botón "Enviar 2ª parte" de cada
+  // pre-inscripto. El link personal se genera recién al tocar el botón.
+  const preinscriptos = (members ?? []).filter((m) => m.status === 'preinscripto');
+  const segundaParte: Record<string, { texto: string; enviadaAt: string | null }> = {};
+  if (preinscriptos.length > 0) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('name, slug, datos_mensajes')
+      .eq('id', profile.tenantId)
+      .single();
+    const h = await headers();
+    const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+    const origin =
+      (tenant && publicUrlForSlug(tenant.slug)) ??
+      `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
+    const datos = parseDatosMensajes(tenant?.datos_mensajes);
+    for (const m of preinscriptos) {
+      const p = plantilla(m.reprocann === 'vigente' ? '2.3' : '3.6')!;
+      segundaParte[m.id] = {
+        texto: rellenar(p.texto, {
+          club: tenant?.name ?? 'el club',
+          operador: profile.name.trim().split(/\s+/)[0],
+          datos,
+          linkPreinscripcion: `${origin}/alta-socio`,
+          socio: {
+            nombre: m.nombre_pila ?? null,
+            plan: m.plan_solicitado ?? null,
+            adicionales: m.adicionales_solicitados ?? [],
+            reprExp: m.repr_exp ?? null,
+          },
+        }),
+        enviadaAt: m.etapa2_enviada_at ? fmtDateTime(m.etapa2_enviada_at) : null,
+      };
+    }
+  }
 
   return (
     <div>
@@ -75,7 +116,7 @@ export default async function SociosPage({
         ))}
       </div>
 
-      <SociosTable members={members ?? []} />
+      <SociosTable members={members ?? []} segundaParte={segundaParte} />
     </div>
   );
 }

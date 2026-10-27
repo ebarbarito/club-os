@@ -35,6 +35,7 @@ export default async function CompletarAltaPage({ params }: { params: Promise<{ 
         reprocannPendiente={etapa2.reprocann !== 'vigente'}
         planInicial={etapa2.plan}
         adicionalesIniciales={etapa2.adicionales}
+        documentos={etapa2.documentos}
       />
     </main>
   );
