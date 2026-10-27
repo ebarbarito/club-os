@@ -133,12 +133,20 @@ export async function createMemberPublic(formData: FormData) {
     return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
   }
 
+  // Nombre y apellido llegan separados: `name` se arma como "Apellido
+  // Nombre" (mismo formato que el resto del padrón) y el nombre de pila se
+  // guarda aparte para el saludo de los mensajes de WhatsApp.
+  const nombre = str(formData, 'nombre');
+  const apellido = str(formData, 'apellido');
+  if (!nombre || !apellido) return { error: 'Completá tu nombre y apellido' };
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('members')
     .insert({
       tenant_id: tenant.id,
-      name: String(formData.get('name') ?? '').trim(),
+      name: `${apellido} ${nombre}`,
+      nombre_pila: nombre,
       dni: String(formData.get('dni') ?? '').trim(),
       birth,
       phone: str(formData, 'phone'),

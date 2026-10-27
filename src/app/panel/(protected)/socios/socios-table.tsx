@@ -22,6 +22,7 @@ type Member = {
   id: string;
   member_number: number | null;
   name: string;
+  nombre_pila?: string | null;
   dni: string;
   birth: string | null;
   phone: string | null;

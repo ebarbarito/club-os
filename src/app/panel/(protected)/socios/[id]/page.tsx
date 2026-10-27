@@ -7,7 +7,11 @@ import { MEMBER_STATUS } from '@/lib/status-meta';
 import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
 import { ADICIONALES, ENTREGAS, PLANES, labelDe } from '@/lib/alta/opciones';
-import { EnviarEtapa2 } from './enviar-etapa2';
+import { MensajesSocio } from './mensajes-socio';
+import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plantilla } from '@/lib/alta/mensajes';
+import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { publicUrlForSlug } from '@/lib/tenant/resolve';
+import { headers } from 'next/headers';
 
 const REPR_LABEL: Record<string, string> = {
   vigente: 'REPROCANN vigente',
@@ -45,7 +49,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       .eq('es_cuota_social', true)
       .order('created_at', { ascending: false }),
     supabase.from('member_credits').select('amount').eq('member_id', id).eq('kind', 'cuota_social'),
-    supabase.from('tenants').select('name').eq('id', member.tenant_id).single(),
+    supabase.from('tenants').select('name, slug, datos_mensajes').eq('id', member.tenant_id).single(),
   ]);
   const saldoCuotaSocial = (creditRows ?? []).reduce((s, r) => s + r.amount, 0);
 
@@ -60,6 +64,35 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   );
 
   const meta = MEMBER_STATUS[member.status as keyof typeof MEMBER_STATUS];
+
+  // Mensajes de la guía para el estado actual del socio, ya completados.
+  const profile = await getSessionProfile();
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const origin =
+    (tenant && publicUrlForSlug(tenant.slug)) ??
+    `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
+  const ctxMensajes = {
+    club: tenant?.name ?? 'el club',
+    operador: profile?.name?.trim().split(/\s+/)[0] ?? null,
+    datos: parseDatosMensajes(tenant?.datos_mensajes),
+    linkPreinscripcion: `${origin}/alta-socio`,
+    socio: {
+      nombre: (member.nombre_pila as string | null) ?? null,
+      plan: (member.plan_solicitado as string | null) ?? null,
+      adicionales: (member.adicionales_solicitados as string[] | null) ?? [],
+      reprExp: (member.repr_exp as string | null) ?? null,
+    },
+  };
+  const mensajes = mensajesParaEstado({
+    status: member.status,
+    reprocann: member.reprocann,
+    etapa2Enviada: !!member.etapa2_enviada_at,
+    tieneVencimiento: !!member.repr_exp,
+  })
+    .map((id) => plantilla(id))
+    .filter((p): p is Plantilla => p != null)
+    .map((p) => ({ id: p.id, titulo: p.titulo, texto: rellenar(p.textoFicha ?? p.texto, ctxMensajes) }));
 
   async function validate() {
     'use server';
@@ -84,14 +117,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <Badge label={meta.label} color={meta.color} />
       </div>
 
-      {member.status === 'preinscripto' && (
-        <EnviarEtapa2
-          memberId={id}
-          phone={member.phone}
-          tenantName={tenant?.name ?? 'el club'}
-          enviadaAt={member.etapa2_enviada_at ? fmtDateTime(member.etapa2_enviada_at) : null}
-        />
-      )}
+      <MensajesSocio
+        key={`${member.status}-${member.etapa2_enviada_at ?? ''}`}
+        memberId={id}
+        phone={member.phone}
+        mensajes={mensajes}
+        etapa2EnviadaAt={member.etapa2_enviada_at ? fmtDateTime(member.etapa2_enviada_at) : null}
+        puedeGenerarLink={member.status === 'preinscripto'}
+      />
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <p className="text-xs font-semibold text-text-mute uppercase mb-3">Datos personales</p>

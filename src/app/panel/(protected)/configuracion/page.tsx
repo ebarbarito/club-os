@@ -7,6 +7,8 @@ import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { ConfigTabs } from '@/components/config-tabs';
 import { PublicSiteToggle } from './public-site-toggle';
 import { CopiarMensajeAlta } from './copiar-mensaje-alta';
+import { DatosMensajesForm } from './datos-mensajes-form';
+import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { PlanDeCuentas } from './plan-de-cuentas';
 import { GenerarCuotasForm } from './generar-cuotas-form';
 
@@ -17,7 +19,7 @@ export default async function ConfiguracionPage() {
 
   const supabase = await createClient();
   const [{ data: tenant }, { data: conceptRows }, { count: memberCount }] = await Promise.all([
-    supabase.from('tenants').select('slug, name, public_site_enabled').eq('id', profile.tenantId).single(),
+    supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
     supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null),
   ]);
@@ -28,6 +30,16 @@ export default async function ConfiguracionPage() {
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
   const origin = publicUrl ?? `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
+  const datosMensajes = parseDatosMensajes(tenant?.datos_mensajes);
+  const mensajeAlta = tenant
+    ? rellenar(plantilla('2.1')!.texto, {
+        club: tenant.name,
+        operador: profile.name.trim().split(/\s+/)[0],
+        datos: datosMensajes,
+        linkPreinscripcion: `${origin}/alta-socio`,
+        socio: { nombre: null, plan: null, adicionales: [], reprExp: null },
+      })
+    : '';
 
   return (
     <div>
@@ -65,7 +77,7 @@ export default async function ConfiguracionPage() {
 
         {tenant && (
           <div className="border-t border-line pt-4">
-            <CopiarMensajeAlta clubName={tenant.name} altaUrl={`${origin}/alta-socio`} />
+            <CopiarMensajeAlta mensaje={mensajeAlta} altaUrl={`${origin}/alta-socio`} />
             {!tenant.public_site_enabled && (
               <p className="text-amber-tx text-xs mt-2">
                 Ojo: con el sitio público oculto, el link de pre-inscripción tampoco funciona para los socios.
@@ -73,6 +85,19 @@ export default async function ConfiguracionPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Datos para los mensajes a socios */}
+      <div className="max-w-2xl rounded-xl border border-line bg-surface p-5 mb-6">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-1">Datos para mensajes</p>
+        <p className="text-text-soft text-sm mb-4">
+          Completan solos los mensajes de WhatsApp para socios (dirección, horarios, valor de la consulta…). Lo que
+          quede vacío aparece entre corchetes para completarlo a mano.{' '}
+          <a href="/panel/socios/mensajes" className="text-accent font-medium hover:underline">
+            Ver todos los mensajes →
+          </a>
+        </p>
+        <DatosMensajesForm datos={datosMensajes} />
       </div>
 
       {/* Cuotas sociales */}

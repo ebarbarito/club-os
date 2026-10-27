@@ -66,9 +66,13 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         <h2 className="font-display font-bold text-accent mb-1">1. Datos personales</h2>
         <p className="text-text-mute text-sm mb-4">Completá tal como figuran en tu DNI.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="sm:col-span-2">
-            <label className={labelCls}>Apellido y nombre {req}</label>
-            <input name="name" required autoComplete="name" className={inputCls} />
+          <div>
+            <label className={labelCls}>Nombre {req}</label>
+            <input name="nombre" required autoComplete="given-name" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Apellido {req}</label>
+            <input name="apellido" required autoComplete="family-name" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>DNI / Pasaporte {req}</label>

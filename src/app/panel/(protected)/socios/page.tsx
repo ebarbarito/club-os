@@ -42,6 +42,12 @@ export default async function SociosPage({
         </div>
         <div className="flex gap-2">
           <Link
+            href="/panel/socios/mensajes"
+            className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
+          >
+            Mensajes
+          </Link>
+          <Link
             href="/panel/socios/export"
             className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
           >

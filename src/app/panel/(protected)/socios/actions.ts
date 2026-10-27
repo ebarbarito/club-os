@@ -115,6 +115,7 @@ export async function updateMember(memberId: string, formData: FormData) {
     .update({
       member_number: memberNumber ? Number(memberNumber) : null,
       name: String(formData.get('name') ?? ''),
+      nombre_pila: (formData.get('nombre_pila') as string)?.trim() || null,
       dni: String(formData.get('dni') ?? ''),
       birth: (formData.get('birth') as string) || null,
       phone: (formData.get('phone') as string) || null,

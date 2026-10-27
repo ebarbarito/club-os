@@ -12,6 +12,7 @@ type Member = {
   id: string;
   member_number: number | null;
   name: string;
+  nombre_pila?: string | null;
   dni: string;
   birth: string | null;
   phone: string | null;
@@ -82,6 +83,10 @@ export function EditMemberForm({ member }: { member: Member }) {
       <div className="col-span-2">
         <label className={labelCls}>Nombre y apellido</label>
         <input name="name" required defaultValue={member.name} className={inputCls} />
+      </div>
+      <div className="col-span-2">
+        <label className={labelCls}>Nombre para mensajes (saludo de WhatsApp)</label>
+        <input name="nombre_pila" defaultValue={member.nombre_pila ?? ''} placeholder="Ej. Juan" className={inputCls} />
       </div>
       <div>
         <label className={labelCls}>DNI</label>

@@ -39,51 +39,7 @@ export function labelDe(list: readonly { value: string; title: string }[], value
   return list.find((o) => o.value === value)?.title ?? value;
 }
 
-// Mensaje instructivo de la etapa 1 — el club lo copia desde Configuración
-// y lo pega en WhatsApp en la consulta inicial.
-export function mensajeEtapa1(clubName: string, link: string) {
-  return `¡Hola! 👋 Gracias por tu interés en ${clubName} 🌿
-
-Para empezar tu incorporación, completá este formulario (te lleva unos 5 minutos):
-👉 ${link}
-
-*Tené a mano:*
-• Tu DNI
-• Tu CUIL (si no lo sabés, lo encontrás en anses.gob.ar)
-• Tu credencial REPROCANN, si ya la tenés
-
-*Cómo completarlo:*
-1️⃣ *Datos personales:* cargalos tal como figuran en tu DNI.
-2️⃣ *Plan:* elegí el que corresponde a tu indicación médica (y los adicionales si los necesitás). Si dudás, escribinos antes.
-3️⃣ *REPROCANN:*
-   • Si ya lo tenés: cargá el número y la fecha de vencimiento.
-   • Si está en trámite o no lo tenés: marcá esa opción y listo. Te ayudamos a tramitarlo.
-4️⃣ Aceptá el uso de tus datos y tocá *Enviar*.
-
-Cuando lo recibamos te escribimos por acá para mandarte la segunda parte: indicación médica y firma de la documentación.
-
-Cualquier duda, respondé este mensaje 🙌`;
-}
-
-// Mensaje con el link personal de la etapa 2 — sale desde la ficha del
-// socio con el botón "Enviar etapa 2 por WhatsApp".
-// Sin el nombre en el saludo: el campo es "Apellido y nombre" en un solo
-// texto y no hay forma confiable de sacar el nombre de pila.
-export function mensajeEtapa2(clubName: string, link: string) {
-  return `¡Hola! 👋 Ya revisamos tus datos de pre-inscripción en ${clubName} ✅
-
-Para terminar tu incorporación, completá la segunda parte (es personal, no la compartas):
-👉 ${link}
-
-*Tené a mano:*
-• La indicación médica con las cantidades prescriptas
-• Tu credencial REPROCANN (si ya la tenés)
-• Foto de tu DNI, frente y dorso
-
-Ahí confirmás tu plan y la forma de retiro o envío, aceptás el estatuto y firmás con el dedo desde el celular.
-
-Cualquier duda, respondé este mensaje 🙌`;
-}
+// Los textos de los mensajes de WhatsApp están en ./mensajes.ts.
 
 // wa.me necesita el número en formato internacional sin '+' ni espacios.
 // Para Argentina los celulares van como 549 + característica + número
