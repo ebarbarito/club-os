@@ -120,8 +120,10 @@ export function DocumentosForm({
       </div>
 
       <p className="text-text-mute text-xs mt-3">
-        En el texto podés usar <code>[NOMBRE COMPLETO]</code>, <code>[DNI]</code>, <code>[FECHA]</code> y{' '}
-        <code>[CLUB]</code>: se completan solos con los datos de cada socio.
+        En el texto podés usar <code>[NOMBRE COMPLETO]</code>, <code>[DNI]</code>, <code>[DOMICILIO]</code>,{' '}
+        <code>[EMAIL]</code>, <code>[CATEGORÍA]</code>, <code>[FECHA]</code>, <code>[FECHA LARGA]</code>,{' '}
+        <code>[PLAN]</code>, <code>[CUOTA MENSUAL]</code> y <code>[CUOTA EN LETRAS]</code>: se completan solos con los
+        datos de cada socio.
       </p>
 
       <div className="flex flex-wrap items-center gap-3 mt-4">

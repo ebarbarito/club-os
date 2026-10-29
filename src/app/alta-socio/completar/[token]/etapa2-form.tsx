@@ -6,6 +6,7 @@ import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pa
 import { ENTREGAS } from '@/lib/alta/opciones';
 import { PlanSelector } from '@/components/alta/plan-selector';
 import { DocumentoScroll } from './documento-scroll';
+import { aplicarPlan } from '@/lib/alta/documentos';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -68,6 +69,12 @@ export function Etapa2Form({
   const [entrega, setEntrega] = useState('');
   const sigRef = useRef<SignaturePadHandle>(null);
   const [aceptados, setAceptados] = useState<boolean[]>(() => documentos.map(() => false));
+
+  // Si cambia el plan, cambia la cuota que figura en los contratos: hay que
+  // volver a aceptarlos.
+  function reiniciarAceptaciones() {
+    setAceptados((prev) => (prev.some(Boolean) ? documentos.map(() => false) : prev));
+  }
 
   function submit(formData: FormData) {
     setError(null);
@@ -201,9 +208,15 @@ export function Etapa2Form({
         </p>
         <PlanSelector
           plan={plan}
-          onPlanChange={setPlan}
+          onPlanChange={(v) => {
+            setPlan(v);
+            reiniciarAceptaciones();
+          }}
           adicionales={adicionales}
-          onAdicionalesChange={setAdicionales}
+          onAdicionalesChange={(v) => {
+            setAdicionales(v);
+            reiniciarAceptaciones();
+          }}
         />
       </section>
 
@@ -251,7 +264,7 @@ export function Etapa2Form({
               key={i}
               index={i}
               titulo={d.titulo}
-              texto={d.texto}
+              texto={aplicarPlan(d.texto, plan, adicionales)}
               aceptado={aceptados[i] ?? false}
               onAceptadoChange={(v) => setAceptados((prev) => prev.map((x, j) => (j === i ? v : x)))}
             />

@@ -6,7 +6,7 @@ import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
-import { documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
+import { aplicarPlan, documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
 
 // Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
 // constancia REPROCANN e indicación médica son datos sensibles, se sirven
@@ -211,7 +211,7 @@ async function memberPorToken(token: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from('members')
-    .select('id, name, dni, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
+    .select('id, name, dni, address, localidad, provincia, email, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
     .eq('tenant_id', tenant.id)
     .eq('etapa2_token', token)
     .eq('status', 'preinscripto')
@@ -224,17 +224,32 @@ async function memberPorToken(token: string) {
 // Documentos a firmar, ya personalizados con los datos del socio. Se
 // arman siempre del lado del servidor (nunca con texto que mande el
 // navegador): lo que se guarda como aceptado es exactamente esto.
-async function documentosParaFirmar(
-  tenant: { id: string; name: string },
-  member: { name: string; dni: string; reprocann_type: string | null },
-) {
+type MemberDoc = {
+  name: string;
+  dni: string;
+  reprocann_type: string | null;
+  address: string | null;
+  localidad: string | null;
+  provincia: string | null;
+  email: string | null;
+};
+
+async function documentosParaFirmar(tenant: { id: string; name: string }, member: MemberDoc) {
   const admin = createAdminClient();
   const { data } = await admin.from('tenants').select('documentos_adhesion').eq('id', tenant.id).single();
   const fecha = new Date();
   const esAutocultivador = member.reprocann_type === 'autocultivador';
   return documentosParaSocio(data?.documentos_adhesion, esAutocultivador).map((d) => ({
     titulo: d.titulo,
-    texto: personalizarDocumento(d.texto, { club: tenant.name, nombreCompleto: member.name, dni: member.dni, fecha }),
+    texto: personalizarDocumento(d.texto, {
+      club: tenant.name,
+      nombreCompleto: member.name,
+      dni: member.dni,
+      domicilio: [member.address, member.localidad, member.provincia].filter(Boolean).join(', '),
+      email: member.email ?? '',
+      tipo: member.reprocann_type,
+      fecha,
+    }),
   }));
 }
 
@@ -252,7 +267,7 @@ export async function getEtapa2(token: string) {
     // (o lo ajuste) ya con la indicación médica en la mano.
     plan: (res.member.plan_solicitado as string | null) ?? '',
     adicionales: (res.member.adicionales_solicitados as string[] | null) ?? [],
-    documentos: await documentosParaFirmar(res.tenant, res.member as { name: string; dni: string; reprocann_type: string | null }),
+    documentos: await documentosParaFirmar(res.tenant, res.member as MemberDoc),
   };
 }
 
@@ -263,7 +278,7 @@ export async function completarEtapa2(token: string, formData: FormData) {
 
   // Cada documento tiene que venir aceptado ("Leí y acepto"), en el mismo
   // orden en que se mostró.
-  const documentos = await documentosParaFirmar(tenant, member as { name: string; dni: string; reprocann_type: string | null });
+  const documentos = await documentosParaFirmar(tenant, member as MemberDoc);
   if (documentos.some((_, i) => formData.get(`acepta_doc_${i}`) !== 'on')) {
     return { error: 'Tenés que leer y aceptar todos los documentos' };
   }
@@ -337,7 +352,8 @@ export async function completarEtapa2(token: string, formData: FormData) {
       member_id: member.id,
       orden: i,
       documento_titulo: d.titulo,
-      documento_texto: d.texto,
+      // Con los datos del plan que efectivamente envió.
+      documento_texto: aplicarPlan(d.texto, plan, adicionales),
       ip,
       user_agent: userAgent,
     })),

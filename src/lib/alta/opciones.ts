@@ -94,3 +94,59 @@ export function linkWhatsApp(telefono: string | null | undefined, texto: string)
   const tel = telefonoWhatsApp(telefono);
   return `https://wa.me/${tel ?? ''}?text=${encodeURIComponent(texto)}`;
 }
+
+// ── Cuota mensual (plan + adicionales) para los contratos ─────────────────
+
+function precioNumero(precio: string): number {
+  return Number(precio.replace(/[^\d]/g, '')) || 0;
+}
+
+export function cuotaMensual(plan: string | null | undefined, adicionales: string[] | null | undefined): number {
+  const p = PLANES.find((x) => x.value === plan);
+  if (!p) return 0;
+  const extras = (adicionales ?? [])
+    .map((a) => ADICIONALES.find((x) => x.value === a))
+    .reduce((s, a) => s + (a ? precioNumero(a.precio) : 0), 0);
+  return precioNumero(p.precio) + extras;
+}
+
+export function formatPesos(n: number): string {
+  return `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+}
+
+const UNIDADES = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés', 'veinticuatro', 'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+const DECENAS = ['', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+const CENTENAS = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+function menorQueMil(n: number): string {
+  if (n === 0) return '';
+  if (n === 100) return 'cien';
+  const c = Math.floor(n / 100);
+  const r = n % 100;
+  let texto = CENTENAS[c];
+  if (r > 0) {
+    let dec: string;
+    if (r < 30) dec = UNIDADES[r];
+    else {
+      const d = Math.floor(r / 10);
+      const u = r % 10;
+      dec = u === 0 ? DECENAS[d] : `${DECENAS[d]} y ${UNIDADES[u]}`;
+    }
+    texto = texto ? `${texto} ${dec}` : dec;
+  }
+  return texto;
+}
+
+// Número entero a letras, para montos de contratos ("ciento cuarenta mil").
+export function numeroALetras(n: number): string {
+  n = Math.floor(Math.abs(n));
+  if (n === 0) return 'cero';
+  const millones = Math.floor(n / 1_000_000);
+  const miles = Math.floor((n % 1_000_000) / 1000);
+  const resto = n % 1000;
+  const partes: string[] = [];
+  if (millones > 0) partes.push(millones === 1 ? 'un millón' : `${menorQueMil(millones).replace(/veintiuno$/, 'veintiún').replace(/uno$/, 'un')} millones`);
+  if (miles > 0) partes.push(miles === 1 ? 'mil' : `${menorQueMil(miles).replace(/veintiuno$/, 'veintiún').replace(/uno$/, 'un')} mil`);
+  if (resto > 0) partes.push(menorQueMil(resto));
+  return partes.join(' ');
+}
