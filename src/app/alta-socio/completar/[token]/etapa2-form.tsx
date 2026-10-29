@@ -6,7 +6,7 @@ import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pa
 import { ENTREGAS } from '@/lib/alta/opciones';
 import { PlanSelector } from '@/components/alta/plan-selector';
 import { DocumentoScroll } from './documento-scroll';
-import { aplicarPlan } from '@/lib/alta/documentos';
+import { aplicarDatosEtapa2 } from '@/lib/alta/documentos';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
@@ -51,6 +51,8 @@ export function Etapa2Form({
   planInicial,
   adicionalesIniciales,
   documentos,
+  tipo,
+  reprocannActual,
 }: {
   token: string;
   tenantName: string;
@@ -59,6 +61,8 @@ export function Etapa2Form({
   planInicial: string;
   adicionalesIniciales: string[];
   documentos: { titulo: string; texto: string }[];
+  tipo: string;
+  reprocannActual: { credencial: string; vencimiento: string };
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +72,28 @@ export function Etapa2Form({
   const [adicionales, setAdicionales] = useState<string[]>(adicionalesIniciales);
   const [entrega, setEntrega] = useState('');
   const sigRef = useRef<SignaturePadHandle>(null);
-  const [aceptados, setAceptados] = useState<boolean[]>(() => documentos.map(() => false));
-
-  // Si cambia el plan, cambia la cuota que figura en los contratos: hay que
-  // volver a aceptarlos.
-  function reiniciarAceptaciones() {
-    setAceptados((prev) => (prev.some(Boolean) ? documentos.map(() => false) : prev));
-  }
+  // Lo que va completando en este formulario, para que los documentos se
+  // muestren ya completos (médico, dosis, REPROCANN, plan y cuota).
+  const [campos, setCampos] = useState<Record<string, string>>({});
+  const textos = documentos.map((d) =>
+    aplicarDatosEtapa2(d.texto, {
+      plan,
+      adicionales,
+      reprocann: reprocannPendiente ? reprocann : 'vigente',
+      credencial: reprocannPendiente ? campos.repr_num : reprocannActual.credencial,
+      vencimiento: reprocannPendiente ? campos.repr_exp : reprocannActual.vencimiento,
+      medico: campos.doctor,
+      especialidad: campos.especialidad_institucion,
+      diagnostico: campos.patologia,
+      producto: campos.producto_prescripto,
+      dosis: campos.dosis_mensual,
+      unidad: campos.dosis_unidad ?? 'g',
+    }),
+  );
+  // Se guarda el texto que aceptó: si después cambia un dato que figura en
+  // el documento, deja de estar aceptado y hay que volver a aceptarlo.
+  const [aceptadoTexto, setAceptadoTexto] = useState<string[]>(() => documentos.map(() => ''));
+  const aceptados = textos.map((t, i) => aceptadoTexto[i] === t);
 
   function submit(formData: FormData) {
     setError(null);
@@ -110,7 +129,16 @@ export function Etapa2Form({
   const o = reprocannPendiente ? 1 : 0;
 
   return (
-    <form action={submit} className="max-w-2xl mx-auto px-4 py-10 space-y-5">
+    <form
+      action={submit}
+      onChange={(e) => {
+        const t = e.target as HTMLInputElement;
+        if (t.name && t.type !== 'file' && t.type !== 'checkbox' && t.type !== 'radio') {
+          setCampos((prev) => ({ ...prev, [t.name]: t.value }));
+        }
+      }}
+      className="max-w-2xl mx-auto px-4 py-10 space-y-5"
+    >
       <div>
         <p className="text-xs font-semibold text-text-mute uppercase tracking-wide">Paso 2 de 2</p>
         <h1 className="font-display text-2xl font-bold text-text">Formulario de adhesión</h1>
@@ -208,15 +236,10 @@ export function Etapa2Form({
         </p>
         <PlanSelector
           plan={plan}
-          onPlanChange={(v) => {
-            setPlan(v);
-            reiniciarAceptaciones();
-          }}
+          onPlanChange={setPlan}
           adicionales={adicionales}
-          onAdicionalesChange={(v) => {
-            setAdicionales(v);
-            reiniciarAceptaciones();
-          }}
+          onAdicionalesChange={setAdicionales}
+          autocultivo={tipo === 'autocultivador'}
         />
       </section>
 
@@ -264,9 +287,9 @@ export function Etapa2Form({
               key={i}
               index={i}
               titulo={d.titulo}
-              texto={aplicarPlan(d.texto, plan, adicionales)}
+              texto={textos[i]}
               aceptado={aceptados[i] ?? false}
-              onAceptadoChange={(v) => setAceptados((prev) => prev.map((x, j) => (j === i ? v : x)))}
+              onAceptadoChange={(v) => setAceptadoTexto((prev) => prev.map((x, j) => (j === i ? (v ? textos[i] : '') : x)))}
             />
           ))}
         </div>

@@ -10,20 +10,41 @@ set documentos_adhesion = jsonb_build_array(
 
 Asociación Civil Green Level – Ley 27.350 y Decreto Reglamentario N° 883/2020
 
-1. DATOS DEL SOLICITANTE
+1. DATOS PERSONALES
 
 Apellido y Nombre: [NOMBRE COMPLETO]
 DNI / Pasaporte N°: [DNI]
-Domicilio real: [DOMICILIO]
+Fecha de Nacimiento: [FECHA DE NACIMIENTO]
+Nacionalidad: [NACIONALIDAD]
+Estado Civil: [ESTADO CIVIL]
+Domicilio real: [DOMICILIO REAL]
+Localidad: [LOCALIDAD]
+Provincia: [PROVINCIA]
+Código Postal: [CÓDIGO POSTAL]
+Teléfono / WhatsApp: [TELÉFONO]
 Correo electrónico: [EMAIL]
-
-Los demás datos personales, la información médica y de REPROCANN, y la documentación adjunta son los consignados por el/la solicitante en el formulario digital de alta, que forma parte integrante del presente.
+CUIL/CUIT: [CUIL]
 
 2. CATEGORÍA DE SOCIO SOLICITADA
 
 Socio [CATEGORÍA]
+Plan: [PLAN]
 
-3. DECLARACIÓN DEL SOLICITANTE Y CONSENTIMIENTO DE DATOS
+3. INFORMACIÓN MÉDICA Y REPROCANN
+
+¿Posee inscripción en REPROCANN?: [REPROCANN]
+Categoría REPROCANN: [CATEGORÍA REPROCANN]
+N° de credencial REPROCANN: [CREDENCIAL REPROCANN]
+Fecha de vencimiento credencial: [VENCIMIENTO REPROCANN]
+Médico tratante: [MÉDICO TRATANTE]
+Especialidad / Institución: [ESPECIALIDAD]
+Diagnóstico / patología principal: [DIAGNÓSTICO]
+Producto prescripto: [PRODUCTO PRESCRIPTO]
+Dosis mensual indicada: [DOSIS MENSUAL]
+
+La documentación (DNI frente y dorso, credencial REPROCANN vigente y receta médica con cantidades prescriptas) se adjunta en el formulario digital de alta y forma parte integrante del presente.
+
+4. DECLARACIÓN DEL SOLICITANTE Y CONSENTIMIENTO DE DATOS
 
 El/La solicitante declara conocer y aceptar el Estatuto y Reglamento Interno de la Asociación Civil Green Level, comprometiéndose a cumplir las obligaciones que de ellos surjan, en el marco de la Ley N° 27.350 y sus normas complementarias.
 
@@ -155,20 +176,23 @@ EL/LA AUTOCULTIVADOR/A declara:
 
 • Ser mayor de edad, plenamente capaz.
 • Contar con indicación médica para el consumo de cannabis y sus derivados.
-• Haber completado su inscripción ante el REPROCANN en la categoría "autocultivador", aportando en el formulario digital de alta copia de su credencial vigente (Anexo I) y copia de la receta médica con cantidades prescriptas (Anexo II).
+• Haber completado su inscripción ante el REPROCANN en la categoría "autocultivador" (credencial N° [CREDENCIAL REPROCANN], vigente hasta el [VENCIMIENTO REPROCANN]), aportando en el formulario digital de alta copia de su credencial vigente (Anexo I) y copia de la receta médica con cantidades prescriptas (Anexo II).
 • Que, por razones personales, técnicas, de seguridad, habitabilidad y/o convivencia, su domicilio particular no resulta apto para el ejercicio del cultivo autorizado, por lo que ha decidido declarar como predio de cultivo ante el REPROCANN el vivero de la Asociación, a fin de continuar ejerciendo su derecho al autocultivo dentro del marco normativo vigente.
 
 Las Partes dejan expresa constancia de que el presente contrato no implica delegación de la condición de autocultivador ni transferencia de la titularidad del cultivo. El/la Autocultivador/a mantiene la plena responsabilidad jurídica y administrativa derivada de su inscripción ante REPROCANN. La Asociación se limita a brindar infraestructura, soporte técnico y acompañamiento conforme lo aquí pactado.
 
 PRIMERA. OBJETO
 
-La Asociación prestará al/la Autocultivador/a los servicios de infraestructura y asistencia técnica para el cultivo de cannabis medicinal descriptos en la Cláusula Cuarta, en el vivero de la Asociación declarado como predio de cultivo ante el REPROCANN.
+La Asociación prestará al/la Autocultivador/a los servicios de infraestructura y asistencia técnica para el cultivo de cannabis medicinal descriptos en la Cláusula Cuarta, en el predio ubicado en Cristóbal Colón 941, Monte Grande, Pcia. de Buenos Aires.
 
 SEGUNDA. PARCELA ASIGNADA Y PRODUCCIÓN ESTIMADA
 
-El plan contratado, la superficie asignada y la producción estimada son los acordados con la Asociación al momento del alta y registrados en la ficha del/la Autocultivador/a. La variedad / genotipo se determinará según la prescripción médica.
+Plan contratado: [PLAN AUTOCULTIVO]
+Superficie asignada: [SUPERFICIE]
+Producción estimada: hasta [PRODUCCIÓN] de flores secas / mes
+Variedad / genotipo: a determinar según prescripción médica
 
-La producción estimada es orientativa y no constituye garantía de resultado. La Asociación no será responsable por mermas derivadas de factores naturales, plagas, condiciones climáticas adversas u otras circunstancias fuera de su control razonable.
+La producción estimada indicada precedentemente es orientativa y no constituye garantía de resultado. La Asociación no será responsable por mermas derivadas de factores naturales, plagas, condiciones climáticas adversas u otras circunstancias fuera de su control razonable.
 
 TERCERA. NO MODIFICACIÓN DEL PREDIO DECLARADO
 
@@ -197,7 +221,7 @@ El presente contrato tendrá vigencia de un (1) año desde su suscripción, reno
 
 SEXTA. RETRIBUCIÓN
 
-Las Partes convienen la retribución mensual correspondiente al plan acordado, que la Asociación informa al/la Autocultivador/a al momento del alta, abonada entre los días 1 y 5 de cada mes.
+Las Partes convienen una retribución mensual de [CUOTA MENSUAL] (Pesos [CUOTA EN LETRAS]), abonada entre los días 1 y 5 de cada mes.
 
 La Asociación emitirá la factura legal correspondiente al cierre de cada mes. Dicho valor podrá ser actualizado con un preaviso mínimo de 15 días, notificando al domicilio electrónico del/la Autocultivador/a.
 

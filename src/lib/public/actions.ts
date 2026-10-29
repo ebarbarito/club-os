@@ -6,7 +6,7 @@ import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
-import { aplicarPlan, documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
+import { aplicarDatosEtapa2, documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
 
 // Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
 // constancia REPROCANN e indicación médica son datos sensibles, se sirven
@@ -136,6 +136,9 @@ export async function createMemberPublic(formData: FormData) {
   if (!tipoInscripcion || !['paciente', 'autocultivador'].includes(tipoInscripcion)) {
     return { error: 'Contanos si te inscribís como paciente o como autocultivador' };
   }
+  if (tipoInscripcion === 'autocultivador' && plan === 'medicinal') {
+    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN' };
+  }
   const tramite = str(formData, 'tramite_reprocann');
   if (!tieneReprocann && (!tramite || !['propio', 'acompanado'].includes(tramite))) {
     return { error: 'Contanos cómo vas a tramitar tu REPROCANN' };
@@ -211,7 +214,9 @@ async function memberPorToken(token: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from('members')
-    .select('id, name, dni, address, localidad, provincia, email, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados')
+    .select(
+      'id, name, dni, birth, nacionalidad, estado_civil, address, localidad, provincia, codigo_postal, phone, email, cuil_cuit, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados',
+    )
     .eq('tenant_id', tenant.id)
     .eq('etapa2_token', token)
     .eq('status', 'preinscripto')
@@ -227,11 +232,17 @@ async function memberPorToken(token: string) {
 type MemberDoc = {
   name: string;
   dni: string;
-  reprocann_type: string | null;
+  birth: string | null;
+  nacionalidad: string | null;
+  estado_civil: string | null;
   address: string | null;
   localidad: string | null;
   provincia: string | null;
+  codigo_postal: string | null;
+  phone: string | null;
   email: string | null;
+  cuil_cuit: string | null;
+  reprocann_type: string | null;
 };
 
 async function documentosParaFirmar(tenant: { id: string; name: string }, member: MemberDoc) {
@@ -245,8 +256,16 @@ async function documentosParaFirmar(tenant: { id: string; name: string }, member
       club: tenant.name,
       nombreCompleto: member.name,
       dni: member.dni,
-      domicilio: [member.address, member.localidad, member.provincia].filter(Boolean).join(', '),
-      email: member.email ?? '',
+      fechaNacimiento: member.birth,
+      nacionalidad: member.nacionalidad,
+      estadoCivil: member.estado_civil,
+      domicilioReal: member.address,
+      localidad: member.localidad,
+      provincia: member.provincia,
+      codigoPostal: member.codigo_postal,
+      telefono: member.phone,
+      email: member.email,
+      cuil: member.cuil_cuit,
       tipo: member.reprocann_type,
       fecha,
     }),
@@ -268,6 +287,12 @@ export async function getEtapa2(token: string) {
     plan: (res.member.plan_solicitado as string | null) ?? '',
     adicionales: (res.member.adicionales_solicitados as string[] | null) ?? [],
     documentos: await documentosParaFirmar(res.tenant, res.member as MemberDoc),
+    tipo: (res.member.reprocann_type as string | null) ?? 'paciente',
+    // Para completar los documentos si ya tenía REPROCANN vigente.
+    reprocannActual: {
+      credencial: (res.member.repr_num as string | null) ?? '',
+      vencimiento: (res.member.repr_exp as string | null) ?? '',
+    },
   };
 }
 
@@ -287,6 +312,9 @@ export async function completarEtapa2(token: string, formData: FormData) {
 
   const plan = str(formData, 'plan_solicitado');
   if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan' };
+  if (member.reprocann_type === 'autocultivador' && plan === 'medicinal') {
+    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN' };
+  }
   const entrega = str(formData, 'entrega_preferida');
   if (!entrega || !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío' };
   const adicionales = formData
@@ -352,8 +380,20 @@ export async function completarEtapa2(token: string, formData: FormData) {
       member_id: member.id,
       orden: i,
       documento_titulo: d.titulo,
-      // Con los datos del plan que efectivamente envió.
-      documento_texto: aplicarPlan(d.texto, plan, adicionales),
+      // Con lo que efectivamente envió en la segunda parte.
+      documento_texto: aplicarDatosEtapa2(d.texto, {
+        plan,
+        adicionales,
+        reprocann: (reprocannUpdate.reprocann as string | undefined) ?? member.reprocann,
+        credencial: member.reprocann === 'vigente' ? member.repr_num : reprocannUpdate.repr_num,
+        vencimiento: member.reprocann === 'vigente' ? member.repr_exp : reprocannUpdate.repr_exp,
+        medico: str(formData, 'doctor'),
+        especialidad: str(formData, 'especialidad_institucion'),
+        diagnostico: str(formData, 'patologia'),
+        producto: str(formData, 'producto_prescripto'),
+        dosis: str(formData, 'dosis_mensual'),
+        unidad: str(formData, 'dosis_unidad'),
+      }),
       ip,
       user_agent: userAgent,
     })),

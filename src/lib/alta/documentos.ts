@@ -1,13 +1,13 @@
-import { ADICIONALES, PLANES, cuotaMensual, formatPesos, labelDe, numeroALetras } from './opciones';
+import { ADICIONALES, PLANES, cuotaMensual, formatPesos, labelDe, numeroALetras, planAutocultivo } from './opciones';
 
 // Documentos que el socio lee y acepta en la segunda parte del alta (ver
 // migración 0062). El club los edita en Configuración → Documentos para
 // firmar; si no cargó ninguno se usan estos por defecto.
 //
-// En el texto se pueden usar [NOMBRE COMPLETO], [DNI], [DOMICILIO], [EMAIL],
-// [CATEGORÍA], [FECHA], [FECHA LARGA], [CLUB], [PLAN], [CUOTA MENSUAL] y
-// [CUOTA EN LETRAS]: se completan con los datos del socio al mostrarlo, y se
-// guarda en la constancia tal cual lo leyó.
+// En el texto se usan datos entre corchetes ([NOMBRE COMPLETO], [DNI],
+// [CUOTA MENSUAL], etc. — ver personalizarDocumento y aplicarDatosEtapa2)
+// que se completan con los datos del socio; la constancia guarda el texto
+// tal cual lo leyó.
 
 // soloAutocultivador: el documento lo firman solo quienes se inscriben como
 // autocultivadores (el paciente firma únicamente los generales).
@@ -49,20 +49,35 @@ export function documentosParaSocio(raw: unknown, esAutocultivador: boolean): Do
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+function fechaDDMMAAAA(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+// Datos de la pre-inscripción (etapa 1), conocidos al abrir la segunda parte.
 export type DatosDocumento = {
   club: string;
   nombreCompleto: string;
   dni: string;
-  domicilio: string;
-  email: string;
+  fechaNacimiento: string | null;
+  nacionalidad: string | null;
+  estadoCivil: string | null;
+  domicilioReal: string | null;
+  localidad: string | null;
+  provincia: string | null;
+  codigoPostal: string | null;
+  telefono: string | null;
+  email: string | null;
+  cuil: string | null;
   // 'autocultivador' | 'paciente' (paciente = socio Activo en los contratos)
   tipo: string | null;
   fecha: Date;
 };
 
-// Completa los datos del socio. Los del plan ([PLAN], [CUOTA MENSUAL],
-// [CUOTA EN LETRAS]) se completan aparte con aplicarPlan(), porque el socio
-// puede cambiar el plan en la misma pantalla de la segunda parte.
+// Completa los datos de la pre-inscripción. Lo que se carga en la misma
+// segunda parte (plan, REPROCANN pendiente, indicación médica) se completa
+// después con aplicarDatosEtapa2().
 export function personalizarDocumento(texto: string, d: DatosDocumento): string {
   const partes = new Intl.DateTimeFormat('es-AR', {
     day: 'numeric',
@@ -75,29 +90,82 @@ export function personalizarDocumento(texto: string, d: DatosDocumento): string 
   const anio = partes.find((p) => p.type === 'year')?.value ?? '';
   const fechaCorta = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio}`;
   const fechaLarga = `a los ${dia} días del mes de ${MESES[mes - 1]} del año ${anio}`;
-  const categoria = d.tipo === 'autocultivador' ? 'Autocultivador' : 'Activo';
+  const esAuto = d.tipo === 'autocultivador';
+  const domicilio = [d.domicilioReal, d.localidad, d.provincia].filter(Boolean).join(', ');
 
-  return texto
-    .replaceAll('[CLUB]', d.club)
-    .replaceAll('[NOMBRE COMPLETO]', d.nombreCompleto)
-    .replaceAll('[DNI]', d.dni)
-    .replaceAll('[DOMICILIO]', d.domicilio || '—')
-    .replaceAll('[EMAIL]', d.email || '—')
-    .replaceAll('[CATEGORÍA]', categoria)
-    .replaceAll('[FECHA LARGA]', fechaLarga)
-    .replaceAll('[FECHA]', fechaCorta);
+  const vars: Record<string, string> = {
+    CLUB: d.club,
+    'NOMBRE COMPLETO': d.nombreCompleto,
+    DNI: d.dni,
+    'FECHA DE NACIMIENTO': fechaDDMMAAAA(d.fechaNacimiento),
+    NACIONALIDAD: d.nacionalidad ?? '',
+    'ESTADO CIVIL': d.estadoCivil ?? '',
+    'DOMICILIO REAL': d.domicilioReal ?? '',
+    DOMICILIO: domicilio,
+    LOCALIDAD: d.localidad ?? '',
+    PROVINCIA: d.provincia ?? '',
+    'CÓDIGO POSTAL': d.codigoPostal ?? '',
+    TELÉFONO: d.telefono ?? '',
+    EMAIL: d.email ?? '',
+    CUIL: d.cuil ?? '',
+    CATEGORÍA: esAuto ? 'Autocultivador' : 'Activo',
+    'CATEGORÍA REPROCANN': esAuto ? 'Autocultivador' : 'Paciente',
+    'FECHA LARGA': fechaLarga,
+    FECHA: fechaCorta,
+  };
+  return reemplazar(texto, vars);
 }
 
-// Datos del plan elegido. Se aplica en el navegador (para mostrar el texto
-// al día si el socio cambia de plan) y en el servidor al guardar la
-// constancia, con el plan que efectivamente envió.
-export function aplicarPlan(texto: string, plan: string | null | undefined, adicionales: string[] | null | undefined): string {
-  const nombrePlan = plan
-    ? [labelDe(PLANES, plan), ...(adicionales ?? []).map((a) => labelDe(ADICIONALES, a))].filter(Boolean).join(' + ')
-    : '[PLAN SIN ELEGIR]';
-  const cuota = cuotaMensual(plan, adicionales);
-  return texto
-    .replaceAll('[PLAN]', nombrePlan)
-    .replaceAll('[CUOTA MENSUAL]', cuota ? formatPesos(cuota) : '$ —')
-    .replaceAll('[CUOTA EN LETRAS]', cuota ? numeroALetras(cuota) : '—');
+// Lo que el socio completa en la misma segunda parte. Se aplica en el
+// navegador (el texto se actualiza mientras completa el formulario) y en el
+// servidor al guardar la constancia, con lo que efectivamente envió.
+export type DatosEtapa2 = {
+  plan: string | null | undefined;
+  adicionales: string[] | null | undefined;
+  reprocann: string | null | undefined; // 'vigente' | 'tramite' | 'no'
+  credencial: string | null | undefined;
+  vencimiento: string | null | undefined; // yyyy-mm-dd
+  medico: string | null | undefined;
+  especialidad: string | null | undefined;
+  diagnostico: string | null | undefined;
+  producto: string | null | undefined;
+  dosis: string | null | undefined;
+  unidad: string | null | undefined;
+};
+
+const ESTADO_REPROCANN: Record<string, string> = { vigente: 'Sí', tramite: 'En trámite', no: 'No' };
+
+export function aplicarDatosEtapa2(texto: string, d: DatosEtapa2): string {
+  const nombrePlan = d.plan
+    ? [labelDe(PLANES, d.plan), ...(d.adicionales ?? []).map((a) => labelDe(ADICIONALES, a))].filter(Boolean).join(' + ')
+    : '';
+  const cuota = cuotaMensual(d.plan, d.adicionales);
+  const auto = planAutocultivo(d.plan);
+  const t = (v: string | null | undefined) => (v ?? '').trim();
+  const vars: Record<string, string> = {
+    PLAN: nombrePlan,
+    'CUOTA MENSUAL': cuota ? formatPesos(cuota) : '',
+    'CUOTA EN LETRAS': cuota ? numeroALetras(cuota) : '',
+    'PLAN AUTOCULTIVO': auto?.nombre ?? '',
+    SUPERFICIE: auto?.superficie ?? '',
+    PRODUCCIÓN: auto?.produccion ?? '',
+    REPROCANN: d.reprocann ? (ESTADO_REPROCANN[d.reprocann] ?? '') : '',
+    'CREDENCIAL REPROCANN': d.reprocann === 'vigente' ? t(d.credencial) : '',
+    'VENCIMIENTO REPROCANN': d.reprocann === 'vigente' ? fechaDDMMAAAA(t(d.vencimiento)) : '',
+    'MÉDICO TRATANTE': t(d.medico),
+    ESPECIALIDAD: t(d.especialidad),
+    DIAGNÓSTICO: t(d.diagnostico),
+    'PRODUCTO PRESCRIPTO': t(d.producto),
+    'DOSIS MENSUAL': t(d.dosis) ? `${t(d.dosis)} ${t(d.unidad) || 'g'}` : '',
+  };
+  return reemplazar(texto, vars);
+}
+
+// Reemplaza solo los corchetes conocidos; un dato vacío queda como "—".
+function reemplazar(texto: string, vars: Record<string, string>): string {
+  return texto.replace(/\[([^\]]+)\]/g, (m, key: string) => {
+    if (!(key in vars)) return m;
+    const v = vars[key];
+    return v && v.trim() ? v : '—';
+  });
 }

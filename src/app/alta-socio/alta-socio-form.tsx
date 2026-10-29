@@ -139,12 +139,48 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display font-bold text-accent mb-1">2. Plan mensual</h2>
+        <h2 className="font-display font-bold text-accent mb-1">2. Tipo de socio y plan</h2>
         <p className="text-text-mute text-sm mb-4">
           Elegí el plan que corresponde a tu indicación médica. Si todavía no la tenés, elegí el que pensás que vas a
           necesitar: lo confirmás en la segunda parte.
         </p>
-        <PlanSelector plan={plan} onPlanChange={setPlan} adicionales={adicionales} onAdicionalesChange={setAdicionales} />
+        <p className="text-sm font-medium text-text mb-2">¿Cómo te inscribís? {req}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {TIPOS_INSCRIPCION.map((t) => (
+            <label
+              key={t.value}
+              className={`rounded-lg border p-3 cursor-pointer ${tipo === t.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
+            >
+              <div className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="reprocann_type"
+                  value={t.value}
+                  checked={tipo === t.value}
+                  onChange={() => {
+                    setTipo(t.value);
+                    // El plan Medicinal no aplica al autocultivo.
+                    if (t.value === 'autocultivador' && plan === 'medicinal') setPlan('');
+                  }}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-semibold text-text text-sm">{t.title}</p>
+                  <p className="text-text-soft text-xs">{t.desc}</p>
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4" />
+        <PlanSelector
+          plan={plan}
+          onPlanChange={setPlan}
+          adicionales={adicionales}
+          onAdicionalesChange={setAdicionales}
+          autocultivo={tipo === 'autocultivador'}
+        />
       </section>
 
       <section className="rounded-xl border border-line bg-surface p-5">
@@ -168,31 +204,6 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
                 <div>
                   <p className="font-semibold text-text text-sm">{o.title}</p>
                   <p className="text-text-soft text-xs">{o.desc}</p>
-                </div>
-              </div>
-            </label>
-          ))}
-        </div>
-
-        <p className="text-sm font-medium text-text mt-4 mb-2">¿Cómo te inscribís? {req}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {TIPOS_INSCRIPCION.map((t) => (
-            <label
-              key={t.value}
-              className={`rounded-lg border p-3 cursor-pointer ${tipo === t.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
-            >
-              <div className="flex items-start gap-2">
-                <input
-                  type="radio"
-                  name="reprocann_type"
-                  value={t.value}
-                  checked={tipo === t.value}
-                  onChange={() => setTipo(t.value)}
-                  className="mt-1"
-                />
-                <div>
-                  <p className="font-semibold text-text text-sm">{t.title}</p>
-                  <p className="text-text-soft text-xs">{t.desc}</p>
                 </div>
               </div>
             </label>

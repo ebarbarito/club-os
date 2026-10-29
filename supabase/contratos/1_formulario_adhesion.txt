@@ -2,20 +2,41 @@ FORMULARIO DE ADHESIÓN DE SOCIO
 
 Asociación Civil Green Level – Ley 27.350 y Decreto Reglamentario N° 883/2020
 
-1. DATOS DEL SOLICITANTE
+1. DATOS PERSONALES
 
 Apellido y Nombre: [NOMBRE COMPLETO]
 DNI / Pasaporte N°: [DNI]
-Domicilio real: [DOMICILIO]
+Fecha de Nacimiento: [FECHA DE NACIMIENTO]
+Nacionalidad: [NACIONALIDAD]
+Estado Civil: [ESTADO CIVIL]
+Domicilio real: [DOMICILIO REAL]
+Localidad: [LOCALIDAD]
+Provincia: [PROVINCIA]
+Código Postal: [CÓDIGO POSTAL]
+Teléfono / WhatsApp: [TELÉFONO]
 Correo electrónico: [EMAIL]
-
-Los demás datos personales, la información médica y de REPROCANN, y la documentación adjunta son los consignados por el/la solicitante en el formulario digital de alta, que forma parte integrante del presente.
+CUIL/CUIT: [CUIL]
 
 2. CATEGORÍA DE SOCIO SOLICITADA
 
 Socio [CATEGORÍA]
+Plan: [PLAN]
 
-3. DECLARACIÓN DEL SOLICITANTE Y CONSENTIMIENTO DE DATOS
+3. INFORMACIÓN MÉDICA Y REPROCANN
+
+¿Posee inscripción en REPROCANN?: [REPROCANN]
+Categoría REPROCANN: [CATEGORÍA REPROCANN]
+N° de credencial REPROCANN: [CREDENCIAL REPROCANN]
+Fecha de vencimiento credencial: [VENCIMIENTO REPROCANN]
+Médico tratante: [MÉDICO TRATANTE]
+Especialidad / Institución: [ESPECIALIDAD]
+Diagnóstico / patología principal: [DIAGNÓSTICO]
+Producto prescripto: [PRODUCTO PRESCRIPTO]
+Dosis mensual indicada: [DOSIS MENSUAL]
+
+La documentación (DNI frente y dorso, credencial REPROCANN vigente y receta médica con cantidades prescriptas) se adjunta en el formulario digital de alta y forma parte integrante del presente.
+
+4. DECLARACIÓN DEL SOLICITANTE Y CONSENTIMIENTO DE DATOS
 
 El/La solicitante declara conocer y aceptar el Estatuto y Reglamento Interno de la Asociación Civil Green Level, comprometiéndose a cumplir las obligaciones que de ellos surjan, en el marco de la Ley N° 27.350 y sus normas complementarias.
 

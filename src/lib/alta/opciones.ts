@@ -15,12 +15,43 @@ export const CATEGORIAS_SOCIO = [
   { value: 'adherente', title: 'Socio Adherente', desc: 'Familiar o cuidador de paciente medicinal. Sin REPROCANN propio.' },
 ] as const;
 
+// autocultivo: equivalencia para el socio autocultivador (Contrato de
+// Locación de Servicios). BASIC = Flores 10, STANDARD = Flores 20,
+// FULL GREEN = Flores 40. El plan Medicinal no aplica a autocultivo.
 export const PLANES = [
-  { value: 'flores_10', title: 'Flores 10', desc: '10 g de flores secas por mes', precio: '$120.000' },
-  { value: 'flores_20', title: 'Flores 20', desc: '20 g de flores secas por mes', precio: '$220.000' },
-  { value: 'flores_40', title: 'Flores 40', desc: '40 g de flores secas por mes', precio: '$420.000' },
-  { value: 'medicinal', title: 'Medicinal', desc: 'Aceite + crema: 1 aceite de 30 ml y 1 crema por mes. Sin flores.', precio: '$60.000' },
+  {
+    value: 'flores_10',
+    title: 'Flores 10',
+    desc: '10 g de flores secas por mes',
+    precio: '$120.000',
+    autocultivo: { nombre: 'BASIC', superficie: '0,25 m²', produccion: '10 g' },
+  },
+  {
+    value: 'flores_20',
+    title: 'Flores 20',
+    desc: '20 g de flores secas por mes',
+    precio: '$220.000',
+    autocultivo: { nombre: 'STANDARD', superficie: '0,50 m²', produccion: '20 g' },
+  },
+  {
+    value: 'flores_40',
+    title: 'Flores 40',
+    desc: '40 g de flores secas por mes',
+    precio: '$420.000',
+    autocultivo: { nombre: 'FULL GREEN', superficie: '0,75 m²', produccion: '40 g' },
+  },
+  {
+    value: 'medicinal',
+    title: 'Medicinal',
+    desc: 'Aceite + crema: 1 aceite de 30 ml y 1 crema por mes. Sin flores.',
+    precio: '$60.000',
+    autocultivo: null,
+  },
 ] as const;
+
+export function planAutocultivo(plan: string | null | undefined) {
+  return PLANES.find((p) => p.value === plan)?.autocultivo ?? null;
+}
 
 export const ADICIONALES = [
   { value: 'aceite_10', title: 'Aceite 10 ml', precio: '$20.000' },
