@@ -132,7 +132,8 @@ export function Etapa2Form({
     <form
       action={submit}
       onChange={(e) => {
-        const t = e.target as HTMLInputElement;
+        const t: EventTarget = e.target;
+        if (!(t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement)) return;
         if (t.name && t.type !== 'file' && t.type !== 'checkbox' && t.type !== 'radio') {
           setCampos((prev) => ({ ...prev, [t.name]: t.value }));
         }
