@@ -15,6 +15,11 @@ const REPROCANN_OPCIONES = [
   { value: 'no', title: 'No tengo', desc: 'Todavía no lo empecé.' },
 ] as const;
 
+const TIPOS_INSCRIPCION = [
+  { value: 'paciente', title: 'Paciente', desc: 'El club cultiva tu tratamiento.' },
+  { value: 'autocultivador', title: 'Autocultivador', desc: 'Te inscribís como autocultivador y cedés tu parcela al club.' },
+] as const;
+
 // ETAPA 1 — Pre-inscripción. Lo médico, el plan, los consentimientos
 // restantes y la firma van en la etapa 2 (/alta-socio/completar/<token>),
 // que el club manda por WhatsApp después de revisar estos datos.
@@ -26,6 +31,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [adicionales, setAdicionales] = useState<string[]>([]);
   const [reprocann, setReprocann] = useState<string>('vigente');
   const [tramite, setTramite] = useState('');
+  const [tipo, setTipo] = useState('paciente');
 
   function submit(formData: FormData) {
     setError(null);
@@ -168,15 +174,33 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           ))}
         </div>
 
+        <p className="text-sm font-medium text-text mt-4 mb-2">¿Cómo te inscribís? {req}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {TIPOS_INSCRIPCION.map((t) => (
+            <label
+              key={t.value}
+              className={`rounded-lg border p-3 cursor-pointer ${tipo === t.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
+            >
+              <div className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="reprocann_type"
+                  value={t.value}
+                  checked={tipo === t.value}
+                  onChange={() => setTipo(t.value)}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="font-semibold text-text text-sm">{t.title}</p>
+                  <p className="text-text-soft text-xs">{t.desc}</p>
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+
         {reprocann === 'vigente' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <div>
-              <label className={labelCls}>Categoría REPROCANN</label>
-              <select name="reprocann_type" className={inputCls} defaultValue="paciente">
-                <option value="paciente">Paciente</option>
-                <option value="autocultivador">Autocultivador</option>
-              </select>
-            </div>
             <div>
               <label className={labelCls}>N° de credencial {req}</label>
               <input name="repr_num" required className={inputCls} />

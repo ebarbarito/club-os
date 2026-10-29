@@ -22,7 +22,12 @@ export function DocumentosForm({
   const [estado, setEstado] = useState<'idle' | 'ok'>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  function cambiar(i: number, campo: keyof DocumentoAdhesion, valor: string) {
+  function cambiarSoloAuto(i: number, valor: boolean) {
+    setEstado('idle');
+    setDocs((prev) => prev.map((d, j) => (j === i ? { ...d, soloAutocultivador: valor } : d)));
+  }
+
+  function cambiar(i: number, campo: 'titulo' | 'texto', valor: string) {
     setEstado('idle');
     setDocs((prev) => prev.map((d, j) => (j === i ? { ...d, [campo]: valor } : d)));
   }
@@ -101,6 +106,15 @@ export function DocumentosForm({
               placeholder="Pegá acá el texto completo del documento"
               className={`${inputCls} font-sans`}
             />
+            <label className="flex items-center gap-2 mt-2 text-sm text-text-soft cursor-pointer">
+              <input
+                type="checkbox"
+                checked={d.soloAutocultivador === true}
+                onChange={(e) => cambiarSoloAuto(i, e.target.checked)}
+              />
+              Solo para autocultivadores
+              <span className="text-text-mute text-xs">(el paciente no lo ve ni lo firma)</span>
+            </label>
           </div>
         ))}
       </div>
@@ -116,7 +130,7 @@ export function DocumentosForm({
             type="button"
             onClick={() => {
               setEstado('idle');
-              setDocs((prev) => [...prev, { titulo: '', texto: '' }]);
+              setDocs((prev) => [...prev, { titulo: '', texto: '', soloAutocultivador: false }]);
             }}
             className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
           >

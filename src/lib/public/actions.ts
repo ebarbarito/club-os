@@ -6,7 +6,7 @@ import { slugFromHost } from '@/lib/tenant/resolve';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
-import { documentosVigentes, personalizarDocumento } from '@/lib/alta/documentos';
+import { documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
 
 // Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
 // constancia REPROCANN e indicación médica son datos sensibles, se sirven
@@ -130,6 +130,12 @@ export async function createMemberPublic(formData: FormData) {
   const reprocann = str(formData, 'reprocann') ?? 'no';
   if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
   const tieneReprocann = reprocann === 'vigente';
+  // Paciente o autocultivador: se pregunta siempre (define qué documentos
+  // firma en la segunda parte).
+  const tipoInscripcion = str(formData, 'reprocann_type');
+  if (!tipoInscripcion || !['paciente', 'autocultivador'].includes(tipoInscripcion)) {
+    return { error: 'Contanos si te inscribís como paciente o como autocultivador' };
+  }
   const tramite = str(formData, 'tramite_reprocann');
   if (!tieneReprocann && (!tramite || !['propio', 'acompanado'].includes(tramite))) {
     return { error: 'Contanos cómo vas a tramitar tu REPROCANN' };
@@ -167,7 +173,7 @@ export async function createMemberPublic(formData: FormData) {
       plan_solicitado: plan,
       adicionales_solicitados: adicionales,
       reprocann,
-      reprocann_type: tieneReprocann ? str(formData, 'reprocann_type') : null,
+      reprocann_type: tipoInscripcion,
       repr_num: tieneReprocann ? str(formData, 'repr_num') : null,
       repr_exp: tieneReprocann ? str(formData, 'repr_exp') : null,
       tramite_reprocann: tieneReprocann ? null : tramite,
@@ -218,11 +224,15 @@ async function memberPorToken(token: string) {
 // Documentos a firmar, ya personalizados con los datos del socio. Se
 // arman siempre del lado del servidor (nunca con texto que mande el
 // navegador): lo que se guarda como aceptado es exactamente esto.
-async function documentosParaFirmar(tenant: { id: string; name: string }, member: { name: string; dni: string }) {
+async function documentosParaFirmar(
+  tenant: { id: string; name: string },
+  member: { name: string; dni: string; reprocann_type: string | null },
+) {
   const admin = createAdminClient();
   const { data } = await admin.from('tenants').select('documentos_adhesion').eq('id', tenant.id).single();
   const fecha = new Date();
-  return documentosVigentes(data?.documentos_adhesion).map((d) => ({
+  const esAutocultivador = member.reprocann_type === 'autocultivador';
+  return documentosParaSocio(data?.documentos_adhesion, esAutocultivador).map((d) => ({
     titulo: d.titulo,
     texto: personalizarDocumento(d.texto, { club: tenant.name, nombreCompleto: member.name, dni: member.dni, fecha }),
   }));
@@ -242,7 +252,7 @@ export async function getEtapa2(token: string) {
     // (o lo ajuste) ya con la indicación médica en la mano.
     plan: (res.member.plan_solicitado as string | null) ?? '',
     adicionales: (res.member.adicionales_solicitados as string[] | null) ?? [],
-    documentos: await documentosParaFirmar(res.tenant, res.member as { name: string; dni: string }),
+    documentos: await documentosParaFirmar(res.tenant, res.member as { name: string; dni: string; reprocann_type: string | null }),
   };
 }
 
@@ -253,7 +263,7 @@ export async function completarEtapa2(token: string, formData: FormData) {
 
   // Cada documento tiene que venir aceptado ("Leí y acepto"), en el mismo
   // orden en que se mostró.
-  const documentos = await documentosParaFirmar(tenant, member as { name: string; dni: string });
+  const documentos = await documentosParaFirmar(tenant, member as { name: string; dni: string; reprocann_type: string | null });
   if (documentos.some((_, i) => formData.get(`acepta_doc_${i}`) !== 'on')) {
     return { error: 'Tenés que leer y aceptar todos los documentos' };
   }
@@ -285,7 +295,6 @@ export async function completarEtapa2(token: string, formData: FormData) {
     }
     reprocannUpdate.reprocann = reprocann;
     if (reprocann === 'vigente') {
-      reprocannUpdate.reprocann_type = str(formData, 'reprocann_type');
       reprocannUpdate.repr_num = str(formData, 'repr_num');
       reprocannUpdate.repr_exp = str(formData, 'repr_exp');
     }

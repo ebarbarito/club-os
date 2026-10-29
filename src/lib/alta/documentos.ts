@@ -6,7 +6,9 @@
 // se completan con los datos del socio al mostrarlo, y se guarda en la
 // constancia tal cual lo leyó.
 
-export type DocumentoAdhesion = { titulo: string; texto: string };
+// soloAutocultivador: el documento lo firman solo quienes se inscriben como
+// autocultivadores (el paciente firma únicamente los generales).
+export type DocumentoAdhesion = { titulo: string; texto: string; soloAutocultivador?: boolean };
 
 export const DOCUMENTOS_POR_DEFECTO: DocumentoAdhesion[] = [
   {
@@ -26,7 +28,7 @@ export function parseDocumentos(raw: unknown): DocumentoAdhesion[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((d): d is DocumentoAdhesion => !!d && typeof d.titulo === 'string' && typeof d.texto === 'string')
-    .map((d) => ({ titulo: d.titulo.trim(), texto: d.texto.trim() }))
+    .map((d) => ({ titulo: d.titulo.trim(), texto: d.texto.trim(), soloAutocultivador: d.soloAutocultivador === true }))
     .filter((d) => d.titulo && d.texto)
     .slice(0, MAX_DOCUMENTOS);
 }
@@ -35,6 +37,11 @@ export function parseDocumentos(raw: unknown): DocumentoAdhesion[] {
 export function documentosVigentes(raw: unknown): DocumentoAdhesion[] {
   const propios = parseDocumentos(raw);
   return propios.length > 0 ? propios : DOCUMENTOS_POR_DEFECTO;
+}
+
+// Los que le corresponden a un socio según cómo se inscribe.
+export function documentosParaSocio(raw: unknown, esAutocultivador: boolean): DocumentoAdhesion[] {
+  return documentosVigentes(raw).filter((d) => !d.soloAutocultivador || esAutocultivador);
 }
 
 export function personalizarDocumento(

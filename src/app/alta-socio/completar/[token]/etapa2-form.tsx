@@ -135,13 +135,6 @@ export function Etapa2Form({
           {reprocann === 'vigente' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
               <div>
-                <label className={labelCls}>Categoría REPROCANN</label>
-                <select name="reprocann_type" className={inputCls} defaultValue="paciente">
-                  <option value="paciente">Paciente</option>
-                  <option value="autocultivador">Autocultivador</option>
-                </select>
-              </div>
-              <div>
                 <label className={labelCls}>N° de credencial {req}</label>
                 <input name="repr_num" required className={inputCls} />
               </div>
