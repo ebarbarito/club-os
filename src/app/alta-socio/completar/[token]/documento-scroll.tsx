@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CAMPO_INVALIDO } from '@/lib/alta/marcar-campo';
 
 // Un documento para leer y aceptar: el "Leí y acepto" se habilita recién
 // cuando el socio llegó al final del texto (o si el texto entra entero sin
@@ -34,7 +35,7 @@ export function DocumentoScroll({
   }, []);
 
   return (
-    <div className="rounded-lg border border-line-2">
+    <div data-campo className={`rounded-lg border border-line-2 scroll-mt-4 ${CAMPO_INVALIDO}`}>
       <div className="px-3 py-2 border-b border-line-2 bg-surface-2 flex items-center justify-between gap-2">
         <p className="font-semibold text-text text-sm">{titulo}</p>
         {aceptado ? (

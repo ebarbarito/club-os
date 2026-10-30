@@ -110,11 +110,11 @@ export async function createMemberPublic(formData: FormData) {
   // Menor", todos tienen que ser mayores de edad. Un menor se gestiona a
   // mano desde el panel.
   if (!birth || !isAdult(birth)) {
-    return { error: 'Tenés que ser mayor de 18 años para asociarte' };
+    return { error: 'Tenés que ser mayor de 18 años para asociarte', campo: 'birth' };
   }
 
   const plan = str(formData, 'plan_solicitado');
-  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan' };
+  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan', campo: 'plan_solicitado' };
   const adicionales = formData
     .getAll('adicionales_solicitados')
     .map(String)
@@ -124,27 +124,30 @@ export async function createMemberPublic(formData: FormData) {
   // que es dato de salud): el consentimiento de la Ley 25.326 va acá. El
   // del estatuto y el de veracidad se firman en la etapa 2.
   if (formData.get('consiente_datos') !== 'on') {
-    return { error: 'Tenés que aceptar el tratamiento de tus datos personales' };
+    return { error: 'Tenés que aceptar el tratamiento de tus datos personales', campo: 'consiente_datos' };
   }
 
   const reprocann = str(formData, 'reprocann') ?? 'no';
-  if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
+  if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida', campo: 'reprocann' };
   const tieneReprocann = reprocann === 'vigente';
   // Paciente o autocultivador: se pregunta siempre (define qué documentos
   // firma en la segunda parte).
   const tipoInscripcion = str(formData, 'reprocann_type');
   if (!tipoInscripcion || !['paciente', 'autocultivador'].includes(tipoInscripcion)) {
-    return { error: 'Contanos si te inscribís como paciente o como autocultivador' };
+    return { error: 'Contanos si te inscribís como paciente o como autocultivador', campo: 'reprocann_type' };
   }
   if (tipoInscripcion === 'autocultivador' && plan === 'medicinal') {
-    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN' };
+    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN', campo: 'plan_solicitado' };
   }
   const tramite = str(formData, 'tramite_reprocann');
   if (!tieneReprocann && (!tramite || !['propio', 'acompanado'].includes(tramite))) {
-    return { error: 'Contanos cómo vas a tramitar tu REPROCANN' };
+    return { error: 'Contanos cómo vas a tramitar tu REPROCANN', campo: 'tramite_reprocann' };
   }
   if (tieneReprocann && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
-    return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
+    return {
+        error: 'Completá el número y el vencimiento de tu credencial REPROCANN',
+        campo: !str(formData, 'repr_num') ? 'repr_num' : 'repr_exp',
+      };
   }
 
   // Nombre y apellido llegan separados: `name` se arma como "Apellido
@@ -152,7 +155,7 @@ export async function createMemberPublic(formData: FormData) {
   // guarda aparte para el saludo de los mensajes de WhatsApp.
   const nombre = str(formData, 'nombre');
   const apellido = str(formData, 'apellido');
-  if (!nombre || !apellido) return { error: 'Completá tu nombre y apellido' };
+  if (!nombre || !apellido) return { error: 'Completá tu nombre y apellido', campo: !nombre ? 'nombre' : 'apellido' };
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -189,7 +192,7 @@ export async function createMemberPublic(formData: FormData) {
   if (error) {
     // unique (tenant_id, dni): ya se pre-inscribió antes (o ya es socio).
     if (error.code === '23505') {
-      return { error: 'Ya hay una solicitud con ese DNI en el club. Escribinos por WhatsApp y lo vemos.' };
+      return { error: 'Ya hay una solicitud con ese DNI en el club. Escribinos por WhatsApp y lo vemos.', campo: 'dni' };
     }
     return { error: 'No pudimos enviar tu solicitud. Probá de nuevo en unos minutos.' };
   }
@@ -322,27 +325,29 @@ export async function completarEtapa2(token: string, formData: FormData) {
   // Cada documento tiene que venir aceptado ("Leí y acepto"), en el mismo
   // orden en que se mostró.
   const documentos = await documentosParaFirmar(tenant, member as MemberDoc);
-  if (documentos.some((_, i) => formData.get(`acepta_doc_${i}`) !== 'on')) {
-    return { error: 'Tenés que leer y aceptar todos los documentos' };
+  const sinAceptar = documentos.findIndex((_, i) => formData.get(`acepta_doc_${i}`) !== 'on');
+  if (sinAceptar >= 0) {
+    return { error: 'Tenés que leer y aceptar todos los documentos', campo: `acepta_doc_${sinAceptar}` };
   }
   const firma = String(formData.get('firma_data_url') ?? '');
-  if (!firma.startsWith('data:image/png;base64,')) return { error: 'Falta tu firma' };
+  if (!firma.startsWith('data:image/png;base64,')) return { error: 'Falta tu firma', campo: 'firma_data_url' };
 
   const plan = str(formData, 'plan_solicitado');
-  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan' };
+  if (!plan || !PLANES.some((p) => p.value === plan)) return { error: 'Elegí un plan', campo: 'plan_solicitado' };
   if (member.reprocann_type === 'autocultivador' && plan === 'medicinal') {
-    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN' };
+    return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN', campo: 'plan_solicitado' };
   }
   const entrega = str(formData, 'entrega_preferida');
-  if (!entrega || !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío' };
+  if (!entrega || !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío', campo: 'entrega_preferida' };
   const adicionales = formData
     .getAll('adicionales_solicitados')
     .map(String)
     .filter((a) => ADICIONALES.some((o) => o.value === a));
 
   const dosis = str(formData, 'dosis_mensual');
-  if (!str(formData, 'doctor') || !str(formData, 'patologia') || !str(formData, 'producto_prescripto') || !dosis) {
-    return { error: 'Completá los datos de tu indicación médica' };
+  const faltaMedico = ['doctor', 'patologia', 'producto_prescripto', 'dosis_mensual'].find((c) => !str(formData, c));
+  if (faltaMedico) {
+    return { error: 'Completá los datos de tu indicación médica', campo: faltaMedico };
   }
 
   // REPROCANN: si en la etapa 1 quedó pendiente, se actualiza acá. Si ya
@@ -350,9 +355,12 @@ export async function completarEtapa2(token: string, formData: FormData) {
   const reprocannUpdate: Record<string, string | null> = {};
   if (member.reprocann !== 'vigente') {
     const reprocann = str(formData, 'reprocann') ?? member.reprocann;
-    if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida' };
+    if (!['vigente', 'tramite', 'no'].includes(reprocann)) return { error: 'Opción de REPROCANN inválida', campo: 'reprocann' };
     if (reprocann === 'vigente' && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
-      return { error: 'Completá el número y el vencimiento de tu credencial REPROCANN' };
+      return {
+        error: 'Completá el número y el vencimiento de tu credencial REPROCANN',
+        campo: !str(formData, 'repr_num') ? 'repr_num' : 'repr_exp',
+      };
     }
     reprocannUpdate.reprocann = reprocann;
     if (reprocann === 'vigente') {

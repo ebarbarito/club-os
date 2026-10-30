@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { CAMPO_INVALIDO, desmarcar, marcarCampo } from '@/lib/alta/marcar-campo';
+import { useRef, useState, useTransition } from 'react';
 import { createMemberPublic } from '@/lib/public/actions';
 import { PlanSelector } from '@/components/alta/plan-selector';
 import { TRAMITES_REPROCANN } from '@/lib/alta/opciones';
 
-const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
+const inputCls = `w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent ${CAMPO_INVALIDO}`;
+const seccionCls = `rounded-xl border border-line bg-surface p-5 scroll-mt-4 ${CAMPO_INVALIDO}`;
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const req = <span className="text-red">*</span>;
 
@@ -33,20 +35,25 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [tramite, setTramite] = useState('');
   const [tipo, setTipo] = useState('paciente');
 
-  function submit(formData: FormData) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function fallar(mensaje: string, campo?: string) {
+    setError(mensaje);
+    marcarCampo(formRef.current, campo);
+  }
+
+  // onSubmit (y no <form action>) para que, si hay un error, no se borre lo
+  // que ya se completó.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     setError(null);
-    if (!plan) {
-      setError('Elegí un plan');
-      return;
-    }
-    if (reprocann !== 'vigente' && !tramite) {
-      setError('Contanos cómo vas a tramitar tu REPROCANN');
-      return;
-    }
+    if (!plan) return fallar('Elegí un plan', 'plan_solicitado');
+    if (reprocann !== 'vigente' && !tramite) return fallar('Contanos cómo vas a tramitar tu REPROCANN', 'tramite_reprocann');
     startTransition(async () => {
       const res = await createMemberPublic(formData);
       if (res?.error) {
-        setError(res.error);
+        fallar(res.error, 'campo' in res ? res.campo : undefined);
         return;
       }
       setDone(true);
@@ -72,14 +79,20 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   }
 
   return (
-    <form action={submit} className="max-w-2xl mx-auto px-4 py-10 space-y-5">
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      onInput={(e) => desmarcar(e.target)}
+      onChange={(e) => desmarcar(e.target)}
+      className="max-w-2xl mx-auto px-4 py-10 space-y-5"
+    >
       <div>
         <p className="text-xs font-semibold text-text-mute uppercase tracking-wide">Paso 1 de 2</p>
         <h1 className="font-display text-2xl font-bold text-text">Pre-inscripción</h1>
         <p className="text-text-soft">{tenantName}</p>
       </div>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">1. Datos personales</h2>
         <p className="text-text-mute text-sm mb-4">Completá tal como figuran en tu DNI.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -138,7 +151,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         </div>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">2. Tipo de socio y plan</h2>
         <p className="text-text-mute text-sm mb-4">
           Elegí el plan que corresponde a tu indicación médica. Si todavía no la tenés, elegí el que pensás que vas a
@@ -183,7 +196,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         />
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">3. REPROCANN</h2>
         <p className="text-text-mute text-sm mb-4">¿Tenés tu credencial de REPROCANN?</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -264,7 +277,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         )}
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-3">4. Tus datos</h2>
         <label className="flex items-start gap-2 text-sm text-text-soft">
           <input type="checkbox" name="consiente_datos" required className="mt-0.5" />
@@ -275,7 +288,11 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
         </label>
       </section>
 
-      {error && <p className="text-red text-sm">{error}</p>}
+      {error && (
+        <p role="alert" className="text-red text-sm font-medium bg-red-bg rounded-lg px-3 py-2">
+          {error} — revisá el campo marcado en rojo.
+        </p>
+      )}
 
       <button
         type="submit"

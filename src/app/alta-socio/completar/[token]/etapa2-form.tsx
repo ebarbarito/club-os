@@ -1,5 +1,6 @@
 'use client';
 
+import { CAMPO_INVALIDO, desmarcar, marcarCampo } from '@/lib/alta/marcar-campo';
 import { useRef, useState, useTransition } from 'react';
 import { completarEtapa2 } from '@/lib/public/actions';
 import { SignaturePad, type SignaturePadHandle } from '@/components/signature-pad';
@@ -8,7 +9,8 @@ import { PlanSelector } from '@/components/alta/plan-selector';
 import { DocumentoScroll } from './documento-scroll';
 import { aplicarDatosEtapa2 } from '@/lib/alta/documentos';
 
-const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
+const inputCls = `w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent ${CAMPO_INVALIDO}`;
+const seccionCls = `rounded-xl border border-line bg-surface p-5 scroll-mt-4 ${CAMPO_INVALIDO}`;
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const req = <span className="text-red">*</span>;
 
@@ -95,17 +97,29 @@ export function Etapa2Form({
   const [aceptadoTexto, setAceptadoTexto] = useState<string[]>(() => documentos.map(() => ''));
   const aceptados = textos.map((t, i) => aceptadoTexto[i] === t);
 
-  function submit(formData: FormData) {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function fallar(mensaje: string, campo?: string) {
+    setError(mensaje);
+    marcarCampo(formRef.current, campo);
+  }
+
+  // onSubmit (y no <form action>) para que, si hay un error, no se borre lo
+  // que ya se completó.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     setError(null);
-    if (!plan) return setError('Elegí un plan');
-    if (!entrega) return setError('Elegí retiro o envío');
-    if (aceptados.some((a) => !a)) return setError('Tenés que leer y aceptar todos los documentos');
-    if (sigRef.current?.isEmpty()) return setError('Falta tu firma');
+    if (!plan) return fallar('Elegí un plan', 'plan_solicitado');
+    if (!entrega) return fallar('Elegí retiro o envío', 'entrega_preferida');
+    const sinAceptar = aceptados.findIndex((a) => !a);
+    if (sinAceptar >= 0) return fallar('Tenés que leer y aceptar todos los documentos', `acepta_doc_${sinAceptar}`);
+    if (sigRef.current?.isEmpty()) return fallar('Falta tu firma', 'firma_data_url');
     formData.set('firma_data_url', sigRef.current?.getDataUrl() ?? '');
     startTransition(async () => {
       const res = await completarEtapa2(token, formData);
       if (res?.error) {
-        setError(res.error);
+        fallar(res.error, 'campo' in res ? res.campo : undefined);
         return;
       }
       setDone(true);
@@ -130,8 +144,15 @@ export function Etapa2Form({
 
   return (
     <form
-      action={submit}
+      ref={formRef}
+      onSubmit={submit}
+      onInput={(e) => desmarcar(e.target)}
+      // La firma es un canvas: no dispara input/change.
+      onPointerDown={(e) => {
+        if (e.target instanceof HTMLCanvasElement) desmarcar(e.target);
+      }}
       onChange={(e) => {
+        desmarcar(e.target);
         const t: EventTarget = e.target;
         if (!(t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement)) return;
         if (t.name && t.type !== 'file' && t.type !== 'checkbox' && t.type !== 'radio') {
@@ -149,7 +170,7 @@ export function Etapa2Form({
       </div>
 
       {reprocannPendiente && (
-        <section className="rounded-xl border border-line bg-surface p-5">
+        <section className={seccionCls}>
           <h2 className="font-display font-bold text-accent mb-1">1. REPROCANN</h2>
           <p className="text-text-mute text-sm mb-4">En la pre-inscripción quedó pendiente. ¿Ya tenés tu credencial?</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -187,7 +208,7 @@ export function Etapa2Form({
         </section>
       )}
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{1 + o}. Indicación médica</h2>
         <p className="text-text-mute text-sm mb-4">Copiá los datos de la indicación de tu médico/a.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -228,7 +249,7 @@ export function Etapa2Form({
         </div>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{2 + o}. Plan</h2>
         <p className="text-text-mute text-sm mb-4">
           {planInicial
@@ -244,7 +265,7 @@ export function Etapa2Form({
         />
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{3 + o}. Retiro o envío</h2>
         <p className="text-text-mute text-sm mb-4">¿Cómo preferís recibirlo?</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -262,7 +283,7 @@ export function Etapa2Form({
         </div>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{4 + o}. DNI</h2>
         <p className="text-text-mute text-sm mb-4">Sacale una foto a tu DNI. Si ya lo mandaste por WhatsApp, podés saltear este paso.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -277,7 +298,7 @@ export function Etapa2Form({
         </div>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{5 + o}. Documentación</h2>
         <p className="text-text-mute text-sm mb-4">
           Leé cada documento hasta el final y marcá &quot;Leí y acepto&quot;. Después firmás abajo.
@@ -296,13 +317,17 @@ export function Etapa2Form({
         </div>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-5">
+      <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{6 + o}. Firma</h2>
         <p className="text-text-mute text-sm mb-3">Firmá con el dedo (en el celular) o con el mouse.</p>
         <SignaturePad ref={sigRef} hiddenInputName="firma_data_url" />
       </section>
 
-      {error && <p className="text-red text-sm">{error}</p>}
+      {error && (
+        <p role="alert" className="text-red text-sm font-medium bg-red-bg rounded-lg px-3 py-2">
+          {error} — revisá el campo marcado en rojo.
+        </p>
+      )}
 
       <button
         type="submit"
