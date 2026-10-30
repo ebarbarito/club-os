@@ -1,45 +1,58 @@
 import Link from 'next/link';
 import { Eyebrow } from './eyebrow';
+import { ADICIONALES, PLANES } from '@/lib/alta/opciones';
 
-const PLANS = [
-  { name: 'Neón', price: '$8.000/mes', desc: 'Acceso a catálogo y reservas básicas.', featured: false },
-  { name: 'Premium', price: '$16.000/mes', desc: 'Prioridad en dispensa + descuentos.', featured: true },
-  { name: 'VIP', price: '$28.000/mes', desc: 'Beneficios completos + eventos del club.', featured: false },
-];
-
+// Planes reales (los mismos que se eligen en la pre-inscripción y que figuran
+// en los contratos): salen de src/lib/alta/opciones.ts, así un cambio de
+// precio se actualiza en todos lados a la vez.
 export function MembershipSection() {
   return (
     <section id="membresia" className="py-16 px-6 max-w-6xl mx-auto">
-      <Eyebrow>Planes</Eyebrow>
+      <Eyebrow>Planes mensuales</Eyebrow>
       <h2 className="font-display text-3xl font-bold text-text mb-2">Membresía</h2>
-      <p className="text-text-soft mb-8">Elegí el plan que mejor se adapte a vos.</p>
+      <p className="text-text-soft mb-8">
+        Elegí el plan que corresponde a tu indicación médica. La cuota cubre los costos de producción: somos una
+        asociación civil sin fines de lucro.
+      </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        {PLANS.map((p) => (
-          <div
-            key={p.name}
-            className={`relative rounded-xl border bg-surface p-5 ${p.featured ? 'border-gold border-2' : 'border-line'}`}
-          >
-            {p.featured && (
-              <span className="absolute -top-3 left-5 rounded-full bg-gold text-green-900 text-[10px] font-bold uppercase tracking-wide px-3 py-1">
-                Más elegido
-              </span>
-            )}
-            <h3 className="font-display font-bold text-text mb-1">{p.name}</h3>
-            <p className={`font-semibold mb-3 ${p.featured ? 'text-amber-tx' : 'text-accent'}`}>{p.price}</p>
-            <p className="text-text-soft text-sm">{p.desc}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {PLANES.map((p) => {
+          const destacado = p.value === 'medicinal';
+          return (
+            <div
+              key={p.value}
+              className={`flex flex-col rounded-xl border p-5 ${
+                destacado ? 'bg-green-900 text-white border-transparent' : 'bg-surface border-line'
+              }`}
+            >
+              <p className={`text-xs font-semibold uppercase tracking-[0.15em] mb-2 ${destacado ? 'text-gold' : 'text-amber-tx'}`}>
+                {p.title}
+              </p>
+              <p className={`font-display text-3xl font-bold leading-none mb-2 ${destacado ? 'text-gold' : 'text-text'}`}>
+                {p.value === 'medicinal' ? 'Aceite + crema' : p.title.replace('Flores ', '') + ' g'}
+              </p>
+              <p className={`text-sm flex-1 ${destacado ? 'text-white/80' : 'text-text-soft'}`}>{p.desc}</p>
+              <p className={`mt-4 font-semibold text-lg ${destacado ? 'text-gold' : 'text-accent'}`}>{p.precio}</p>
+              <p className={`text-xs ${destacado ? 'text-white/60' : 'text-text-mute'}`}>cuota mensual</p>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="rounded-xl border border-dashed border-line-2 p-5 mb-8">
-        <h3 className="font-display font-bold text-text mb-1">Green Box — suscripción mensual</h3>
-        <p className="text-text-soft text-sm">
-          Una selección curada de genéticas todos los meses, coordinada con tu dispensador/a.
-        </p>
+      <div className="rounded-xl border border-line bg-surface p-5 mb-8">
+        <p className="font-display font-bold text-text mb-3">Adicionales</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {ADICIONALES.map((a) => (
+            <div key={a.value} className="flex items-center justify-between rounded-lg bg-surface-2 px-4 py-3">
+              <span className="text-sm font-medium text-text">{a.title}</span>
+              <span className="text-sm font-semibold text-text">{a.precio}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-text-mute text-xs mt-3">Se suman a cualquier plan, según tu indicación médica.</p>
       </div>
 
-      <Link href="/alta-socio" className="inline-block rounded-lg bg-gold text-green-900 text-sm font-semibold px-4 py-2">
+      <Link href="/alta-socio" className="inline-block rounded-lg bg-gold text-green-900 text-sm font-semibold px-5 py-2.5">
         Quiero ser socio/a
       </Link>
     </section>
