@@ -92,6 +92,8 @@ export type Contexto = {
   operador?: string | null;
   datos: DatosMensajes;
   linkPreinscripcion?: string | null;
+  // Link personal de la segunda parte (solo socios pre-inscriptos).
+  linkEtapa2?: string | null;
   // Datos del socio (solo en la ficha).
   socio?: {
     nombre: string | null;
@@ -124,6 +126,7 @@ export function rellenar(texto: string, ctx: Contexto): string {
     'HORARIO DE RETIRO': d.horario_retiro,
     PLANES: planesTexto(),
     'LINK PRE-INSCRIPCIÓN': ctx.linkPreinscripcion,
+    'LINK SEGUNDA PARTE': ctx.linkEtapa2,
     'PLAN ELEGIDO': planElegido,
     'FECHA DE VENCIMIENTO': ctx.socio?.reprExp ? fmtFecha(ctx.socio.reprExp) : null,
     NOMBRE: ctx.socio?.nombre,

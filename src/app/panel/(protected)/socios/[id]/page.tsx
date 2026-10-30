@@ -12,6 +12,7 @@ import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plant
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { headers } from 'next/headers';
+import { randomBytes } from 'node:crypto';
 
 const REPR_LABEL: Record<string, string> = {
   vigente: 'REPROCANN vigente',
@@ -77,11 +78,24 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const origin =
     (tenant && publicUrlForSlug(tenant.slug)) ??
     `${h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
+  // Pre-inscripto: el link personal de la segunda parte se crea al abrir la
+  // ficha, así el mensaje ya muestra la dirección real. "Enviar" / "Copiar"
+  // reutilizan ese mismo link y registran el envío.
+  let tokenEtapa2 = (member.etapa2_token as string | null) ?? null;
+  if (member.status === 'preinscripto' && !tokenEtapa2) {
+    const nuevo = randomBytes(24).toString('base64url');
+    const { error: tokenError } = await supabase.from('members').update({ etapa2_token: nuevo }).eq('id', id);
+    if (!tokenError) tokenEtapa2 = nuevo;
+  }
+  const linkEtapa2 =
+    member.status === 'preinscripto' && tokenEtapa2 ? `${origin}/alta-socio/completar/${tokenEtapa2}` : null;
+
   const ctxMensajes = {
     club: tenant?.name ?? 'el club',
     operador: profile?.name?.trim().split(/\s+/)[0] ?? null,
     datos: parseDatosMensajes(tenant?.datos_mensajes),
     linkPreinscripcion: `${origin}/alta-socio`,
+    linkEtapa2,
     socio: {
       nombre: (member.nombre_pila as string | null) ?? null,
       plan: (member.plan_solicitado as string | null) ?? null,

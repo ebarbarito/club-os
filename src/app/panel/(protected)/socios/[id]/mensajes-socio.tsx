@@ -43,11 +43,12 @@ export function MensajesSocio({
   const telValido = telefonoWhatsApp(phone) != null;
 
   async function resolverTexto(): Promise<string | null> {
-    if (!llevaLink) return texto;
     if (!puedeGenerarLink) {
+      if (!llevaLink) return texto;
       setError('El link de la segunda parte solo se puede generar mientras el socio está pre-inscripto.');
       return null;
     }
+    // Reutiliza el mismo link que ya figura en el mensaje y registra el envío.
     const res = await generarLinkEtapa2(memberId);
     if (res.error || !res.url) {
       setError(res.error ?? 'No se pudo generar el link');
@@ -71,7 +72,7 @@ export function MensajesSocio({
       const wa = linkWhatsApp(phone, final);
       if (win) win.location.href = wa;
       else window.location.href = wa;
-      if (llevaLink) router.refresh();
+      if (puedeGenerarLink) router.refresh();
     });
   }
 
@@ -87,7 +88,7 @@ export function MensajesSocio({
       } catch {
         setError('No se pudo copiar. Seleccioná el texto a mano.');
       }
-      if (llevaLink) router.refresh();
+      if (puedeGenerarLink) router.refresh();
     });
   }
 
@@ -128,9 +129,9 @@ export function MensajesSocio({
           Completá antes de enviar: {pendientes.join(', ')}
         </p>
       )}
-      {llevaLink && (
+      {puedeGenerarLink && (
         <p className="text-text-mute text-xs mt-2">
-          El link personal de la segunda parte se genera al enviar o copiar.
+          El link es personal de este socio: sirve solo para él.
           {etapa2EnviadaAt && ` Último envío: ${etapa2EnviadaAt}.`}
         </p>
       )}
