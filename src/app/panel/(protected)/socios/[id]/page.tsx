@@ -95,6 +95,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     operador: profile?.name?.trim().split(/\s+/)[0] ?? null,
     datos: parseDatosMensajes(tenant?.datos_mensajes),
     linkPreinscripcion: `${origin}/alta-socio`,
+    linkSitio: origin,
     linkEtapa2,
     socio: {
       nombre: (member.nombre_pila as string | null) ?? null,

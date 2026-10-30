@@ -40,6 +40,7 @@ export default async function ConfiguracionPage() {
         operador: profile.name.trim().split(/\s+/)[0],
         datos: datosMensajes,
         linkPreinscripcion: `${origin}/alta-socio`,
+        linkSitio: origin,
         socio: { nombre: null, plan: null, adicionales: [], reprExp: null },
       })
     : '';

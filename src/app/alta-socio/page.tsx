@@ -2,12 +2,18 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { getTenantBySlug, canPreviewTenant } from '@/lib/tenant/get-tenant';
 import { AltaSocioForm } from './alta-socio-form';
+import { metadataPublica } from '@/lib/tenant/metadata';
 
 export async function generateMetadata(): Promise<Metadata> {
   const slug = (await headers()).get('x-club-os-tenant-slug');
   if (!slug) return {};
   const tenant = await getTenantBySlug(slug);
-  return { title: tenant ? `Alta de socio — ${tenant.name}` : 'Alta de socio' };
+  if (!tenant) return { title: 'Pre-inscripción' };
+  return metadataPublica(tenant, {
+    title: `Pre-inscripción · ${tenant.name}`,
+    description: 'Completá tus datos para empezar tu ingreso. Te lleva unos 5 minutos.',
+    path: '/alta-socio',
+  });
 }
 
 // Pantalla independiente (no modal) para que el club pueda compartir un

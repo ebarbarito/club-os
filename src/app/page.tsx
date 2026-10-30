@@ -4,14 +4,23 @@ import { getTenantBySlug, canPreviewTenant } from "@/lib/tenant/get-tenant";
 import { getCatalog } from "@/lib/public/get-catalog";
 import { PublicSite } from "@/components/public/public-site";
 import { ProductLanding } from "@/components/marketing/product-landing";
-import { Marca } from "@/components/public/marca";
+import { Marca, marcaDe } from "@/components/public/marca";
+import { metadataPublica } from "@/lib/tenant/metadata";
 
 export async function generateMetadata(): Promise<Metadata> {
   const slug = (await headers()).get('x-club-os-tenant-slug');
   if (!slug) {
     return { title: "Mi Club — Un solo panel para llevar tu club" };
   }
-  return {};
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) return {};
+  return metadataPublica(tenant, {
+    title: tenant.name,
+    description: marcaDe(tenant)
+      ? 'Cannabis medicinal, legal y trazable. ONG de la salud registrada en REPROCANN.'
+      : 'Club social de cannabis.',
+    path: '/',
+  });
 }
 
 export default async function Home() {

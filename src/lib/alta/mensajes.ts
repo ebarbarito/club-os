@@ -42,40 +42,46 @@ export const PLANTILLAS: Plantilla[] = [
   {
     id: 'preinscripcion',
     titulo: 'Pre-inscripción',
-    texto: `¡Hola! 🌿 Gracias por tu interés en [CLUB].
+    texto: `¡Hola! 👋 Gracias por tu interés en [CLUB] 🌿
 
-Para empezar tu ingreso, completá este formulario (te lleva unos 5 minutos):
+Para empezar tu ingreso, completá este formulario (te lleva unos 5 minutos ⏱️):
 👉 [LINK PRE-INSCRIPCIÓN]
 
-Ahí cargás tus datos, elegís tu plan y nos contás si ya tenés REPROCANN (si no lo tenés, te ayudamos a tramitarlo).
+📝 Ahí cargás tus datos, elegís tu plan y nos contás si ya tenés REPROCANN (si no lo tenés, te acompañamos con el trámite).
 
-*Tené a mano:* tu DNI, tu CUIL y tu credencial REPROCANN si ya la tenés.
+📎 *Tené a mano:* tu DNI, tu CUIL y tu credencial REPROCANN, si ya la tenés.
 
-Cualquier duda, escribime por acá.`,
+Cualquier duda, escribinos por acá 💬`,
   },
   {
     id: 'segunda-parte',
     titulo: 'Segunda parte (firma)',
-    texto: `¡Hola [NOMBRE]! Ya revisamos tus datos ✅ Anotamos el plan [PLAN ELEGIDO].
+    texto: `¡Hola [NOMBRE]! 👋 Ya revisamos tus datos ✅
+Anotamos el plan *[PLAN ELEGIDO]* 🌿
 
-Para cerrar tu ingreso solo falta la segunda parte: cargar tu indicación médica, leer y firmar la documentación (es personal, no la compartas):
+Para cerrar tu ingreso solo falta la segunda parte: cargar tu indicación médica y leer y firmar la documentación ✍️
 👉 [LINK SEGUNDA PARTE]
+🔒 Es personal, no lo compartas.
 
-*Tené a mano:* la indicación médica con las cantidades prescriptas, tu credencial REPROCANN y una foto de tu DNI (frente y dorso).
+📎 *Tené a mano:*
+• La indicación médica con las cantidades prescriptas
+• Tu credencial REPROCANN
+• Una foto de tu DNI (frente y dorso)
 
-Una vez hecho, quedan listos tu alta y tu primer retiro.`,
+Una vez completo, coordinamos tu alta y tu primer retiro 🗓️`,
   },
   {
     id: 'bienvenida',
     titulo: 'Bienvenida',
     texto: `🎉 ¡Te damos la bienvenida a [CLUB], [NOMBRE]!
 
-Ya sos parte del club. Algunas cosas útiles:
-📍 Dirección: [DIRECCIÓN]
-🕒 Horarios de retiro: [HORARIO DE RETIRO]
+Ya sos parte del club 💚 Algunos datos útiles:
+📍 *Dirección:* [DIRECCIÓN]
+🕒 *Horarios de retiro:* [HORARIO DE RETIRO]
+🌐 *Nuestro sitio:* [LINK SITIO]
 💬 Ante cualquier duda, este es tu canal directo con nosotros.
 
-Gracias por elegirnos. 💚`,
+¡Gracias por elegirnos! 🌿`,
   },
 ];
 
@@ -92,6 +98,8 @@ export type Contexto = {
   operador?: string | null;
   datos: DatosMensajes;
   linkPreinscripcion?: string | null;
+  // Sitio público del club.
+  linkSitio?: string | null;
   // Link personal de la segunda parte (solo socios pre-inscriptos).
   linkEtapa2?: string | null;
   // Datos del socio (solo en la ficha).
@@ -126,6 +134,7 @@ export function rellenar(texto: string, ctx: Contexto): string {
     'HORARIO DE RETIRO': d.horario_retiro,
     PLANES: planesTexto(),
     'LINK PRE-INSCRIPCIÓN': ctx.linkPreinscripcion,
+    'LINK SITIO': ctx.linkSitio,
     'LINK SEGUNDA PARTE': ctx.linkEtapa2,
     'PLAN ELEGIDO': planElegido,
     'FECHA DE VENCIMIENTO': ctx.socio?.reprExp ? fmtFecha(ctx.socio.reprExp) : null,

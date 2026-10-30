@@ -121,9 +121,16 @@ export function telefonoWhatsApp(raw: string | null | undefined): string | null 
   return `549${d}`;
 }
 
+// api.whatsapp.com y no wa.me: wa.me redirige y en esa redirección los
+// emojis llegan rotos ("�"), sobre todo en WhatsApp de escritorio.
 export function linkWhatsApp(telefono: string | null | undefined, texto: string) {
   const tel = telefonoWhatsApp(telefono);
-  return `https://wa.me/${tel ?? ''}?text=${encodeURIComponent(texto)}`;
+  const params = new URLSearchParams();
+  if (tel) params.set('phone', tel);
+  params.set('text', texto);
+  // URLSearchParams codifica los espacios como "+": WhatsApp los muestra tal
+  // cual, así que se pasan a %20.
+  return `https://api.whatsapp.com/send?${params.toString().replace(/\+/g, '%20')}`;
 }
 
 // ── Cuota mensual (plan + adicionales) para los contratos ─────────────────

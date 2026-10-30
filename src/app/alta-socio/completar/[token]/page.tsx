@@ -1,12 +1,26 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { etapa2Completada, getEtapa2 } from '@/lib/public/actions';
+import { getTenantBySlug } from '@/lib/tenant/get-tenant';
+import { metadataPublica } from '@/lib/tenant/metadata';
 import { Etapa2Form } from './etapa2-form';
 
-export const metadata: Metadata = {
-  title: 'Formulario de adhesión',
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
   // Link personal: que no lo indexe ningún buscador.
-  robots: { index: false, follow: false },
-};
+  const robots = { index: false, follow: false };
+  const slug = (await headers()).get('x-club-os-tenant-slug');
+  const tenant = slug ? await getTenantBySlug(slug) : null;
+  if (!tenant) return { title: 'Formulario de adhesión', robots };
+  return {
+    ...(await metadataPublica(tenant, {
+      title: `Formulario de adhesión · ${tenant.name}`,
+      description: 'Segunda parte de tu ingreso: indicación médica y firma de la documentación.',
+      path: `/alta-socio/completar/${token}`,
+    })),
+    robots,
+  };
+}
 
 // ETAPA 2 del alta. No usa el gate de public_site_enabled: el link lo
 // manda el club a mano a un socio puntual, y el token ya es el permiso.

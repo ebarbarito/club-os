@@ -61,6 +61,7 @@ export default async function SociosPage({
           operador: profile.name.trim().split(/\s+/)[0],
           datos,
           linkPreinscripcion: `${origin}/alta-socio`,
+          linkSitio: origin,
           socio: {
             nombre: m.nombre_pila ?? null,
             plan: m.plan_solicitado ?? null,
