@@ -3,6 +3,10 @@ export type TenantTheme = {
   accent: string;
   dark: string;
   bg: string;
+  // Identidad de marca propia para el sitio público (colores, tipografías y
+  // texturas del manual de marca). Hoy solo 'greenlevel'. El panel interno
+  // no la usa.
+  marca?: string;
 };
 
 export type Tenant = {

@@ -4,6 +4,7 @@ import { getTenantBySlug, canPreviewTenant } from "@/lib/tenant/get-tenant";
 import { getCatalog } from "@/lib/public/get-catalog";
 import { PublicSite } from "@/components/public/public-site";
 import { ProductLanding } from "@/components/marketing/product-landing";
+import { Marca } from "@/components/public/marca";
 
 export async function generateMetadata(): Promise<Metadata> {
   const slug = (await headers()).get('x-club-os-tenant-slug');
@@ -35,14 +36,20 @@ export default async function Home() {
 
   if (!tenant.public_site_enabled && !(await canPreviewTenant(tenant.id))) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-2 bg-bg font-sans text-center px-4">
-        <h1 className="font-display text-2xl font-bold">{tenant.name}</h1>
-        <p className="text-text-soft">Este sitio todavía no está disponible al público.</p>
-      </main>
+      <Marca tenant={tenant}>
+        <main className="flex flex-1 flex-col items-center justify-center gap-2 bg-bg font-sans text-center px-4">
+          <h1 className="font-display text-2xl font-bold">{tenant.name}</h1>
+          <p className="text-text-soft">Este sitio todavía no está disponible al público.</p>
+        </main>
+      </Marca>
     );
   }
 
   const catalog = await getCatalog(tenant.id);
 
-  return <PublicSite tenant={tenant} catalog={catalog} />;
+  return (
+    <Marca tenant={tenant}>
+      <PublicSite tenant={tenant} catalog={catalog} />
+    </Marca>
+  );
 }

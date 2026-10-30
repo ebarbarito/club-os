@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, Hanken_Grotesk } from "next/font/google";
+import { Archivo, Bebas_Neue, Hanken_Grotesk, Montserrat } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { getTenantBySlug } from "@/lib/tenant/get-tenant";
@@ -15,6 +15,22 @@ const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+// Tipografías del manual de marca de Green Level (sitio público, ver
+// .marca-greenlevel en globals.css): Montserrat para textos y Bebas Neue para
+// títulos. El manual pide Norwester para títulos, pero no tiene tildes ni Ñ;
+// Bebas Neue es la más parecida y es la que usa la propuesta de pacientes.
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const bebas = Bebas_Neue({
+  variable: "--font-bebas",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -34,7 +50,7 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={`${archivo.variable} ${hanken.variable} h-full antialiased`}
+      className={`${archivo.variable} ${hanken.variable} ${montserrat.variable} ${bebas.variable} h-full antialiased`}
     >
       <head>
         {/* Aplica el tema guardado antes del primer render — evita el flash

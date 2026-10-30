@@ -87,6 +87,69 @@
   --color-gold: var(--color-gold);
 }
 
+/* ── Marca Green Level (sitio público) ─────────────────────────────────────
+   Manual de marca: verdes 05221C / 053A1C / 006838 / 033A1E, dorados
+   DCAD49 / D3A762 (composición C6932F → DCAD49 → FBF09C), fondo claro
+   F7F3E8 con trama diagonal; Montserrat (textos) y Norwester → Bebas Neue
+   (títulos). Se aplica solo dentro de .marca-greenlevel (ver
+   components/public/marca.tsx), así el panel y los otros clubes no cambian.
+   Siempre en claro, aunque el usuario tenga el panel en modo oscuro. */
+.marca-greenlevel {
+  color-scheme: light;
+  --font-hanken: var(--font-montserrat);
+  --font-archivo: var(--font-bebas);
+
+  --color-green-900: #05221c;
+  --color-accent: #006838;
+  --color-accent-deep: #033a1e;
+  --color-bg: #f7f3e8;
+  --color-surface: #fffdf8;
+  --color-surface-2: #f7f3e8;
+  --color-surface-3: #efe6cf;
+  --color-text: #12201a;
+  --color-text-soft: #4f5d56;
+  --color-text-mute: #85908a;
+  --color-line: rgba(5, 34, 28, 0.12);
+  --color-line-2: rgba(5, 34, 28, 0.2);
+  --color-gold: #dcad49;
+  --color-amber: #dcad49;
+  --color-amber-bg: #f5ead0;
+  --color-amber-tx: #8a6420;
+  --gl-trama-clara: repeating-linear-gradient(115deg, rgba(198, 147, 47, 0.07) 0 1px, transparent 1px 10px);
+  --gl-trama-oscura: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 10px);
+  --gl-dorado: linear-gradient(90deg, #c6932f, #dcad49 35%, #fbf09c 60%, #dcad49 85%, #c6932f);
+
+  background-color: var(--color-bg);
+  background-image: var(--gl-trama-clara);
+  color: var(--color-text);
+}
+
+.marca-greenlevel .bg-bg {
+  background-image: var(--gl-trama-clara);
+}
+
+/* Bloques verdes (hero, aviso +18, encabezados): degradé verde con trama y
+   filete dorado abajo, como el "oscuro con textura" del manual. */
+.marca-greenlevel .bg-green-900 {
+  background-image: var(--gl-trama-oscura), linear-gradient(135deg, #006838 0%, #053a1c 55%, #05221c 100%);
+  border-bottom: 3px solid transparent;
+  border-image: var(--gl-dorado) 1;
+}
+
+/* Botones y detalles dorados con la composición de dorado del manual. */
+.marca-greenlevel .bg-gold {
+  background-image: var(--gl-dorado);
+  color: #05221c;
+}
+
+/* Bebas Neue tiene un solo peso: sin negrita "falsa" del navegador. */
+.marca-greenlevel .font-display {
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
