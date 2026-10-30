@@ -272,6 +272,24 @@ async function documentosParaFirmar(tenant: { id: string; name: string }, member
   }));
 }
 
+// Link de la segunda parte ya usado: el socio completó el formulario y está
+// en evaluación. Solo devuelve el nombre del club (para el "¡Listo!").
+export async function etapa2Completada(token: string) {
+  const tenant = await getRequestTenant();
+  if (!tenant || !token) return null;
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from('members')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .eq('etapa2_token', token)
+    .eq('status', 'pending')
+    .not('etapa2_completada_at', 'is', null)
+    .is('deleted_at', null)
+    .maybeSingle();
+  return data ? { tenantName: tenant.name } : null;
+}
+
 // Lo mínimo para armar la pantalla: el link de la etapa 2 no expone más
 // datos personales que el nombre (si se reenvía por error, no filtra la
 // ficha completa).
@@ -362,8 +380,10 @@ export async function completarEtapa2(token: string, formData: FormData) {
       consiente_veracidad: true,
       status: 'pending',
       etapa2_completada_at: new Date().toISOString(),
-      // El link se quema al usarlo: no se puede volver a pisar la ficha.
-      etapa2_token: null,
+      // El token se conserva para poder mostrar "¡Listo!" si se recarga o se
+      // vuelve a abrir el link; no permite volver a pisar la ficha porque
+      // memberPorToken solo acepta socios pre-inscriptos. Validar/rechazar lo
+      // borra.
     })
     .eq('id', member.id)
     .eq('tenant_id', tenant.id)
