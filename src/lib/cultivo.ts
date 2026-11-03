@@ -97,7 +97,5 @@ export type ItemCosecha = {
   strainId: string;
   pesoHumedo: number | null;
   extraccionPlantas: number;
-  extraccionPeso: number | null;
   aceitePlantas: number;
-  aceitePeso: number | null;
 };

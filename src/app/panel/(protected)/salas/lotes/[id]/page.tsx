@@ -43,7 +43,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
     supabase
       .from('lote_procesos')
       .select(
-        'id, tipo, plantas, peso_entrada, estado, resultado, unidad, nota, created_at, terminado_at, strain:strains!lote_procesos_strain_id_fkey(name), producto:strains!lote_procesos_producto_id_fkey(name)',
+        'id, origen, tipo, plantas, peso_entrada, estado, resultado, unidad, nota, created_at, terminado_at, strain:strains!lote_procesos_strain_id_fkey(name), producto:strains!lote_procesos_producto_id_fkey(name)',
       )
       .eq('lote_id', id)
       .order('created_at'),
@@ -216,7 +216,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                   <th className="text-left font-semibold px-3 py-2">Proceso</th>
                   <th className="text-left font-semibold px-3 py-2">Genética</th>
                   <th className="text-right font-semibold px-3 py-2">Plantas</th>
-                  <th className="text-right font-semibold px-3 py-2">Peso al salir</th>
+                  <th className="text-right font-semibold px-3 py-2">Destinado</th>
                   <th className="text-right font-semibold px-3 py-2">Rindió</th>
                   <th className="text-right font-semibold px-3 py-2">%</th>
                   <th className="text-left font-semibold px-3 py-2">Stock</th>
@@ -226,8 +226,9 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                 {(procesos ?? []).map(
                   (pr: {
                     id: string;
+                    origen: string;
                     tipo: string;
-                    plantas: number;
+                    plantas: number | null;
                     peso_entrada: number | null;
                     estado: string;
                     resultado: number | null;
@@ -242,10 +243,11 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                       <tr key={pr.id}>
                         <td className="px-3 py-2">
                           {pr.tipo === 'extraccion' ? 'Extracción' : 'Aceites'}
+                          <span className="block text-xs text-text-mute">{pr.origen === 'stock' ? 'Desde stock' : 'Al cosechar'}</span>
                           {pr.nota && <span className="block text-xs text-text-mute">{pr.nota}</span>}
                         </td>
                         <td className="px-3 py-2">{uno(pr.strain)?.name ?? '—'}</td>
-                        <td className="px-3 py-2 text-right">{pr.plantas}</td>
+                        <td className="px-3 py-2 text-right">{pr.plantas ?? '—'}</td>
                         <td className="px-3 py-2 text-right">{entrada ? fmtGramos(entrada) : '—'}</td>
                         <td className="px-3 py-2 text-right">
                           {pr.estado === 'pendiente' ? (

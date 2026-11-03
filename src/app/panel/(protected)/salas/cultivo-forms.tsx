@@ -11,6 +11,7 @@ import {
   editarLote,
   enviarLoteAStock,
   moverPlantas,
+  procesoDesdeStock,
   terminarProceso,
 } from './actions';
 
@@ -329,8 +330,8 @@ export function DescartarForm({ grupos }: { grupos: GrupoPlantas[] }) {
 // ── Cosechar: lo que no se deriva pasa a secado ────────────────────────────
 
 type LineaLote = { strainId: string; strainName: string; plants: number };
-type Deriv = { humedo: string; extP: string; extG: string; aceP: string; aceG: string; abierta: boolean };
-const DERIV_VACIA: Deriv = { humedo: '', extP: '', extG: '', aceP: '', aceG: '', abierta: false };
+type Deriv = { humedo: string; extP: string; aceP: string; abierta: boolean };
+const DERIV_VACIA: Deriv = { humedo: '', extP: '', aceP: '', abierta: false };
 
 export function CosecharForm({
   loteId,
@@ -363,10 +364,7 @@ export function CosecharForm({
 
   function submit() {
     for (const l of lineas) {
-      const x = d(l.strainId);
       if (aSecado(l) < 0) return setError(`${l.strainName} tiene ${l.plants} plantas: revisá lo derivado.`);
-      if (entero(x.extP) > 0 && !(numero(x.extG) ?? 0)) return setError(`Cargá el peso que sale a extracción de ${l.strainName}.`);
-      if (entero(x.aceP) > 0 && !(numero(x.aceG) ?? 0)) return setError(`Cargá el peso que sale a aceites de ${l.strainName}.`);
     }
     if (tot.secado > 0 && !sala) return setError('Creá una sala de tipo "Secado y manicura" para poder cosechar.');
     enviar(() =>
@@ -379,9 +377,7 @@ export function CosecharForm({
             strainId: l.strainId,
             pesoHumedo: numero(x.humedo),
             extraccionPlantas: entero(x.extP),
-            extraccionPeso: numero(x.extG),
             aceitePlantas: entero(x.aceP),
-            aceitePeso: numero(x.aceG),
           };
         }),
       ),
@@ -439,16 +435,11 @@ export function CosecharForm({
                   + Derivar a extracción / aceites
                 </button>
               ) : (
-                <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-xs rounded-lg bg-surface-2 p-2">
-                  <span />
-                  <span className="text-text-mute">Plantas</span>
-                  <span className="text-text-mute">Peso al salir (g)</span>
-                  <span className="font-semibold text-text">Extracción</span>
+                <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-xs rounded-lg bg-surface-2 p-2">
+                  <span className="font-semibold text-text">Plantas a extracción</span>
                   <input type="number" min="0" inputMode="numeric" value={x.extP} onChange={(e) => set(l.strainId, { extP: e.target.value })} className={inputCls} />
-                  <input type="number" min="0" step="0.1" inputMode="decimal" value={x.extG} onChange={(e) => set(l.strainId, { extG: e.target.value })} className={inputCls} />
-                  <span className="font-semibold text-text">Aceites</span>
+                  <span className="font-semibold text-text">Plantas a aceites</span>
                   <input type="number" min="0" inputMode="numeric" value={x.aceP} onChange={(e) => set(l.strainId, { aceP: e.target.value })} className={inputCls} />
-                  <input type="number" min="0" step="0.1" inputMode="decimal" value={x.aceG} onChange={(e) => set(l.strainId, { aceG: e.target.value })} className={inputCls} />
                 </div>
               )}
             </div>
@@ -479,7 +470,14 @@ export function ProcesoForm({
   proceso,
   productos,
 }: {
-  proceso: { id: string; loteId: string; tipo: 'extraccion' | 'aceite'; strainName: string; plantas: number; pesoEntrada: number | null };
+  proceso: {
+    id: string;
+    loteId: string | null;
+    tipo: 'extraccion' | 'aceite';
+    strainName: string;
+    plantas: number | null;
+    pesoEntrada: number | null;
+  };
   productos: { id: string; name: string }[];
 }) {
   const { pending, error, setError, enviar } = useEnvio();
@@ -494,14 +492,15 @@ export function ProcesoForm({
       setError('Cargá cuánto rindió el proceso.');
       return;
     }
-    enviar(() => terminarProceso(proceso.id, proceso.loteId, { resultado: r, unidad, productoId: producto || null, nota }));
+    enviar(() => terminarProceso(proceso.id, proceso.loteId ?? '', { resultado: r, unidad, productoId: producto || null, nota }));
   }
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
-        {proceso.tipo === 'extraccion' ? 'Extracción' : 'Aceites'} · {proceso.strainName} · {proceso.plantas} plantas
-        {proceso.pesoEntrada ? ` · salió con ${fmtGramos(proceso.pesoEntrada)}` : ''}
+        {proceso.tipo === 'extraccion' ? 'Extracción' : 'Aceites'} · {proceso.strainName}
+        {proceso.plantas ? ` · ${proceso.plantas} plantas` : ''}
+        {proceso.pesoEntrada ? ` · se destinaron ${fmtGramos(proceso.pesoEntrada)}` : ''}
       </p>
       <div className="flex gap-2">
         <div className="flex-1">
@@ -538,6 +537,99 @@ export function ProcesoForm({
       <MsgError msg={error} />
       <button type="button" disabled={pending} onClick={submit} className={btnCls}>
         {pending ? 'Guardando…' : 'Cerrar proceso'}
+      </button>
+    </div>
+  );
+}
+
+// ── Material seco del stock a extracción / aceites ─────────────────────────
+
+export function DesdeStockForm({
+  stock,
+  lotes,
+}: {
+  stock: { strainId: string; name: string; grams: number }[];
+  lotes: { id: string; numero: number; strainIds: string[] }[];
+}) {
+  const { pending, error, setError, enviar } = useEnvio();
+  const [tipo, setTipo] = useState<'extraccion' | 'aceite'>('extraccion');
+  const [strainId, setStrainId] = useState(stock[0]?.strainId ?? '');
+  const [gramos, setGramos] = useState('');
+  const [loteId, setLoteId] = useState('');
+  const [nota, setNota] = useState('');
+
+  const item = stock.find((s) => s.strainId === strainId);
+  const lotesDeGen = lotes.filter((l) => l.strainIds.includes(strainId));
+
+  function submit() {
+    const g = numero(gramos);
+    if (!item) return setError('Elegí la genética.');
+    if (!g || g <= 0) return setError('Indicá cuántos gramos se destinan.');
+    if (g > item.grams) return setError(`En stock general hay ${fmtGramos(item.grams)} de ${item.name}.`);
+    enviar(() => procesoDesdeStock({ strainId, tipo, gramos: g, loteId: loteId || null, nota }));
+  }
+
+  if (stock.length === 0) return <p className="text-sm text-text-soft">No hay genéticas con stock general.</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-soft">
+        Flor ya seca y pesada que sale del <strong>stock general</strong> a un proceso. Se descuenta del stock ahora y después
+        cargás cuánto rindió.
+      </p>
+      <div className="flex gap-2">
+        {(['extraccion', 'aceite'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTipo(t)}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
+              tipo === t ? 'border-accent bg-accent text-white' : 'border-line-2 text-text-soft'
+            }`}
+          >
+            {t === 'extraccion' ? 'Extracción' : 'Aceites'}
+          </button>
+        ))}
+      </div>
+      <div>
+        <label className={labelCls}>Genética</label>
+        <select
+          value={strainId}
+          onChange={(e) => {
+            setStrainId(e.target.value);
+            setLoteId('');
+          }}
+          className={inputCls}
+        >
+          {stock.map((s) => (
+            <option key={s.strainId} value={s.strainId}>
+              {s.name} · {fmtGramos(s.grams)} en stock
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Gramos que se destinan</label>
+        <input type="number" min="0" step="0.1" inputMode="decimal" value={gramos} onChange={(e) => setGramos(e.target.value)} className={inputCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Lote de origen (opcional)</label>
+        <select value={loteId} onChange={(e) => setLoteId(e.target.value)} className={inputCls}>
+          <option value="">Sin especificar</option>
+          {lotesDeGen.map((l) => (
+            <option key={l.id} value={l.id}>
+              {codigoLote(l.numero)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <input value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} />
+      </div>
+      <MsgError msg={error} />
+      <button type="button" disabled={pending} onClick={submit} className={btnCls}>
+        {pending ? 'Guardando…' : `Enviar a ${tipo === 'extraccion' ? 'extracción' : 'aceites'}`}
       </button>
     </div>
   );

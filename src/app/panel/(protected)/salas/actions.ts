@@ -114,9 +114,7 @@ export async function cosecharLote(loteId: string, salaSecado: string, items: It
       strain_id: i.strainId,
       peso_humedo: i.pesoHumedo,
       extraccion_plantas: i.extraccionPlantas,
-      extraccion_peso: i.extraccionPeso,
       aceite_plantas: i.aceitePlantas,
-      aceite_peso: i.aceitePeso,
     })),
   });
   if (error) return { error: error.message };
@@ -129,6 +127,7 @@ export async function terminarProceso(
   loteId: string,
   datos: { resultado: number; unidad: 'g' | 'ml'; productoId: string | null; nota: string },
 ): Promise<Res> {
+  // loteId puede venir vacío (procesos que salieron del stock sin lote).
   const p = await perfil(false);
   if ('error' in p) return { error: p.error };
   const supabase = await createClient();
@@ -140,8 +139,31 @@ export async function terminarProceso(
     p_nota: datos.nota || null,
   });
   if (error) return { error: error.message };
-  refrescar(loteId);
+  refrescar(loteId || undefined);
   if (datos.productoId) revalidatePath('/panel/stock');
+  return {};
+}
+
+export async function procesoDesdeStock(datos: {
+  strainId: string;
+  tipo: 'extraccion' | 'aceite';
+  gramos: number;
+  loteId: string | null;
+  nota: string;
+}): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('proceso_desde_stock', {
+    p_strain: datos.strainId,
+    p_tipo: datos.tipo,
+    p_gramos: datos.gramos,
+    p_lote: datos.loteId,
+    p_nota: datos.nota || null,
+  });
+  if (error) return { error: error.message };
+  refrescar(datos.loteId ?? undefined);
+  revalidatePath('/panel/stock');
   return {};
 }
 
