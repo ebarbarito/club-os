@@ -10,6 +10,8 @@ import { codigoLote, diaDeEtapa, diasEntre, fmtFecha, fmtGramos } from '@/lib/cu
 const TIPO_MOV: Record<string, string> = {
   alta: 'Carga',
   mover: 'Movimiento',
+  derivar: 'Derivación',
+  proceso: 'Proceso',
   descarte: 'Descarte',
   cosecha: 'Cosecha',
   stock: 'A stock',
@@ -28,7 +30,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: lote }, { data: plantas }, { data: pesajes }, { data: movs }, { data: salas }] = await Promise.all([
+  const [{ data: lote }, { data: plantas }, { data: pesajes }, { data: movs }, { data: salas }, { data: procesos }] = await Promise.all([
     supabase.from('lotes').select('*').eq('id', id).maybeSingle(),
     supabase.from('sala_strains').select('strain_id, plants, strain:strains(name)').eq('lote_id', id),
     supabase.from('lote_pesajes').select('strain_id, plantas, peso_humedo, peso_seco, peso_trim, strain:strains(name)').eq('lote_id', id),
@@ -38,6 +40,13 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
       .eq('lote_id', id)
       .order('created_at'),
     supabase.from('salas').select('id, name'),
+    supabase
+      .from('lote_procesos')
+      .select(
+        'id, tipo, plantas, peso_entrada, estado, resultado, unidad, nota, created_at, terminado_at, strain:strains!lote_procesos_strain_id_fkey(name), producto:strains!lote_procesos_producto_id_fkey(name)',
+      )
+      .eq('lote_id', id)
+      .order('created_at'),
   ]);
   if (!lote) notFound();
 
@@ -81,13 +90,16 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
   const totTrim = lista.reduce((s, f) => s + (Number(f.trim) || 0), 0);
 
   const cierre: string | null = lote.cerrado_at ? new Date(lote.cerrado_at).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null;
-  const diasFlora = lote.secado_inicio ? diasEntre(lote.flora_inicio, lote.secado_inicio) : diaDeEtapa(lote.flora_inicio);
+  // Fin de flora: el pase a secado, o el cierre si todo se derivó a procesos.
+  const finFlora: string | null = lote.secado_inicio ?? cierre;
+  const diasFlora = finFlora ? diasEntre(lote.flora_inicio, finFlora) : diaDeEtapa(lote.flora_inicio);
+  const conSecado = Boolean(lote.secado_inicio);
   const diasSecado = lote.secado_inicio ? (cierre ? diasEntre(lote.secado_inicio, cierre) : diaDeEtapa(lote.secado_inicio)) : null;
 
   const ESTADO: Record<string, { label: string; color: 'purple' | 'amber' | 'gray' }> = {
     flora: { label: 'En flora', color: 'purple' },
     secado: { label: 'En secado', color: 'amber' },
-    cerrado: { label: 'En stock', color: 'gray' },
+    cerrado: { label: 'Cerrado', color: 'gray' },
   };
   const e = ESTADO[lote.estado] ?? ESTADO.cerrado;
 
@@ -108,7 +120,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
           <p className="text-xs font-semibold uppercase text-purple">Flora</p>
           <p className="font-display font-bold text-text">{nombreSala(lote.sala_flora_id)}</p>
           <p className="text-sm text-text-soft">
-            {fmtFecha(lote.flora_inicio)} → {lote.secado_inicio ? fmtFecha(lote.secado_inicio) : 'hoy'}
+            {fmtFecha(lote.flora_inicio)} → {finFlora ? fmtFecha(finFlora) : 'hoy'}
           </p>
           <p className="text-sm text-text">
             {lote.estado === 'flora' ? `Día ${diasFlora} de ${lote.dias_flora}` : `${diasFlora} días`}
@@ -127,12 +139,12 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
               <p className="text-sm text-text">{lote.estado === 'secado' ? `Día ${diasSecado}` : `${diasSecado} días`}</p>
             </>
           ) : (
-            <p className="text-sm text-text-mute">Pendiente</p>
+            <p className="text-sm text-text-mute">{cierre ? 'No pasó por secado' : 'Pendiente'}</p>
           )}
         </div>
-        <div className={`rounded-xl border p-4 ${cierre ? 'border-line bg-surface' : 'border-dashed border-line-2'}`}>
+        <div className={`rounded-xl border p-4 ${cierre && conSecado ? 'border-line bg-surface' : 'border-dashed border-line-2'}`}>
           <p className="text-xs font-semibold uppercase text-accent">Stock</p>
-          {cierre ? (
+          {cierre && conSecado ? (
             <>
               <p className="font-display font-bold text-text">{fmtGramos(totSeco)}</p>
               <p className="text-sm text-text-soft">Ingresó el {fmtFecha(cierre)}</p>
@@ -141,7 +153,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
               </p>
             </>
           ) : (
-            <p className="text-sm text-text-mute">Pendiente</p>
+            <p className="text-sm text-text-mute">{cierre ? 'Todo fue a extracción / aceites' : 'Pendiente'}</p>
           )}
         </div>
       </div>
@@ -193,6 +205,72 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
           )}
         </table>
       </div>
+
+      {(procesos ?? []).length > 0 && (
+        <>
+          <h2 className="font-display text-lg font-bold text-text mb-2">Extracción y aceites</h2>
+          <div className="rounded-xl border border-line bg-surface overflow-x-auto mb-6">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-2 text-xs text-text-soft">
+                <tr>
+                  <th className="text-left font-semibold px-3 py-2">Proceso</th>
+                  <th className="text-left font-semibold px-3 py-2">Genética</th>
+                  <th className="text-right font-semibold px-3 py-2">Plantas</th>
+                  <th className="text-right font-semibold px-3 py-2">Peso al salir</th>
+                  <th className="text-right font-semibold px-3 py-2">Rindió</th>
+                  <th className="text-right font-semibold px-3 py-2">%</th>
+                  <th className="text-left font-semibold px-3 py-2">Stock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {(procesos ?? []).map(
+                  (pr: {
+                    id: string;
+                    tipo: string;
+                    plantas: number;
+                    peso_entrada: number | null;
+                    estado: string;
+                    resultado: number | null;
+                    unidad: string | null;
+                    nota: string | null;
+                    strain: { name: string } | { name: string }[] | null;
+                    producto: { name: string } | { name: string }[] | null;
+                  }) => {
+                    const entrada = pr.peso_entrada == null ? null : Number(pr.peso_entrada);
+                    const res = pr.resultado == null ? null : Number(pr.resultado);
+                    return (
+                      <tr key={pr.id}>
+                        <td className="px-3 py-2">
+                          {pr.tipo === 'extraccion' ? 'Extracción' : 'Aceites'}
+                          {pr.nota && <span className="block text-xs text-text-mute">{pr.nota}</span>}
+                        </td>
+                        <td className="px-3 py-2">{uno(pr.strain)?.name ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">{pr.plantas}</td>
+                        <td className="px-3 py-2 text-right">{entrada ? fmtGramos(entrada) : '—'}</td>
+                        <td className="px-3 py-2 text-right">
+                          {pr.estado === 'pendiente' ? (
+                            <span className="text-amber-tx">En proceso</span>
+                          ) : res != null ? (
+                            `${res.toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${pr.unidad ?? ''}`
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {res != null && entrada && pr.unidad === 'g'
+                            ? `${((res / entrada) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-text-soft">{uno(pr.producto)?.name ?? '—'}</td>
+                      </tr>
+                    );
+                  },
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Historial */}
       <h2 className="font-display text-lg font-bold text-text mb-2">Historial</h2>

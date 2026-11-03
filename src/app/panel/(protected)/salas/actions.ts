@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
-import { TIPOS_SALA } from '@/lib/cultivo';
+import { TIPOS_SALA, type ItemCosecha } from '@/lib/cultivo';
 
 type Res = { error?: string };
 
@@ -103,21 +103,45 @@ export async function descartarPlantas(id: string, plants: number, nota: string)
   return {};
 }
 
-export async function cosecharLote(
-  loteId: string,
-  salaSecado: string,
-  items: { strainId: string; pesoHumedo: number | null }[],
-): Promise<Res> {
+export async function cosecharLote(loteId: string, salaSecado: string, items: ItemCosecha[]): Promise<Res> {
   const p = await perfil(false);
   if ('error' in p) return { error: p.error };
   const supabase = await createClient();
   const { error } = await supabase.rpc('lote_cosechar', {
     p_lote_id: loteId,
-    p_sala_secado: salaSecado,
-    p_items: items.map((i) => ({ strain_id: i.strainId, peso_humedo: i.pesoHumedo })),
+    p_sala_secado: salaSecado || null,
+    p_items: items.map((i) => ({
+      strain_id: i.strainId,
+      peso_humedo: i.pesoHumedo,
+      extraccion_plantas: i.extraccionPlantas,
+      extraccion_peso: i.extraccionPeso,
+      aceite_plantas: i.aceitePlantas,
+      aceite_peso: i.aceitePeso,
+    })),
   });
   if (error) return { error: error.message };
   refrescar(loteId);
+  return {};
+}
+
+export async function terminarProceso(
+  procesoId: string,
+  loteId: string,
+  datos: { resultado: number; unidad: 'g' | 'ml'; productoId: string | null; nota: string },
+): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('proceso_terminar', {
+    p_id: procesoId,
+    p_resultado: datos.resultado,
+    p_unidad: datos.unidad,
+    p_producto: datos.productoId,
+    p_nota: datos.nota || null,
+  });
+  if (error) return { error: error.message };
+  refrescar(loteId);
+  if (datos.productoId) revalidatePath('/panel/stock');
   return {};
 }
 

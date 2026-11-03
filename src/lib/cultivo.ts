@@ -91,3 +91,13 @@ export type LoteResumen = {
   secadoInicio: string | null;
   notas: string | null;
 };
+
+// Cosecha de una genética: lo que va a secado y lo que se deriva.
+export type ItemCosecha = {
+  strainId: string;
+  pesoHumedo: number | null;
+  extraccionPlantas: number;
+  extraccionPeso: number | null;
+  aceitePlantas: number;
+  aceitePeso: number | null;
+};

@@ -5,6 +5,7 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
+import { fmtDate } from '@/lib/format';
 import {
   DESTINOS,
   TIPO_COLOR,
@@ -25,6 +26,7 @@ import {
   DescartarForm,
   EditarLoteForm,
   MoverForm,
+  ProcesoForm,
   StockForm,
   type DestinoSala,
 } from './cultivo-forms';
@@ -54,8 +56,15 @@ export default async function SalasPage() {
 
   const supabase = await createClient();
 
-  const [{ data: salaRows }, { data: plantRows }, { data: loteRows }, { data: strainRows }, { data: pesajeRows }] =
-    await Promise.all([
+  const [
+    { data: salaRows },
+    { data: plantRows },
+    { data: loteRows },
+    { data: strainRows },
+    { data: pesajeRows },
+    { data: procesoRows },
+    { data: productoRows },
+  ] = await Promise.all([
       supabase
         .from('salas')
         .select('id, name, tipo, orden, capacity, responsable, temp_min, temp_max, hum_min, hum_max, sensor_id')
@@ -72,6 +81,12 @@ export default async function SalasPage() {
         .limit(60),
       supabase.from('strains').select('id, name').eq('item_type', 'genetica').neq('status', 'inactiva').order('name'),
       supabase.from('lote_pesajes').select('lote_id, strain_id, plantas, peso_humedo, peso_seco'),
+      supabase
+        .from('lote_procesos')
+        .select('id, lote_id, tipo, plantas, peso_entrada, created_at, strain:strains!lote_procesos_strain_id_fkey(name), lote:lotes(numero)')
+        .eq('estado', 'pendiente')
+        .order('created_at'),
+      supabase.from('strains').select('id, name').neq('status', 'inactiva').order('name'),
     ]);
 
   const salas: Sala[] = salaRows ?? [];
@@ -131,6 +146,33 @@ export default async function SalasPage() {
   );
   const pesajes: { lote_id: string; strain_id: string; plantas: number; peso_humedo: number | null; peso_seco: number | null }[] =
     pesajeRows ?? [];
+
+  const productos: { id: string; name: string }[] = productoRows ?? [];
+  const procesos = (procesoRows ?? []).map(
+    (r: {
+      id: string;
+      lote_id: string;
+      tipo: 'extraccion' | 'aceite';
+      plantas: number;
+      peso_entrada: number | null;
+      created_at: string;
+      strain: { name: string } | { name: string }[] | null;
+      lote: { numero: number } | { numero: number }[] | null;
+    }) => {
+      const strain = Array.isArray(r.strain) ? r.strain[0] : r.strain;
+      const lote = Array.isArray(r.lote) ? r.lote[0] : r.lote;
+      return {
+        id: r.id,
+        loteId: r.lote_id,
+        loteNumero: lote?.numero ?? 0,
+        tipo: r.tipo,
+        strainName: strain?.name ?? '—',
+        plantas: r.plantas,
+        pesoEntrada: r.peso_entrada == null ? null : Number(r.peso_entrada),
+        creado: r.created_at,
+      };
+    },
+  );
 
   const proximoLote = Math.max(0, ...lotes.map((l) => l.numero)) + 1;
   const salaNombre = new Map(salas.map((s) => [s.id, s.name]));
@@ -228,7 +270,7 @@ export default async function SalasPage() {
                   </ModalTrigger>
                 )}
                 {s.tipo === 'flora' && lote && (
-                  <ModalTrigger label="Cosechar → Secado" className={btnPri} title={`Cosechar ${codigoLote(lote.numero)}`}>
+                  <ModalTrigger label="Cosechar →" className={btnPri} title={`Cosechar ${codigoLote(lote.numero)}`}>
                     <CosecharForm
                       loteId={lote.id}
                       loteNumero={lote.numero}
@@ -294,6 +336,29 @@ export default async function SalasPage() {
           <p className="col-span-full text-center text-text-mute py-10">Sin salas cargadas todavía.</p>
         )}
       </div>
+
+      {procesos.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-bold text-text mb-2">Extracción y aceites en proceso</h2>
+          <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+            {procesos.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
+                <Badge label={p.tipo === 'extraccion' ? 'Extracción' : 'Aceites'} color={p.tipo === 'extraccion' ? 'blue' : 'amber'} />
+                <Link href={`/panel/salas/lotes/${p.loteId}`} className="font-semibold text-accent hover:underline">
+                  {codigoLote(p.loteNumero)}
+                </Link>
+                <span className="flex-1 min-w-40 text-text-soft">
+                  {p.strainName} · {p.plantas} plantas{p.pesoEntrada ? ` · ${fmtGramos(p.pesoEntrada)}` : ''} · desde{' '}
+                  {fmtDate(p.creado)}
+                </span>
+                <ModalTrigger label="Cargar resultado" className={btnPri} title={`Resultado — ${codigoLote(p.loteNumero)}`}>
+                  <ProcesoForm proceso={p} productos={productos} />
+                </ModalTrigger>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <LotesTabla lotes={lotes} grupos={grupos} pesajes={pesajes} salaNombre={salaNombre} />
     </div>
@@ -430,7 +495,7 @@ function LotesTabla({
   const ESTADO: Record<string, { label: string; color: 'purple' | 'amber' | 'gray' }> = {
     flora: { label: 'En flora', color: 'purple' },
     secado: { label: 'En secado', color: 'amber' },
-    cerrado: { label: 'En stock', color: 'gray' },
+    cerrado: { label: 'Cerrado', color: 'gray' },
   };
   return (
     <section className="mt-8">

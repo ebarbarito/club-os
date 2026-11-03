@@ -11,6 +11,7 @@ import {
   editarLote,
   enviarLoteAStock,
   moverPlantas,
+  terminarProceso,
 } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -325,9 +326,11 @@ export function DescartarForm({ grupos }: { grupos: GrupoPlantas[] }) {
   );
 }
 
-// ── Cosechar: el lote pasa entero de flora a secado ────────────────────────
+// ── Cosechar: lo que no se deriva pasa a secado ────────────────────────────
 
 type LineaLote = { strainId: string; strainName: string; plants: number };
+type Deriv = { humedo: string; extP: string; extG: string; aceP: string; aceG: string; abierta: boolean };
+const DERIV_VACIA: Deriv = { humedo: '', extP: '', extG: '', aceP: '', aceG: '', abierta: false };
 
 export function CosecharForm({
   loteId,
@@ -340,20 +343,56 @@ export function CosecharForm({
   lineas: LineaLote[];
   salasSecado: { id: string; name: string }[];
 }) {
-  const { pending, error, enviar } = useEnvio();
+  const { pending, error, setError, enviar } = useEnvio();
   const [sala, setSala] = useState(salasSecado[0]?.id ?? '');
-  const [pesos, setPesos] = useState<Record<string, string>>({});
-  const totalPlantas = lineas.reduce((s, l) => s + l.plants, 0);
+  const [datos, setDatos] = useState<Record<string, Deriv>>({});
 
-  if (salasSecado.length === 0) {
-    return <p className="text-sm text-text-soft">Creá una sala de tipo &quot;Secado y manicura&quot; para poder cosechar.</p>;
+  const d = (id: string) => datos[id] ?? DERIV_VACIA;
+  const set = (id: string, patch: Partial<Deriv>) => setDatos((p) => ({ ...p, [id]: { ...d(id), ...patch } }));
+  const entero = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const aSecado = (l: LineaLote) => l.plants - entero(d(l.strainId).extP) - entero(d(l.strainId).aceP);
+
+  const tot = lineas.reduce(
+    (acc, l) => ({
+      secado: acc.secado + Math.max(0, aSecado(l)),
+      ext: acc.ext + entero(d(l.strainId).extP),
+      ace: acc.ace + entero(d(l.strainId).aceP),
+    }),
+    { secado: 0, ext: 0, ace: 0 },
+  );
+
+  function submit() {
+    for (const l of lineas) {
+      const x = d(l.strainId);
+      if (aSecado(l) < 0) return setError(`${l.strainName} tiene ${l.plants} plantas: revisá lo derivado.`);
+      if (entero(x.extP) > 0 && !(numero(x.extG) ?? 0)) return setError(`Cargá el peso que sale a extracción de ${l.strainName}.`);
+      if (entero(x.aceP) > 0 && !(numero(x.aceG) ?? 0)) return setError(`Cargá el peso que sale a aceites de ${l.strainName}.`);
+    }
+    if (tot.secado > 0 && !sala) return setError('Creá una sala de tipo "Secado y manicura" para poder cosechar.');
+    enviar(() =>
+      cosecharLote(
+        loteId,
+        sala,
+        lineas.map((l) => {
+          const x = d(l.strainId);
+          return {
+            strainId: l.strainId,
+            pesoHumedo: numero(x.humedo),
+            extraccionPlantas: entero(x.extP),
+            extraccionPeso: numero(x.extG),
+            aceitePlantas: entero(x.aceP),
+            aceitePeso: numero(x.aceG),
+          };
+        }),
+      ),
+    );
   }
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
-        El lote <strong>{codigoLote(loteNumero)}</strong> pasa completo ({totalPlantas} plantas) a secado. Hoy es el día 1 de
-        secado.
+        Cosecha del lote <strong>{codigoLote(loteNumero)}</strong>. Por cada genética podés derivar plantas a extracción o a
+        aceites; el resto pasa a secado (hoy es el día 1).
       </p>
       {salasSecado.length > 1 && (
         <div>
@@ -369,43 +408,136 @@ export function CosecharForm({
       )}
 
       <div className="rounded-lg border border-line-2 divide-y divide-line">
-        <p className="px-3 py-2 text-xs font-semibold text-text-soft bg-surface-2">Peso húmedo por genética (opcional, en gramos)</p>
-        {lineas.map((l) => (
-          <div key={l.strainId} className="flex items-center gap-2 px-3 py-2">
-            <span className="flex-1 text-sm text-text">
-              {l.strainName}
-              <span className="text-text-mute text-xs"> · {l.plants} plantas</span>
-            </span>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="g"
-              value={pesos[l.strainId] ?? ''}
-              onChange={(e) => setPesos((p) => ({ ...p, [l.strainId]: e.target.value }))}
-              className={`${inputCls} w-28`}
-            />
-          </div>
-        ))}
+        {lineas.map((l) => {
+          const x = d(l.strainId);
+          const sec = aSecado(l);
+          return (
+            <div key={l.strainId} className="px-3 py-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-sm text-text">
+                  {l.strainName}
+                  <span className={`block text-xs ${sec < 0 ? 'text-red' : 'text-text-mute'}`}>
+                    {l.plants} plantas · {Math.max(0, sec)} a secado
+                    {entero(x.extP) > 0 ? ` · ${entero(x.extP)} a extracción` : ''}
+                    {entero(x.aceP) > 0 ? ` · ${entero(x.aceP)} a aceites` : ''}
+                  </span>
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputMode="decimal"
+                  placeholder="Húmedo g"
+                  title="Peso húmedo de lo que va a secado (opcional)"
+                  value={x.humedo}
+                  onChange={(e) => set(l.strainId, { humedo: e.target.value })}
+                  className={`${inputCls} w-28`}
+                />
+              </div>
+              {!x.abierta ? (
+                <button type="button" onClick={() => set(l.strainId, { abierta: true })} className="text-accent text-xs font-semibold">
+                  + Derivar a extracción / aceites
+                </button>
+              ) : (
+                <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2 text-xs rounded-lg bg-surface-2 p-2">
+                  <span />
+                  <span className="text-text-mute">Plantas</span>
+                  <span className="text-text-mute">Peso al salir (g)</span>
+                  <span className="font-semibold text-text">Extracción</span>
+                  <input type="number" min="0" inputMode="numeric" value={x.extP} onChange={(e) => set(l.strainId, { extP: e.target.value })} className={inputCls} />
+                  <input type="number" min="0" step="0.1" inputMode="decimal" value={x.extG} onChange={(e) => set(l.strainId, { extG: e.target.value })} className={inputCls} />
+                  <span className="font-semibold text-text">Aceites</span>
+                  <input type="number" min="0" inputMode="numeric" value={x.aceP} onChange={(e) => set(l.strainId, { aceP: e.target.value })} className={inputCls} />
+                  <input type="number" min="0" step="0.1" inputMode="decimal" value={x.aceG} onChange={(e) => set(l.strainId, { aceG: e.target.value })} className={inputCls} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
+      <p className="text-sm text-text">
+        {tot.secado} a secado
+        {tot.ext > 0 && ` · ${tot.ext} a extracción`}
+        {tot.ace > 0 && ` · ${tot.ace} a aceites`}
+        {tot.secado === 0 && tot.ext + tot.ace > 0 && (
+          <span className="block text-xs text-text-mute">No queda nada para secado: el lote sale de las salas y quedan sus procesos.</span>
+        )}
+      </p>
+
       <MsgError msg={error} />
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() =>
-          enviar(() =>
-            cosecharLote(
-              loteId,
-              sala,
-              lineas.map((l) => ({ strainId: l.strainId, pesoHumedo: numero(pesos[l.strainId] ?? '') })),
-            ),
-          )
-        }
-        className={btnCls}
-      >
-        {pending ? 'Cosechando…' : 'Cosechar y pasar a secado'}
+      <button type="button" disabled={pending} onClick={submit} className={btnCls}>
+        {pending ? 'Cosechando…' : 'Confirmar cosecha'}
+      </button>
+    </div>
+  );
+}
+
+// ── Resultado de extracción / aceites ──────────────────────────────────────
+
+export function ProcesoForm({
+  proceso,
+  productos,
+}: {
+  proceso: { id: string; loteId: string; tipo: 'extraccion' | 'aceite'; strainName: string; plantas: number; pesoEntrada: number | null };
+  productos: { id: string; name: string }[];
+}) {
+  const { pending, error, setError, enviar } = useEnvio();
+  const [resultado, setResultado] = useState('');
+  const [unidad, setUnidad] = useState<'g' | 'ml'>(proceso.tipo === 'aceite' ? 'ml' : 'g');
+  const [producto, setProducto] = useState('');
+  const [nota, setNota] = useState('');
+  const r = numero(resultado);
+
+  function submit() {
+    if (r == null || r < 0) {
+      setError('Cargá cuánto rindió el proceso.');
+      return;
+    }
+    enviar(() => terminarProceso(proceso.id, proceso.loteId, { resultado: r, unidad, productoId: producto || null, nota }));
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-soft">
+        {proceso.tipo === 'extraccion' ? 'Extracción' : 'Aceites'} · {proceso.strainName} · {proceso.plantas} plantas
+        {proceso.pesoEntrada ? ` · salió con ${fmtGramos(proceso.pesoEntrada)}` : ''}
+      </p>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className={labelCls}>Rindió</label>
+          <input type="number" min="0" step="0.1" inputMode="decimal" value={resultado} onChange={(e) => setResultado(e.target.value)} className={inputCls} />
+        </div>
+        <div className="w-24">
+          <label className={labelCls}>Unidad</label>
+          <select value={unidad} onChange={(e) => setUnidad(e.target.value as 'g' | 'ml')} className={inputCls}>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+          </select>
+        </div>
+      </div>
+      {r != null && r > 0 && unidad === 'g' && proceso.pesoEntrada ? (
+        <p className="text-xs text-text-mute">Rendimiento: {((r / proceso.pesoEntrada) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })} % del peso de entrada</p>
+      ) : null}
+      <div>
+        <label className={labelCls}>Sumar al stock de</label>
+        <select value={producto} onChange={(e) => setProducto(e.target.value)} className={inputCls}>
+          <option value="">Ninguno por ahora (queda registrado en el lote)</option>
+          {productos.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-text-mute text-xs mt-1">Cuando exista el artículo en el catálogo, elegilo acá y se suma a su stock general.</p>
+      </div>
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Método, temperatura, solvente…" className={inputCls} />
+      </div>
+      <MsgError msg={error} />
+      <button type="button" disabled={pending} onClick={submit} className={btnCls}>
+        {pending ? 'Guardando…' : 'Cerrar proceso'}
       </button>
     </div>
   );
