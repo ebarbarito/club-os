@@ -3,77 +3,164 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { TIPOS_SALA } from '@/lib/cultivo';
 
-function requireAdmin(role: string) {
-  if (role !== 'admin') throw new Error('Solo un administrador puede hacer esto');
+type Res = { error?: string };
+
+// Configurar salas: solo admin. Mover plantas, cosechar y enviar a stock:
+// admin y cultivo (es el trabajo diario de la sala).
+async function perfil(soloAdmin: boolean) {
+  const profile = await getSessionProfile();
+  if (!profile) return { error: 'No autenticado' as const };
+  if (soloAdmin ? profile.role !== 'admin' : profile.role !== 'admin' && profile.role !== 'cultivo') {
+    return { error: 'No tenés permiso para hacer esto' as const };
+  }
+  return { profile };
 }
 
-export async function upsertSala(formData: FormData) {
-  const profile = await getSessionProfile();
-  if (!profile) return { error: 'No autenticado' };
-  requireAdmin(profile.role);
+function refrescar(loteId?: string) {
+  revalidatePath('/panel/salas');
+  revalidatePath('/panel/sensores');
+  if (loteId) revalidatePath(`/panel/salas/lotes/${loteId}`);
+}
 
-  const id = formData.get('id') as string | null;
-  const strains: { strainId: string; plants: number }[] = JSON.parse(String(formData.get('sala_strains') ?? '[]'));
+function num(v: FormDataEntryValue | null) {
+  return v === null || v === '' ? null : Number(v);
+}
+
+export async function upsertSala(formData: FormData): Promise<Res> {
+  const p = await perfil(true);
+  if ('error' in p) return { error: p.error };
   const supabase = await createClient();
 
+  const id = formData.get('id') as string | null;
+  const tipo = String(formData.get('tipo') ?? 'vege');
+  const etapa = TIPOS_SALA.find((t) => t.value === tipo)?.etapa ?? 'vegetativo';
   const payload = {
-    tenant_id: profile.tenantId,
-    name: String(formData.get('name') ?? ''),
-    etapa: String(formData.get('etapa') ?? 'vegetativo'),
-    etapa_dias: Number(formData.get('etapa_dias') ?? 0),
+    tenant_id: p.profile.tenantId,
+    name: String(formData.get('name') ?? '').trim(),
+    tipo,
+    etapa,
+    orden: Number(formData.get('orden') ?? 0),
     capacity: Number(formData.get('capacity') ?? 0),
-    cosecha_estimada: (formData.get('cosecha_estimada') as string) || null,
     responsable: (formData.get('responsable') as string) || null,
-    temp_min: formData.get('temp_min') ? Number(formData.get('temp_min')) : null,
-    temp_max: formData.get('temp_max') ? Number(formData.get('temp_max')) : null,
-    hum_min: formData.get('hum_min') ? Number(formData.get('hum_min')) : null,
-    hum_max: formData.get('hum_max') ? Number(formData.get('hum_max')) : null,
+    temp_min: num(formData.get('temp_min')),
+    temp_max: num(formData.get('temp_max')),
+    hum_min: num(formData.get('hum_min')),
+    hum_max: num(formData.get('hum_max')),
     sensor_id: (formData.get('sensor_id') as string) || null,
   };
+  if (!payload.name) return { error: 'Poné un nombre para la sala' };
 
-  let salaId = id;
-  if (id) {
-    const { error } = await supabase.from('salas').update(payload).eq('id', id);
-    if (error) return { error: error.message };
-  } else {
-    const { data, error } = await supabase.from('salas').insert(payload).select('id').single();
-    if (error) return { error: error.message };
-    salaId = data.id;
-  }
+  const { error } = id
+    ? await supabase.from('salas').update(payload).eq('id', id)
+    : await supabase.from('salas').insert(payload);
+  if (error) return { error: error.message };
 
-  const { error: deleteError } = await supabase.from('sala_strains').delete().eq('sala_id', salaId!);
-  if (deleteError) return { error: deleteError.message };
-
-  if (strains.length > 0) {
-    const { error: insertError } = await supabase.from('sala_strains').insert(
-      strains.map((s) => ({
-        tenant_id: profile.tenantId,
-        sala_id: salaId,
-        strain_id: s.strainId,
-        plants: s.plants,
-      })),
-    );
-    if (insertError) return { error: insertError.message };
-  }
-
-  revalidatePath('/panel/salas');
+  refrescar();
   return {};
 }
 
-export async function closeCiclo(formData: FormData) {
-  const profile = await getSessionProfile();
-  if (!profile) return { error: 'No autenticado' };
-  requireAdmin(profile.role);
-
-  const salaId = String(formData.get('sala_id'));
-  const items = JSON.parse(String(formData.get('items') ?? '[]'));
-
+export async function cargarPlantas(
+  salaId: string,
+  items: { strainId: string; plants: number; esMadre: boolean }[],
+  nota: string,
+): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
   const supabase = await createClient();
-  const { error } = await supabase.rpc('close_ciclo', { p_sala_id: salaId, p_items: items });
+  const { error } = await supabase.rpc('cultivo_cargar', {
+    p_sala_id: salaId,
+    p_items: items.map((i) => ({ strain_id: i.strainId, plants: i.plants, es_madre: i.esMadre })),
+    p_nota: nota || null,
+  });
   if (error) return { error: error.message };
+  refrescar();
+  return {};
+}
 
-  revalidatePath('/panel/salas');
+export async function moverPlantas(
+  origen: string,
+  destino: string,
+  items: { id: string; plants: number }[],
+): Promise<Res & { lote?: number | null }> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('cultivo_mover', { p_origen: origen, p_destino: destino, p_items: items });
+  if (error) return { error: error.message };
+  refrescar();
+  return { lote: (data as number | null) ?? null };
+}
+
+export async function descartarPlantas(id: string, plants: number, nota: string): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('cultivo_descartar', { p_id: id, p_plants: plants, p_nota: nota || null });
+  if (error) return { error: error.message };
+  refrescar();
+  return {};
+}
+
+export async function cosecharLote(
+  loteId: string,
+  salaSecado: string,
+  items: { strainId: string; pesoHumedo: number | null }[],
+): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('lote_cosechar', {
+    p_lote_id: loteId,
+    p_sala_secado: salaSecado,
+    p_items: items.map((i) => ({ strain_id: i.strainId, peso_humedo: i.pesoHumedo })),
+  });
+  if (error) return { error: error.message };
+  refrescar(loteId);
+  return {};
+}
+
+export async function enviarLoteAStock(
+  loteId: string,
+  items: { strainId: string; pesoSeco: number | null; pesoTrim: number | null }[],
+): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('lote_a_stock', {
+    p_lote_id: loteId,
+    p_items: items.map((i) => ({ strain_id: i.strainId, peso_seco: i.pesoSeco, peso_trim: i.pesoTrim })),
+  });
+  if (error) return { error: error.message };
+  refrescar(loteId);
   revalidatePath('/panel/stock');
+  return {};
+}
+
+export async function editarLote(
+  loteId: string,
+  datos: { numero: number; floraInicio: string; diasFlora: number; secadoInicio: string | null; notas: string },
+): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  if (!Number.isInteger(datos.numero) || datos.numero <= 0) return { error: 'Número de lote inválido' };
+  if (!datos.floraInicio) return { error: 'Indicá la fecha de inicio de flora' };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('lotes')
+    .update({
+      numero: datos.numero,
+      flora_inicio: datos.floraInicio,
+      dias_flora: datos.diasFlora > 0 ? datos.diasFlora : 63,
+      secado_inicio: datos.secadoInicio || null,
+      notas: datos.notas.trim() || null,
+    })
+    .eq('id', loteId);
+  if (error) {
+    if (error.code === '23505') return { error: `Ya existe otro lote con el número ${datos.numero}` };
+    return { error: error.message };
+  }
+  refrescar(loteId);
   return {};
 }
