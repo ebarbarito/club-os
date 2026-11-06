@@ -12,7 +12,7 @@ import { DocumentosForm } from './documentos-form';
 import { DOCUMENTOS_POR_DEFECTO, parseDocumentos } from '@/lib/alta/documentos';
 import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { PlanDeCuentas } from './plan-de-cuentas';
-import { GenerarCuotasForm } from './generar-cuotas-form';
+import { GenerarCuotasForm, type SocioCuota } from './generar-cuotas-form';
 
 export default async function ConfiguracionPage() {
   const profile = await getSessionProfile();
@@ -20,11 +20,38 @@ export default async function ConfiguracionPage() {
   if (profile.role !== 'admin') redirect(`/panel/${ROLES[profile.role].home}`);
 
   const supabase = await createClient();
-  const [{ data: tenant }, { data: conceptRows }, { count: memberCount }] = await Promise.all([
+  // Cuotas ya generadas de los últimos meses y los próximos (para avisar
+  // quién ya la tiene en el período elegido).
+  const hoy = new Date();
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 6, 1);
+  const desdeIso = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-01`;
+
+  const [{ data: tenant }, { data: conceptRows }, { data: sociosRows }, { data: cargosRows }] = await Promise.all([
     supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes, documentos_adhesion').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
-    supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    supabase
+      .from('members')
+      .select('id, name, member_number, cuota_social, cuota_social_bonificada')
+      .is('deleted_at', null)
+      .eq('status', 'valid')
+      .order('name'),
+    supabase.from('cuota_social_charges').select('member_id, periodo').gte('periodo', desdeIso),
   ]);
+
+  const sociosCuota: SocioCuota[] = (sociosRows ?? []).map(
+    (m: { id: string; name: string; member_number: number | null; cuota_social: number | null; cuota_social_bonificada: boolean | null }) => ({
+      id: m.id,
+      name: m.name,
+      memberNumber: m.member_number,
+      cuotaSocial: Number(m.cuota_social ?? 0),
+      bonificada: Boolean(m.cuota_social_bonificada),
+    }),
+  );
+  const cuotasGeneradas: Record<string, string[]> = {};
+  for (const c of (cargosRows ?? []) as { member_id: string; periodo: string }[]) {
+    const k = c.periodo.slice(0, 7);
+    (cuotasGeneradas[k] ??= []).push(c.member_id);
+  }
 
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
   // Sin dominio propio configurado (publicUrlForSlug == null) el sitio se
@@ -118,10 +145,11 @@ export default async function ConfiguracionPage() {
       <div className="max-w-2xl rounded-xl border border-line bg-surface p-5 mb-6">
         <p className="text-xs font-semibold text-text-mute uppercase mb-1">Cuotas sociales</p>
         <p className="text-text-soft text-sm mb-4">
-          Generá los cargos mensuales de cuota social para todos los socios activos. Una vez generados,
-          el aviso de cuota adeudada aparece automáticamente al registrar una dispensa del socio.
+          Generá la cuota social del mes para todos los socios válidos, o para uno solo (por ejemplo, un socio que
+          entra a mitad de mes o después de haber generado las del resto). Al registrar una dispensa del socio
+          aparece el aviso de cuota adeudada.
         </p>
-        <GenerarCuotasForm memberCount={memberCount ?? 0} />
+        <GenerarCuotasForm socios={sociosCuota} generados={cuotasGeneradas} />
       </div>
 
       <div className="max-w-3xl">

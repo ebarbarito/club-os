@@ -5,7 +5,6 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { money } from '@/lib/format';
 import { MemberPicker } from './member-picker';
 import { ComprobantesTable } from './comprobantes-table';
-import { CuotaSocialTab } from './cuota-social-tab';
 import { HistorialPagos } from './historial-pagos';
 import type { HistorialEntry } from './historial-pagos';
 import { CuotasPendientesPanel } from './cuotas-pendientes-panel';
@@ -25,10 +24,9 @@ export default async function CtaCorrientePage({
 }) {
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
-  const isAdmin = profile.role === 'admin';
 
   const { member: memberId, tab } = await searchParams;
-  const activeTab = tab === 'resumen' ? 'resumen' : tab === 'cuota_social' && isAdmin ? 'cuota_social' : 'buscar';
+  const activeTab = tab === 'resumen' ? 'resumen' : 'buscar';
   const supabase = await createClient();
 
   const [{ data: accounts }, { data: allDispensas }, { data: generalCreditRows }, { data: virtualAccounts }] = await Promise.all([
@@ -186,40 +184,6 @@ export default async function CtaCorrientePage({
     historial.sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
-  let cuotaSocialCandidates: { memberId: string; memberName: string; memberNumber: number | null; cuotaSocial: number; bonificada: boolean }[] = [];
-  let periodoLabel = '';
-  let cuotaSocialUndoableCount = 0;
-  let cuotaSocialPeriodoIso = '';
-  if (activeTab === 'cuota_social') {
-    const now = new Date();
-    const periodoIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    periodoLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-
-    const [{ data: eligible }, { data: allGeneratedRaw }] = await Promise.all([
-      supabase.from('members').select('id, name, member_number, cuota_social, cuota_social_bonificada').eq('factura_automatica', true).eq('status', 'valid'),
-      supabase
-        .from('dispensas')
-        .select('id, member_id, voided_at, dispensa_payments(id)')
-        .eq('es_cuota_social', true)
-        .eq('cuota_social_periodo', periodoIso),
-    ]);
-
-    // Solo las activas (no anuladas) bloquean la re-generación del mes
-    const activeGeneratedSet = new Set(
-      (allGeneratedRaw ?? []).filter((d) => !d.voided_at).map((d) => d.member_id),
-    );
-    // Las que no tienen pagos pueden deshacerse por completo
-    cuotaSocialUndoableCount = (allGeneratedRaw ?? []).filter(
-      (d: { voided_at: string | null; dispensa_payments: { id: string }[] }) =>
-        (d.dispensa_payments ?? []).length === 0,
-    ).length;
-    cuotaSocialPeriodoIso = periodoIso;
-
-    cuotaSocialCandidates = (eligible ?? [])
-      .filter((m) => !activeGeneratedSet.has(m.id))
-      .map((m) => ({ memberId: m.id, memberName: m.name, memberNumber: m.member_number, cuotaSocial: m.cuota_social ?? 0, bonificada: m.cuota_social_bonificada ?? false }));
-  }
-
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-text">Cuenta Corriente</h1>
@@ -238,14 +202,6 @@ export default async function CtaCorrientePage({
         >
           Resumen de deudores
         </Link>
-        {isAdmin && (
-          <Link
-            href="/panel/ctacorriente?tab=cuota_social"
-            className={`px-3 py-2 text-sm border-b-2 -mb-px ${activeTab === 'cuota_social' ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'}`}
-          >
-            Cuota social
-          </Link>
-        )}
       </div>
 
       {activeTab === 'resumen' && (
@@ -295,10 +251,6 @@ export default async function CtaCorrientePage({
             </div>
           )}
         </div>
-      )}
-
-      {activeTab === 'cuota_social' && (
-        <CuotaSocialTab candidates={cuotaSocialCandidates} periodoLabel={periodoLabel} undoableCount={cuotaSocialUndoableCount} periodoIso={cuotaSocialPeriodoIso} />
       )}
 
       {activeTab === 'buscar' && <MemberPicker members={searchableDebtors} value={memberId ?? ''} />}
