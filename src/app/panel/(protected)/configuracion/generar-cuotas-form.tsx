@@ -16,6 +16,8 @@ export type SocioCuota = {
   bonificada: boolean;
 };
 
+export type ResumenPeriodo = { ids: string[]; bonificadas: number; cobradas: number; pendientes: number };
+
 /** Formato 'YYYY-MM' del mes actual, en hora local. */
 function mesActual(): string {
   const now = new Date();
@@ -27,13 +29,14 @@ function etiqueta(s: SocioCuota) {
 }
 
 // Genera la cuota social de un período para todos los socios válidos o para
-// uno solo. `generados` dice, por período 'YYYY-MM', qué socios ya la tienen.
+// uno solo. `generados` resume, por período 'YYYY-MM', qué socios ya la
+// tienen y cuántas están bonificadas, cobradas o pendientes.
 export function GenerarCuotasForm({
   socios,
   generados,
 }: {
   socios: SocioCuota[];
-  generados: Record<string, string[]>;
+  generados: Record<string, ResumenPeriodo>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -44,8 +47,10 @@ export function GenerarCuotasForm({
   const [socioId, setSocioId] = useState('');
   const [result, setResult] = useState<{ count?: number; total?: number; error?: string } | null>(null);
 
-  const yaTienen = useMemo(() => new Set(generados[periodo] ?? []), [generados, periodo]);
+  const resumen = generados[periodo];
+  const yaTienen = useMemo(() => new Set(generados[periodo]?.ids ?? []), [generados, periodo]);
   const faltan = socios.filter((s) => !yaTienen.has(s.id));
+  const faltanBonif = faltan.filter((s) => s.bonificada).length;
   const socio = socios.find((s) => s.id === socioId) ?? null;
 
   const filtrados = useMemo(() => {
@@ -125,8 +130,11 @@ export function GenerarCuotasForm({
             className={inputCls}
           />
           {periodo && (
-            <p className="mt-1 text-xs text-text-mute capitalize">
-              {periodoLabel} · {yaTienen.size} de {socios.length} socios ya la tienen
+            <p className="mt-1 text-xs text-text-mute">
+              <span className="capitalize">{periodoLabel}</span>
+              {resumen
+                ? ` · ${resumen.ids.length} generadas: ${resumen.pendientes} a cobrar, ${resumen.cobradas} cobradas, ${resumen.bonificadas} bonificadas`
+                : ' · todavía no se generó ninguna'}
             </p>
           )}
         </div>
@@ -179,6 +187,7 @@ export function GenerarCuotasForm({
               {filtrados.map((s) => (
                 <option key={s.id} value={s.id}>
                   {etiqueta(s)}
+                  {s.bonificada ? ' · bonificada' : ''}
                   {yaTienen.has(s.id) ? ' (ya la tiene)' : ''}
                 </option>
               ))}
@@ -235,7 +244,9 @@ export function GenerarCuotasForm({
           <p className="text-xs text-text-soft">
             {faltan.length === 0
               ? 'Todos los socios válidos ya tienen la cuota de este período.'
-              : `Se generan para ${faltan.length} socio${faltan.length !== 1 ? 's' : ''} válido${faltan.length !== 1 ? 's' : ''} que todavía no la tienen.`}
+              : `Se generan para ${faltan.length} socio${faltan.length !== 1 ? 's' : ''} válido${faltan.length !== 1 ? 's' : ''} que todavía no la tienen${
+                  faltanBonif > 0 ? ` (${faltanBonif} bonificada${faltanBonif !== 1 ? 's' : ''}: quedan registradas, sin deuda)` : ''
+                }.`}
           </p>
         )}
       </div>

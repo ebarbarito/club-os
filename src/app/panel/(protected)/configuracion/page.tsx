@@ -12,7 +12,7 @@ import { DocumentosForm } from './documentos-form';
 import { DOCUMENTOS_POR_DEFECTO, parseDocumentos } from '@/lib/alta/documentos';
 import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { PlanDeCuentas } from './plan-de-cuentas';
-import { GenerarCuotasForm, type SocioCuota } from './generar-cuotas-form';
+import { GenerarCuotasForm, type ResumenPeriodo, type SocioCuota } from './generar-cuotas-form';
 
 export default async function ConfiguracionPage() {
   const profile = await getSessionProfile();
@@ -35,7 +35,7 @@ export default async function ConfiguracionPage() {
       .is('deleted_at', null)
       .eq('status', 'valid')
       .order('name'),
-    supabase.from('cuota_social_charges').select('member_id, periodo').gte('periodo', desdeIso),
+    supabase.from('cuota_social_charges').select('member_id, periodo, bonificada, paid_at').gte('periodo', desdeIso),
   ]);
 
   const sociosCuota: SocioCuota[] = (sociosRows ?? []).map(
@@ -47,10 +47,13 @@ export default async function ConfiguracionPage() {
       bonificada: Boolean(m.cuota_social_bonificada),
     }),
   );
-  const cuotasGeneradas: Record<string, string[]> = {};
-  for (const c of (cargosRows ?? []) as { member_id: string; periodo: string }[]) {
-    const k = c.periodo.slice(0, 7);
-    (cuotasGeneradas[k] ??= []).push(c.member_id);
+  const cuotasGeneradas: Record<string, ResumenPeriodo> = {};
+  for (const c of (cargosRows ?? []) as { member_id: string; periodo: string; bonificada: boolean; paid_at: string | null }[]) {
+    const r = (cuotasGeneradas[c.periodo.slice(0, 7)] ??= { ids: [], bonificadas: 0, cobradas: 0, pendientes: 0 });
+    r.ids.push(c.member_id);
+    if (c.bonificada) r.bonificadas += 1;
+    else if (c.paid_at) r.cobradas += 1;
+    else r.pendientes += 1;
   }
 
   const publicUrl = tenant ? publicUrlForSlug(tenant.slug) : null;
