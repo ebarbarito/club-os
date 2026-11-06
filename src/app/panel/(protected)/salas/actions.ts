@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
-import { TIPOS_SALA, type ItemCosecha } from '@/lib/cultivo';
+import { DIAS_FLORA_DEFAULT, TIPOS_SALA, type ItemCosecha } from '@/lib/cultivo';
 
 type Res = { error?: string };
 
@@ -198,7 +198,7 @@ export async function editarLote(
     .update({
       numero: datos.numero,
       flora_inicio: datos.floraInicio,
-      dias_flora: datos.diasFlora > 0 ? datos.diasFlora : 63,
+      dias_flora: datos.diasFlora > 0 ? datos.diasFlora : DIAS_FLORA_DEFAULT,
       secado_inicio: datos.secadoInicio || null,
       notas: datos.notas.trim() || null,
     })

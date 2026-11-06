@@ -425,7 +425,7 @@ function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | nul
   }
   const dia = diaDeEtapa(lote.floraInicio);
   const pct = Math.min(100, (dia / Math.max(1, lote.diasFlora)) * 100);
-  const cosecha = sumarDias(lote.floraInicio, lote.diasFlora - 1);
+  const cosecha = sumarDias(lote.floraInicio, lote.diasFlora);
   const pasado = dia > lote.diasFlora;
   return (
     <div className="rounded-lg bg-purple-bg px-3 py-2.5 mb-3">
@@ -433,7 +433,9 @@ function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | nul
         <Link href={`/panel/salas/lotes/${lote.id}`} className="font-display font-bold text-purple hover:underline">
           Lote {codigoLote(lote.numero)}
         </Link>
-        <span className="font-display text-2xl font-bold text-purple leading-none">Día {dia}</span>
+        <span className="font-display text-2xl font-bold text-purple leading-none">
+          Día {dia} <span className="text-sm font-semibold">de {lote.diasFlora}</span>
+        </span>
       </div>
       <div className="h-1.5 rounded-full bg-surface/60 overflow-hidden mt-2">
         <div className={`h-full ${pasado ? 'bg-red' : 'bg-purple'}`} style={{ width: `${pct}%` }} />
@@ -441,7 +443,7 @@ function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | nul
       <div className="flex justify-between text-xs text-text-soft mt-1">
         <span>Inicio {fmtFecha(lote.floraInicio)}</span>
         <span className={pasado ? 'text-red font-semibold' : ''}>
-          Cosecha est. {fmtFecha(cosecha)} ({lote.diasFlora} días)
+          Cosecha est. {fmtFecha(cosecha)} (día {lote.diasFlora})
         </span>
       </div>
     </div>

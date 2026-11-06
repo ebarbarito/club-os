@@ -42,11 +42,15 @@ function aUTC(fecha: string) {
   return Date.UTC(y, m - 1, d);
 }
 
-// Día de la etapa: el día de ingreso es el día 1.
+// Día de la etapa, como lo cuenta el club: el día de ingreso es el día 0
+// (al pasar a flora, "día 0 de 65").
 export function diaDeEtapa(inicio: string | null | undefined): number {
   if (!inicio) return 0;
-  return Math.max(1, Math.round((aUTC(hoyAR()) - aUTC(inicio)) / 86_400_000) + 1);
+  return Math.max(0, Math.round((aUTC(hoyAR()) - aUTC(inicio)) / 86_400_000));
 }
+
+// Días de flora por defecto de un lote nuevo.
+export const DIAS_FLORA_DEFAULT = 65;
 
 export function diasEntre(desde: string, hasta: string): number {
   return Math.max(0, Math.round((aUTC(hasta) - aUTC(desde)) / 86_400_000));

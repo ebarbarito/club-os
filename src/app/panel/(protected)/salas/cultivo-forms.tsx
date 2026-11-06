@@ -226,7 +226,7 @@ export function MoverForm({
           <p className="text-xs mt-1 rounded-lg bg-purple-bg text-purple px-3 py-2">
             {dest.loteNumero
               ? `Se suman al lote ${codigoLote(dest.loteNumero)}, que va por el día ${dest.loteDia} de flora.`
-              : `Nace el lote ${codigoLote(proximoLote)}: el día 1 de flora es hoy.`}
+              : `Nace el lote ${codigoLote(proximoLote)}: hoy es el día 0 de flora.`}
           </p>
         )}
       </div>
@@ -388,7 +388,7 @@ export function CosecharForm({
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
         Cosecha del lote <strong>{codigoLote(loteNumero)}</strong>. Por cada genética podés derivar plantas a extracción o a
-        aceites; el resto pasa a secado (hoy es el día 1).
+        aceites; el resto pasa a secado (hoy es el día 0 de secado).
       </p>
       {salasSecado.length > 1 && (
         <div>
