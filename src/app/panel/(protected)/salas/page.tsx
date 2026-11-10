@@ -608,10 +608,11 @@ function SecadoLotes({
       {lotes.map((l) => {
         const avance = avanceDe(l.id);
         const plantas = avance.reduce((s, x) => s + x.plants, 0);
-        const hechas = avance.reduce((s, x) => s + Math.min(x.plantasHechas, x.plants), 0);
+        // Se manicuran ramas por genética: el avance se mide en genéticas con carga.
+        const conCarga = avance.filter((x) => x.seco > 0).length;
         const seco = avance.reduce((s, x) => s + x.seco, 0);
         const ultima = ultimaManicura(l.id);
-        const pct = plantas > 0 ? Math.min(100, (hechas / plantas) * 100) : 0;
+        const pct = avance.length > 0 ? Math.min(100, (conCarga / avance.length) * 100) : 0;
         return (
           <div key={l.id} className="rounded-lg border border-line-2 p-3">
             <div className="flex items-baseline justify-between gap-2">
@@ -626,7 +627,7 @@ function SecadoLotes({
             <div className="mt-2">
               <div className="flex justify-between text-xs text-text-soft mb-1">
                 <span>
-                  Manicura: {hechas}/{plantas} plantas · {fmtGramos(seco)} a stock
+                  Manicura: {conCarga}/{avance.length} genéticas · {fmtGramos(seco)} a stock
                 </span>
                 <span>
                   {ultima ? `Última: ${fmtFecha(ultima)} · ` : ''}

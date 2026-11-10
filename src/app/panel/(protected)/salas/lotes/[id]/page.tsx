@@ -301,7 +301,6 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                 <tr>
                   <th className="text-left font-semibold px-3 py-2">Fecha</th>
                   <th className="text-left font-semibold px-3 py-2">Genética</th>
-                  <th className="text-right font-semibold px-3 py-2">Plantas</th>
                   <th className="text-right font-semibold px-3 py-2">Flor</th>
                   <th className="text-right font-semibold px-3 py-2">Trim</th>
                   <th className="text-left font-semibold px-3 py-2">Quién</th>
@@ -333,7 +332,6 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right">{m.plantas ?? '—'}</td>
                       <td className={`px-3 py-2 text-right ${m.anulada_at ? 'line-through' : ''}`}>
                         {Number(m.peso_seco) > 0 ? fmtGramos(Number(m.peso_seco)) : '—'}
                       </td>

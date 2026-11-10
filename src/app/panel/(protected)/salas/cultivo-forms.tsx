@@ -1007,9 +1007,9 @@ export function ManicuraForm({
   const [fecha, setFecha] = useState(hoyAR());
   const [operario, setOperario] = useState('');
   const [nota, setNota] = useState('');
-  const [datos, setDatos] = useState<Record<string, { plantas: string; seco: string; trim: string }>>({});
-  const d = (id: string) => datos[id] ?? { plantas: '', seco: '', trim: '' };
-  const set = (id: string, patch: Partial<{ plantas: string; seco: string; trim: string }>) =>
+  const [datos, setDatos] = useState<Record<string, { seco: string; trim: string }>>({});
+  const d = (id: string) => datos[id] ?? { seco: '', trim: '' };
+  const set = (id: string, patch: Partial<{ seco: string; trim: string }>) =>
     setDatos((prev) => ({ ...prev, [id]: { ...d(id), ...patch } }));
 
   const totalSeco = avance.reduce((s, a) => s + (numero(d(a.strainId).seco) ?? 0), 0);
@@ -1020,7 +1020,8 @@ export function ManicuraForm({
         strainId: a.strainId,
         pesoSeco: numero(d(a.strainId).seco),
         pesoTrim: numero(d(a.strainId).trim),
-        plantas: numero(d(a.strainId).plantas),
+        // Se manicuran ramas, no plantas enteras: no se cuentan plantas.
+        plantas: null,
       }))
       .filter((i) => (i.pesoSeco ?? 0) > 0 || (i.pesoTrim ?? 0) > 0);
     if (items.length === 0) return setError('Cargá el peso manicurado de al menos una genética.');
@@ -1050,7 +1051,6 @@ export function ManicuraForm({
           <thead className="bg-surface-2 text-xs text-text-soft">
             <tr>
               <th className="text-left font-semibold px-3 py-2">Genética</th>
-              <th className="text-left font-semibold px-2 py-2">Plantas</th>
               <th className="text-left font-semibold px-2 py-2">Flor (g)</th>
               <th className="text-left font-semibold px-2 py-2">Trim (g)</th>
             </tr>
@@ -1061,18 +1061,8 @@ export function ManicuraForm({
                 <td className="px-3 py-2">
                   <span className="text-text">{a.strainName}</span>
                   <span className="block text-text-mute text-xs">
-                    {a.plantasHechas}/{a.plants} plantas · {fmtGramos(a.seco)} hasta ahora
+                    {a.seco > 0 ? `${fmtGramos(a.seco)} hasta ahora` : 'sin cargas todavía'}
                   </span>
-                </td>
-                <td className="px-2 py-2">
-                  <input
-                    type="number"
-                    min="0"
-                    inputMode="numeric"
-                    value={d(a.strainId).plantas}
-                    onChange={(e) => set(a.strainId, { plantas: e.target.value })}
-                    className={`${inputCls} w-16`}
-                  />
                 </td>
                 <td className="px-2 py-2">
                   <input
