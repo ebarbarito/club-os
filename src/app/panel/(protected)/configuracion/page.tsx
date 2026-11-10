@@ -140,7 +140,7 @@ export default async function ConfiguracionPage() {
           Se precarga en la indicación médica de la segunda parte del alta. Si el socio viene con REPROCANN de otro
           médico, lo reemplaza con los datos de su médico.
         </p>
-        <MedicoClubForm medico={parseMedicoClub(tenant.medico_por_defecto)} />
+        <MedicoClubForm medico={parseMedicoClub(tenant?.medico_por_defecto)} />
       </div>
 
       {/* Documentos que firma el socio en la segunda parte */}
