@@ -15,6 +15,10 @@ const seccionCls = `rounded-xl border border-line bg-surface p-5 scroll-mt-4 ${C
 const labelCls = 'block text-xs font-medium text-text-soft mb-1';
 const req = <span className="text-red">*</span>;
 
+// "Retiro o envío" se sacó del formulario por ahora; con true vuelve a
+// aparecer (y a ser obligatorio).
+const PEDIR_ENTREGA = false;
+
 function OptionCard({
   name,
   value,
@@ -116,7 +120,7 @@ export function Etapa2Form({
     const formData = new FormData(e.currentTarget);
     setError(null);
     if (!plan) return fallar('Elegí un plan', 'plan_solicitado');
-    if (!entrega) return fallar('Elegí retiro o envío', 'entrega_preferida');
+    if (PEDIR_ENTREGA && !entrega) return fallar('Elegí retiro o envío', 'entrega_preferida');
     const sinAceptar = aceptados.findIndex((a) => !a);
     if (sinAceptar >= 0) return fallar('Tenés que leer y aceptar todos los documentos', `acepta_doc_${sinAceptar}`);
     if (sigRef.current?.isEmpty()) return fallar('Falta tu firma', 'firma_data_url');
@@ -146,6 +150,8 @@ export function Etapa2Form({
 
   // Numeración de secciones: la de REPROCANN solo aparece si quedó pendiente.
   const o = reprocannPendiente ? 1 : 0;
+  // Numeración de las secciones que siguen a "Retiro o envío".
+  const n = o + (PEDIR_ENTREGA ? 1 : 0);
 
   return (
     <form
@@ -274,6 +280,7 @@ export function Etapa2Form({
         />
       </section>
 
+      {PEDIR_ENTREGA && (
       <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{3 + o}. Retiro o envío</h2>
         <p className="text-text-mute text-sm mb-4">¿Cómo preferís recibirlo?</p>
@@ -291,9 +298,10 @@ export function Etapa2Form({
           ))}
         </div>
       </section>
+      )}
 
       <section className={seccionCls}>
-        <h2 className="font-display font-bold text-accent mb-1">{4 + o}. DNI</h2>
+        <h2 className="font-display font-bold text-accent mb-1">{3 + n}. DNI</h2>
         <p className="text-text-mute text-sm mb-4">Sacale una foto a tu DNI. Si ya lo mandaste por WhatsApp, podés saltear este paso.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -308,7 +316,7 @@ export function Etapa2Form({
       </section>
 
       <section className={seccionCls}>
-        <h2 className="font-display font-bold text-accent mb-1">{5 + o}. Documentación</h2>
+        <h2 className="font-display font-bold text-accent mb-1">{4 + n}. Documentación</h2>
         <p className="text-text-mute text-sm mb-4">
           Leé cada documento hasta el final y marcá &quot;Leí y acepto&quot;. Después firmás abajo.
         </p>
@@ -327,7 +335,7 @@ export function Etapa2Form({
       </section>
 
       <section className={seccionCls}>
-        <h2 className="font-display font-bold text-accent mb-1">{6 + o}. Firma</h2>
+        <h2 className="font-display font-bold text-accent mb-1">{5 + n}. Firma</h2>
         <p className="text-text-mute text-sm mb-3">Firmá con el dedo (en el celular) o con el mouse.</p>
         <SignaturePad ref={sigRef} hiddenInputName="firma_data_url" />
       </section>

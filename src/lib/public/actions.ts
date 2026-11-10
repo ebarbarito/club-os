@@ -359,7 +359,8 @@ export async function completarEtapa2(token: string, formData: FormData) {
     return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN', campo: 'plan_solicitado' };
   }
   const entrega = str(formData, 'entrega_preferida');
-  if (!entrega || !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío', campo: 'entrega_preferida' };
+  // "Retiro o envío" no se pide por ahora: si llega, tiene que ser válido.
+  if (entrega && !ENTREGAS.some((e) => e.value === entrega)) return { error: 'Elegí retiro o envío', campo: 'entrega_preferida' };
   const adicionales = formData
     .getAll('adicionales_solicitados')
     .map(String)
