@@ -29,9 +29,11 @@ import {
   DescartarForm,
   DesdeStockForm,
   EditarLoteForm,
+  ManicuraForm,
   MoverForm,
   ProcesoForm,
-  StockForm,
+  TerminarSecadoForm,
+  type AvanceManicura,
   type DestinoSala,
 } from './cultivo-forms';
 
@@ -71,6 +73,7 @@ export default async function SalasPage() {
     { data: stockRows },
     { data: lotePesajesCerrados },
     { data: tenantRow },
+    { data: manicuraRows },
   ] = await Promise.all([
       supabase
         .from('salas')
@@ -99,6 +102,7 @@ export default async function SalasPage() {
       supabase.from('stock_general').select('strain_id, grams, strain:strains(name, item_type)').gt('grams', 0),
       supabase.from('lote_pesajes').select('strain_id, peso_seco, lote:lotes(id, numero, codigo, estado)').gt('peso_seco', 0),
       supabase.from('tenants').select('lote_prefijo').eq('id', profile.tenantId).maybeSingle(),
+      supabase.from('lote_manicuras').select('lote_id, strain_id, peso_seco, peso_trim, plantas, fecha'),
     ]);
 
   const prefijo: string | null = tenantRow?.lote_prefijo ?? null;
@@ -257,6 +261,22 @@ export default async function SalasPage() {
       // Primero la sala siguiente directa (vege antes que flora).
       .sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'vege' ? -1 : 1));
 
+  // Avance de la manicura de un lote en secado, por genética.
+  const manicuras: { lote_id: string; strain_id: string; peso_seco: number; peso_trim: number | null; plantas: number | null; fecha: string }[] =
+    manicuraRows ?? [];
+  const avanceDe = (loteId: string): AvanceManicura[] =>
+    lineasDeLote(loteId).map((l) => {
+      const ms = manicuras.filter((m) => m.lote_id === loteId && m.strain_id === l.strainId);
+      return {
+        ...l,
+        seco: ms.reduce((s, m) => s + (Number(m.peso_seco) || 0), 0),
+        trim: ms.reduce((s, m) => s + (Number(m.peso_trim) || 0), 0),
+        plantasHechas: ms.reduce((s, m) => s + (m.plantas ?? 0), 0),
+      };
+    });
+  const ultimaManicura = (loteId: string) =>
+    manicuras.filter((m) => m.lote_id === loteId).reduce<string | null>((max, m) => (!max || m.fecha > max ? m.fecha : max), null);
+
   const salasSecado = salas.filter((s) => s.tipo === 'secado').map((s) => ({ id: s.id, name: s.name }));
 
   return (
@@ -301,8 +321,8 @@ export default async function SalasPage() {
               {s.tipo === 'secado' ? (
                 <SecadoLotes
                   lotes={lotes.filter((l) => l.salaId === s.id && l.estado === 'secado')}
-                  lineasDeLote={lineasDeLote}
-                  pesajes={pesajes}
+                  avanceDe={avanceDe}
+                  ultimaManicura={ultimaManicura}
                   salaFloraNombre={(id) => (id ? salaNombre.get(id) ?? '—' : '—')}
                   nombreDe={nombreDe}
                   salasFlora={salasFlora}
@@ -569,15 +589,15 @@ function ListaPlantas({
 
 function SecadoLotes({
   lotes,
-  lineasDeLote,
-  pesajes,
+  avanceDe,
+  ultimaManicura,
   salaFloraNombre,
   nombreDe,
   salasFlora,
 }: {
   lotes: LoteResumen[];
-  lineasDeLote: (id: string) => { strainId: string; strainName: string; plants: number }[];
-  pesajes: { lote_id: string; strain_id: string; peso_humedo: number | null }[];
+  avanceDe: (id: string) => AvanceManicura[];
+  ultimaManicura: (id: string) => string | null;
   salaFloraNombre: (id: string | null) => string;
   nombreDe: (l: { codigo: string; salaFloraId: string | null }) => string;
   salasFlora: { id: string; name: string }[];
@@ -586,11 +606,12 @@ function SecadoLotes({
   return (
     <div className="space-y-3">
       {lotes.map((l) => {
-        const lineas = lineasDeLote(l.id);
-        const humedos = Object.fromEntries(
-          pesajes.filter((p) => p.lote_id === l.id).map((p) => [p.strain_id, p.peso_humedo]),
-        );
-        const plantas = lineas.reduce((s, x) => s + x.plants, 0);
+        const avance = avanceDe(l.id);
+        const plantas = avance.reduce((s, x) => s + x.plants, 0);
+        const hechas = avance.reduce((s, x) => s + Math.min(x.plantasHechas, x.plants), 0);
+        const seco = avance.reduce((s, x) => s + x.seco, 0);
+        const ultima = ultimaManicura(l.id);
+        const pct = plantas > 0 ? Math.min(100, (hechas / plantas) * 100) : 0;
         return (
           <div key={l.id} className="rounded-lg border border-line-2 p-3">
             <div className="flex items-baseline justify-between gap-2">
@@ -599,12 +620,26 @@ function SecadoLotes({
               </Link>
               <span className="font-display text-xl font-bold text-amber-tx">Día {diaDeEtapa(l.secadoInicio)}</span>
             </div>
-            <p className="text-xs text-text-mute mb-2">
-              De {salaFloraNombre(l.salaFloraId)} · {plantas} plantas · {lineas.length} genéticas
+            <p className="text-xs text-text-mute">
+              De {salaFloraNombre(l.salaFloraId)} · {plantas} plantas · {avance.length} genéticas
             </p>
-            <div className="flex flex-wrap gap-2">
-              <ModalTrigger label="Pesar y enviar a stock" className={btnPri} title={`Pesaje final — ${nombreDe(l)}`}>
-                <StockForm loteId={l.id} loteCodigo={nombreDe(l)} lineas={lineas} humedos={humedos} />
+            <div className="mt-2">
+              <div className="flex justify-between text-xs text-text-soft mb-1">
+                <span>
+                  Manicura: {hechas}/{plantas} plantas · {fmtGramos(seco)} a stock
+                </span>
+                <span>{ultima ? `Última: ${fmtFecha(ultima)}` : 'Sin cargar'}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
+                <div className="h-full bg-amber" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <ModalTrigger label="+ Manicura del día" className={btnPri} title={`Manicura — ${nombreDe(l)}`}>
+                <ManicuraForm loteId={l.id} loteCodigo={nombreDe(l)} avance={avance} />
+              </ModalTrigger>
+              <ModalTrigger label="Terminar secado" className={btnSec} title={`Terminar secado — ${nombreDe(l)}`}>
+                <TerminarSecadoForm loteId={l.id} loteCodigo={nombreDe(l)} avance={avance} />
               </ModalTrigger>
               <ModalTrigger label="Editar lote" className={btnSec} title={`Editar ${nombreDe(l)}`}>
                 <EditarLoteForm lote={l} salasFlora={salasFlora} />

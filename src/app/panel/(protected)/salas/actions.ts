@@ -243,3 +243,41 @@ export async function editarLote(
   refrescar(loteId);
   return {};
 }
+
+export async function registrarManicura(datos: {
+  loteId: string;
+  fecha: string;
+  operario: string;
+  nota: string;
+  items: { strainId: string; pesoSeco: number | null; pesoTrim: number | null; plantas: number | null }[];
+}): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('lote_manicura', {
+    p_lote_id: datos.loteId,
+    p_items: datos.items.map((i) => ({
+      strain_id: i.strainId,
+      peso_seco: i.pesoSeco,
+      peso_trim: i.pesoTrim,
+      plantas: i.plantas,
+    })),
+    p_fecha: datos.fecha || null,
+    p_operario: datos.operario || null,
+    p_nota: datos.nota || null,
+  });
+  if (error) return { error: error.message };
+  refrescar(datos.loteId);
+  revalidatePath('/panel/stock');
+  return {};
+}
+
+export async function terminarSecado(loteId: string): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('lote_terminar_secado', { p_lote_id: loteId });
+  if (error) return { error: error.message };
+  refrescar(loteId);
+  return {};
+}

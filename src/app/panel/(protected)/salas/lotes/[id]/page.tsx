@@ -30,7 +30,8 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: lote }, { data: plantas }, { data: pesajes }, { data: movs }, { data: salas }, { data: procesos }] = await Promise.all([
+  const [{ data: lote }, { data: plantas }, { data: pesajes }, { data: movs }, { data: salas }, { data: procesos }, { data: manicuras }] =
+    await Promise.all([
     supabase.from('lotes').select('*').eq('id', id).maybeSingle(),
     supabase.from('sala_strains').select('strain_id, plants, strain:strains(name)').eq('lote_id', id),
     supabase.from('lote_pesajes').select('strain_id, plantas, peso_humedo, peso_seco, peso_trim, strain:strains(name)').eq('lote_id', id),
@@ -46,6 +47,12 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
         'id, origen, tipo, plantas, peso_entrada, estado, resultado, unidad, nota, created_at, terminado_at, strain:strains!lote_procesos_strain_id_fkey(name), producto:strains!lote_procesos_producto_id_fkey(name)',
       )
       .eq('lote_id', id)
+      .order('created_at'),
+    supabase
+      .from('lote_manicuras')
+      .select('id, fecha, peso_seco, peso_trim, plantas, operario, nota, strain:strains(name)')
+      .eq('lote_id', id)
+      .order('fecha')
       .order('created_at'),
   ]);
   if (!lote) notFound();
@@ -276,6 +283,52 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                       </tr>
                     );
                   },
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {(manicuras ?? []).length > 0 && (
+        <>
+          <h2 className="font-display text-lg font-bold text-text mb-2">Manicura</h2>
+          <div className="rounded-xl border border-line bg-surface overflow-x-auto mb-6">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-2 text-xs text-text-soft">
+                <tr>
+                  <th className="text-left font-semibold px-3 py-2">Fecha</th>
+                  <th className="text-left font-semibold px-3 py-2">Genética</th>
+                  <th className="text-right font-semibold px-3 py-2">Plantas</th>
+                  <th className="text-right font-semibold px-3 py-2">Flor</th>
+                  <th className="text-right font-semibold px-3 py-2">Trim</th>
+                  <th className="text-left font-semibold px-3 py-2">Quién</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {(manicuras ?? []).map(
+                  (m: {
+                    id: string;
+                    fecha: string;
+                    peso_seco: number;
+                    peso_trim: number | null;
+                    plantas: number | null;
+                    operario: string | null;
+                    nota: string | null;
+                    strain: { name: string } | { name: string }[] | null;
+                  }) => (
+                    <tr key={m.id}>
+                      <td className="px-3 py-2">{fmtFecha(m.fecha)}</td>
+                      <td className="px-3 py-2">
+                        {uno(m.strain)?.name ?? '—'}
+                        {m.nota && <span className="block text-xs text-text-mute">{m.nota}</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right">{m.plantas ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">{Number(m.peso_seco) > 0 ? fmtGramos(Number(m.peso_seco)) : '—'}</td>
+                      <td className="px-3 py-2 text-right">{m.peso_trim ? fmtGramos(Number(m.peso_trim)) : '—'}</td>
+                      <td className="px-3 py-2 text-text-soft">{m.operario ?? '—'}</td>
+                    </tr>
+                  ),
                 )}
               </tbody>
             </table>

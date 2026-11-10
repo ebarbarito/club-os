@@ -13,7 +13,9 @@ import {
   enviarLoteAStock,
   moverPlantas,
   procesoDesdeStock,
+  registrarManicura,
   terminarProceso,
+  terminarSecado,
 } from './actions';
 
 const inputCls = 'w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent';
@@ -982,6 +984,198 @@ export function CortarEsquejesForm({
       <MsgError msg={error} />
       <button type="button" disabled={pending} onClick={submit} className={btnCls}>
         {pending ? 'Guardando…' : loteId ? 'Sumar esquejes al lote' : `Crear ${proximoCodigo} con estos esquejes`}
+      </button>
+    </div>
+  );
+}
+
+// ── Manicura diaria (lote en secado) ───────────────────────────────────────
+
+export type AvanceManicura = { strainId: string; strainName: string; plants: number; seco: number; trim: number; plantasHechas: number };
+
+export function ManicuraForm({
+  loteId,
+  loteCodigo,
+  avance,
+}: {
+  loteId: string;
+  loteCodigo: string;
+  avance: AvanceManicura[];
+}) {
+  const { pending, error, setError, enviar } = useEnvio();
+  const [fecha, setFecha] = useState(hoyAR());
+  const [operario, setOperario] = useState('');
+  const [nota, setNota] = useState('');
+  const [datos, setDatos] = useState<Record<string, { plantas: string; seco: string; trim: string }>>({});
+  const d = (id: string) => datos[id] ?? { plantas: '', seco: '', trim: '' };
+  const set = (id: string, patch: Partial<{ plantas: string; seco: string; trim: string }>) =>
+    setDatos((prev) => ({ ...prev, [id]: { ...d(id), ...patch } }));
+
+  const totalSeco = avance.reduce((s, a) => s + (numero(d(a.strainId).seco) ?? 0), 0);
+
+  function submit() {
+    const items = avance
+      .map((a) => ({
+        strainId: a.strainId,
+        pesoSeco: numero(d(a.strainId).seco),
+        pesoTrim: numero(d(a.strainId).trim),
+        plantas: numero(d(a.strainId).plantas),
+      }))
+      .filter((i) => (i.pesoSeco ?? 0) > 0 || (i.pesoTrim ?? 0) > 0);
+    if (items.length === 0) return setError('Cargá el peso manicurado de al menos una genética.');
+    if (!operario.trim()) return setError('Indicá quién hizo la manicura.');
+    enviar(() => registrarManicura({ loteId, fecha, operario, nota, items }));
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-soft">
+        Manicura del lote <strong>{loteCodigo}</strong>. La flor que cargues entra al <strong>stock general</strong> en el
+        momento. Completá solo las genéticas que se trabajaron.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Fecha</label>
+          <input type="date" max={hoyAR()} value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Quién hizo la manicura</label>
+          <input value={operario} onChange={(e) => setOperario(e.target.value)} className={inputCls} />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-line-2 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-2 text-xs text-text-soft">
+            <tr>
+              <th className="text-left font-semibold px-3 py-2">Genética</th>
+              <th className="text-left font-semibold px-2 py-2">Plantas</th>
+              <th className="text-left font-semibold px-2 py-2">Flor (g)</th>
+              <th className="text-left font-semibold px-2 py-2">Trim (g)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {avance.map((a) => (
+              <tr key={a.strainId}>
+                <td className="px-3 py-2">
+                  <span className="text-text">{a.strainName}</span>
+                  <span className="block text-text-mute text-xs">
+                    {a.plantasHechas}/{a.plants} plantas · {fmtGramos(a.seco)} hasta ahora
+                  </span>
+                </td>
+                <td className="px-2 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={d(a.strainId).plantas}
+                    onChange={(e) => set(a.strainId, { plantas: e.target.value })}
+                    className={`${inputCls} w-16`}
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={d(a.strainId).seco}
+                    onChange={(e) => set(a.strainId, { seco: e.target.value })}
+                    className={`${inputCls} w-24`}
+                  />
+                </td>
+                <td className="px-2 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={d(a.strainId).trim}
+                    onChange={(e) => set(a.strainId, { trim: e.target.value })}
+                    className={`${inputCls} w-20`}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <input value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} />
+      </div>
+
+      <MsgError msg={error} />
+      <button type="button" disabled={pending} onClick={submit} className={btnCls}>
+        {pending ? 'Guardando…' : `Cargar manicura${totalSeco > 0 ? ` · ${fmtGramos(totalSeco)} a stock` : ''}`}
+      </button>
+    </div>
+  );
+}
+
+export function TerminarSecadoForm({
+  loteId,
+  loteCodigo,
+  avance,
+}: {
+  loteId: string;
+  loteCodigo: string;
+  avance: AvanceManicura[];
+}) {
+  const { pending, error, enviar } = useEnvio();
+  const totalSeco = avance.reduce((s, a) => s + a.seco, 0);
+  const totalTrim = avance.reduce((s, a) => s + a.trim, 0);
+  const totalPlantas = avance.reduce((s, a) => s + a.plants, 0);
+  const sinManicura = avance.filter((a) => a.seco <= 0);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-soft">
+        Se cierra el lote <strong>{loteCodigo}</strong> con lo manicurado hasta hoy y sale de la sala de secado. Lo que ya se
+        cargó ya está en el stock general.
+      </p>
+      <div className="rounded-lg border border-line-2 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-surface-2 text-xs text-text-soft">
+            <tr>
+              <th className="text-left font-semibold px-3 py-2">Genética</th>
+              <th className="text-right font-semibold px-3 py-2">Flor</th>
+              <th className="text-right font-semibold px-3 py-2">Trim</th>
+              <th className="text-right font-semibold px-3 py-2">g/planta</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {avance.map((a) => (
+              <tr key={a.strainId}>
+                <td className="px-3 py-2">
+                  {a.strainName}
+                  <span className="text-text-mute text-xs"> · {a.plants} plantas</span>
+                </td>
+                <td className={`px-3 py-2 text-right ${a.seco <= 0 ? 'text-red' : ''}`}>{a.seco > 0 ? fmtGramos(a.seco) : 'sin cargar'}</td>
+                <td className="px-3 py-2 text-right">{a.trim > 0 ? fmtGramos(a.trim) : '—'}</td>
+                <td className="px-3 py-2 text-right">{a.seco > 0 && a.plants > 0 ? fmtGramos(a.seco / a.plants) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-surface-2 font-semibold">
+            <tr>
+              <td className="px-3 py-2">Total · {totalPlantas} plantas</td>
+              <td className="px-3 py-2 text-right">{fmtGramos(totalSeco)}</td>
+              <td className="px-3 py-2 text-right">{totalTrim > 0 ? fmtGramos(totalTrim) : '—'}</td>
+              <td className="px-3 py-2 text-right">{totalSeco > 0 && totalPlantas > 0 ? fmtGramos(totalSeco / totalPlantas) : '—'}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {sinManicura.length > 0 && (
+        <p className="rounded-lg bg-amber-bg text-amber-tx text-xs px-3 py-2">
+          Sin manicura cargada: {sinManicura.map((a) => a.strainName).join(', ')}. Si cerrás igual, quedan en 0 g.
+        </p>
+      )}
+      <MsgError msg={error} />
+      <button type="button" disabled={pending || totalSeco <= 0} onClick={() => enviar(() => terminarSecado(loteId))} className={btnCls}>
+        {pending ? 'Cerrando…' : 'Terminar secado y cerrar lote'}
       </button>
     </div>
   );
