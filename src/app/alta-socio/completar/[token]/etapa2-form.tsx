@@ -8,6 +8,7 @@ import { ENTREGAS } from '@/lib/alta/opciones';
 import { PlanSelector } from '@/components/alta/plan-selector';
 import { DocumentoScroll } from './documento-scroll';
 import { aplicarDatosEtapa2 } from '@/lib/alta/documentos';
+import type { MedicoClub } from '@/lib/alta/medico';
 
 const inputCls = `w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent ${CAMPO_INVALIDO}`;
 const seccionCls = `rounded-xl border border-line bg-surface p-5 scroll-mt-4 ${CAMPO_INVALIDO}`;
@@ -55,6 +56,7 @@ export function Etapa2Form({
   documentos,
   tipo,
   reprocannActual,
+  medico,
 }: {
   token: string;
   tenantName: string;
@@ -65,6 +67,8 @@ export function Etapa2Form({
   documentos: { titulo: string; texto: string }[];
   tipo: string;
   reprocannActual: { credencial: string; vencimiento: string };
+  // Médico precargado (el del club, salvo que la ficha ya tenga otro).
+  medico: MedicoClub;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +80,8 @@ export function Etapa2Form({
   const sigRef = useRef<SignaturePadHandle>(null);
   // Lo que va completando en este formulario, para que los documentos se
   // muestren ya completos (médico, dosis, REPROCANN, plan y cuota).
-  const [campos, setCampos] = useState<Record<string, string>>({});
+  const [campos, setCampos] = useState<Record<string, string>>(() => ({ ...medico }));
+  const hayPrecarga = Boolean(medico.doctor);
   const textos = documentos.map((d) =>
     aplicarDatosEtapa2(d.texto, {
       plan,
@@ -210,19 +215,23 @@ export function Etapa2Form({
 
       <section className={seccionCls}>
         <h2 className="font-display font-bold text-accent mb-1">{1 + o}. Indicación médica</h2>
-        <p className="text-text-mute text-sm mb-4">Copiá los datos de la indicación de tu médico/a.</p>
+        <p className="text-text-mute text-sm mb-4">
+          {hayPrecarga
+            ? 'Cargamos los datos de nuestro médico tratante. Si ya tenés REPROCANN con otro médico, reemplazalos por los de tu indicación.'
+            : 'Copiá los datos de la indicación de tu médico/a.'}
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Médico tratante {req}</label>
-            <input name="doctor" required className={inputCls} />
+            <input name="doctor" required defaultValue={medico.doctor ?? ''} className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Matrícula</label>
-            <input name="matricula" className={inputCls} />
+            <input name="matricula" defaultValue={medico.matricula ?? ''} className={inputCls} />
           </div>
           <div className="sm:col-span-2">
             <label className={labelCls}>Especialidad / Institución</label>
-            <input name="especialidad_institucion" className={inputCls} />
+            <input name="especialidad_institucion" defaultValue={medico.especialidad_institucion ?? ''} className={inputCls} />
           </div>
           <div className="sm:col-span-2">
             <label className={labelCls}>Diagnóstico / patología principal {req}</label>
@@ -230,12 +239,12 @@ export function Etapa2Form({
           </div>
           <div>
             <label className={labelCls}>Producto prescripto {req}</label>
-            <input name="producto_prescripto" required className={inputCls} />
+            <input name="producto_prescripto" required defaultValue={medico.producto_prescripto ?? ''} className={inputCls} />
           </div>
           <div className="grid grid-cols-[1fr_5rem] gap-2 items-end">
             <div>
-              <label className={labelCls}>Dosis mensual {req}</label>
-              <input name="dosis_mensual" type="number" inputMode="decimal" min="0" step="0.01" required className={inputCls} />
+              <label className={labelCls}>Dosis mensual <span className="text-text-mute">(opcional)</span></label>
+              <input name="dosis_mensual" type="number" inputMode="decimal" min="0" step="0.01" className={inputCls} />
             </div>
             <select name="dosis_unidad" className={inputCls} defaultValue="g">
               <option value="g">g</option>

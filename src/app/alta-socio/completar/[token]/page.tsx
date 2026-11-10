@@ -66,6 +66,7 @@ export default async function CompletarAltaPage({ params }: { params: Promise<{ 
         documentos={etapa2.documentos}
         tipo={etapa2.tipo}
         reprocannActual={etapa2.reprocannActual}
+        medico={etapa2.medico}
       />
     </main>
   );

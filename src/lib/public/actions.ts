@@ -7,6 +7,7 @@ import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
 import { aplicarDatosEtapa2, documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
+import { parseMedicoClub, type MedicoClub } from '@/lib/alta/medico';
 
 // Documentos de alta: bucket PRIVADO (no público como "media") — DNI,
 // constancia REPROCANN e indicación médica son datos sensibles, se sirven
@@ -217,7 +218,7 @@ async function memberPorToken(token: string) {
   const { data } = await admin
     .from('members')
     .select(
-      'id, name, dni, birth, nacionalidad, estado_civil, address, localidad, provincia, codigo_postal, phone, email, cuil_cuit, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados',
+      'id, name, dni, birth, nacionalidad, estado_civil, address, localidad, provincia, codigo_postal, phone, email, cuil_cuit, reprocann, reprocann_type, repr_num, repr_exp, plan_solicitado, adicionales_solicitados, doctor, matricula, especialidad_institucion, producto_prescripto',
     )
     .eq('tenant_id', tenant.id)
     .eq('etapa2_token', token)
@@ -313,7 +314,28 @@ export async function getEtapa2(token: string) {
       credencial: (res.member.repr_num as string | null) ?? '',
       vencimiento: (res.member.repr_exp as string | null) ?? '',
     },
+    medico: await medicoPrecargado(res.tenant.id, res.member),
   };
+}
+
+// Indicación médica precargada: si la ficha ya tiene un médico (lo cargó el
+// club), ese; si no, el médico tratante del club. El socio lo reemplaza si
+// viene con la indicación de otro médico.
+async function medicoPrecargado(
+  tenantId: string,
+  member: { doctor?: string | null; matricula?: string | null; especialidad_institucion?: string | null; producto_prescripto?: string | null },
+): Promise<MedicoClub> {
+  if (member.doctor?.trim()) {
+    return parseMedicoClub({
+      doctor: member.doctor,
+      matricula: member.matricula,
+      especialidad_institucion: member.especialidad_institucion,
+      producto_prescripto: member.producto_prescripto,
+    });
+  }
+  const admin = createAdminClient();
+  const { data } = await admin.from('tenants').select('medico_por_defecto').eq('id', tenantId).single();
+  return parseMedicoClub(data?.medico_por_defecto);
 }
 
 export async function completarEtapa2(token: string, formData: FormData) {
@@ -344,7 +366,9 @@ export async function completarEtapa2(token: string, formData: FormData) {
     .filter((a) => ADICIONALES.some((o) => o.value === a));
 
   const dosis = str(formData, 'dosis_mensual');
-  const faltaMedico = ['doctor', 'patologia', 'producto_prescripto', 'dosis_mensual'].find((c) => !str(formData, c));
+  // La dosis mensual no es obligatoria.
+  const faltaMedico = ['doctor', 'patologia', 'producto_prescripto'].find((c) => !str(formData, c));
+  if (dosis && !(Number(dosis) >= 0)) return { error: 'La dosis mensual tiene que ser un número', campo: 'dosis_mensual' };
   if (faltaMedico) {
     return { error: 'Completá los datos de tu indicación médica', campo: faltaMedico };
   }
@@ -378,7 +402,7 @@ export async function completarEtapa2(token: string, formData: FormData) {
       matricula: str(formData, 'matricula'),
       patologia: str(formData, 'patologia'),
       producto_prescripto: str(formData, 'producto_prescripto'),
-      dosis_mensual: Number(dosis),
+      dosis_mensual: dosis ? Number(dosis) : null,
       dosis_unidad: str(formData, 'dosis_unidad'),
       plan_solicitado: plan,
       adicionales_solicitados: adicionales,

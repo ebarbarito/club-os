@@ -9,6 +9,8 @@ import { PublicSiteToggle } from './public-site-toggle';
 import { CopiarMensajeAlta } from './copiar-mensaje-alta';
 import { DatosMensajesForm } from './datos-mensajes-form';
 import { DocumentosForm } from './documentos-form';
+import { MedicoClubForm } from './medico-club-form';
+import { parseMedicoClub } from '@/lib/alta/medico';
 import { DOCUMENTOS_POR_DEFECTO, parseDocumentos } from '@/lib/alta/documentos';
 import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { PlanDeCuentas } from './plan-de-cuentas';
@@ -27,7 +29,7 @@ export default async function ConfiguracionPage() {
   const desdeIso = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-01`;
 
   const [{ data: tenant }, { data: conceptRows }, { data: sociosRows }, { data: cargosRows }] = await Promise.all([
-    supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes, documentos_adhesion').eq('id', profile.tenantId).single(),
+    supabase.from('tenants').select('slug, name, public_site_enabled, datos_mensajes, documentos_adhesion, medico_por_defecto').eq('id', profile.tenantId).single(),
     supabase.from('ledger_concepts').select('id, name, allows_ingreso, allows_egreso, active').order('sort_order'),
     supabase
       .from('members')
@@ -129,6 +131,16 @@ export default async function ConfiguracionPage() {
           corchetes para completarlo a mano.
         </p>
         <DatosMensajesForm datos={datosMensajes} />
+      </div>
+
+      {/* Médico tratante que se precarga en la segunda parte */}
+      <div className="max-w-2xl rounded-xl border border-line bg-surface p-5 mb-6">
+        <p className="text-xs font-semibold text-text-mute uppercase mb-1">Médico tratante del club</p>
+        <p className="text-text-soft text-sm mb-4">
+          Se precarga en la indicación médica de la segunda parte del alta. Si el socio viene con REPROCANN de otro
+          médico, lo reemplaza con los datos de su médico.
+        </p>
+        <MedicoClubForm medico={parseMedicoClub(tenant.medico_por_defecto)} />
       </div>
 
       {/* Documentos que firma el socio en la segunda parte */}

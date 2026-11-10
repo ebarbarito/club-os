@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { CAMPOS_DATOS, type DatosMensajes } from '@/lib/alta/mensajes';
 import { MAX_DOCUMENTOS, MAX_TEXTO, parseDocumentos } from '@/lib/alta/documentos';
+import { CAMPOS_MEDICO, type MedicoClub } from '@/lib/alta/medico';
 
 export async function setPublicSiteEnabled(enabled: boolean) {
   const profile = await getSessionProfile();
@@ -38,6 +39,26 @@ export async function guardarDatosMensajes(formData: FormData) {
 
   revalidatePath('/panel/configuracion');
   revalidatePath('/panel/socios', 'layout');
+  return {};
+}
+
+// Médico tratante del club: se precarga en la segunda parte del alta.
+export async function guardarMedicoClub(formData: FormData) {
+  const profile = await getSessionProfile();
+  if (!profile) return { error: 'No autenticado' };
+  if (profile.role !== 'admin') return { error: 'Solo un administrador puede cambiar esto' };
+
+  const medico: MedicoClub = {};
+  for (const { key } of CAMPOS_MEDICO) {
+    const v = String(formData.get(key) ?? '').trim();
+    if (v) medico[key] = v.slice(0, 200);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('tenants').update({ medico_por_defecto: medico }).eq('id', profile.tenantId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/panel/configuracion');
   return {};
 }
 
