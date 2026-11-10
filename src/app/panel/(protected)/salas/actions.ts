@@ -281,3 +281,15 @@ export async function terminarSecado(loteId: string): Promise<Res> {
   refrescar(loteId);
   return {};
 }
+
+export async function anularManicura(id: string, loteId: string, motivo: string): Promise<Res> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  if (!motivo.trim()) return { error: 'Indicá el motivo de la anulación' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('lote_manicura_anular', { p_id: id, p_motivo: motivo });
+  if (error) return { error: error.message };
+  refrescar(loteId);
+  revalidatePath('/panel/stock');
+  return {};
+}

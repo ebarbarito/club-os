@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { Badge } from '@/components/badge';
+import { ModalTrigger } from '@/components/modal-trigger';
+import { AnularManicuraForm } from '../../cultivo-forms';
 import { fmtDateTime } from '@/lib/format';
 import { ESTADO_LOTE, diaDeEtapa, diasEntre, fmtFecha, fmtGramos, nombreLote } from '@/lib/cultivo';
 
@@ -50,7 +52,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
       .order('created_at'),
     supabase
       .from('lote_manicuras')
-      .select('id, fecha, peso_seco, peso_trim, plantas, operario, nota, strain:strains(name)')
+      .select('id, fecha, peso_seco, peso_trim, plantas, operario, nota, anulada_at, anulada_motivo, strain:strains(name)')
       .eq('lote_id', id)
       .order('fecha')
       .order('created_at'),
@@ -292,7 +294,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
 
       {(manicuras ?? []).length > 0 && (
         <>
-          <h2 className="font-display text-lg font-bold text-text mb-2">Manicura</h2>
+          <h2 id="manicura" className="font-display text-lg font-bold text-text mb-2 scroll-mt-4">Manicura</h2>
           <div className="rounded-xl border border-line bg-surface overflow-x-auto mb-6">
             <table className="w-full text-sm">
               <thead className="bg-surface-2 text-xs text-text-soft">
@@ -303,6 +305,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                   <th className="text-right font-semibold px-3 py-2">Flor</th>
                   <th className="text-right font-semibold px-3 py-2">Trim</th>
                   <th className="text-left font-semibold px-3 py-2">Quién</th>
+                  <th className="px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -315,18 +318,42 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
                     plantas: number | null;
                     operario: string | null;
                     nota: string | null;
+                    anulada_at: string | null;
+                    anulada_motivo: string | null;
                     strain: { name: string } | { name: string }[] | null;
                   }) => (
-                    <tr key={m.id}>
+                    <tr key={m.id} className={m.anulada_at ? 'text-text-mute bg-red/5' : ''}>
                       <td className="px-3 py-2">{fmtFecha(m.fecha)}</td>
                       <td className="px-3 py-2">
                         {uno(m.strain)?.name ?? '—'}
                         {m.nota && <span className="block text-xs text-text-mute">{m.nota}</span>}
+                        {m.anulada_at && (
+                          <span className="block text-xs text-red">
+                            Anulada: {m.anulada_motivo}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right">{m.plantas ?? '—'}</td>
-                      <td className="px-3 py-2 text-right">{Number(m.peso_seco) > 0 ? fmtGramos(Number(m.peso_seco)) : '—'}</td>
+                      <td className={`px-3 py-2 text-right ${m.anulada_at ? 'line-through' : ''}`}>
+                        {Number(m.peso_seco) > 0 ? fmtGramos(Number(m.peso_seco)) : '—'}
+                      </td>
                       <td className="px-3 py-2 text-right">{m.peso_trim ? fmtGramos(Number(m.peso_trim)) : '—'}</td>
                       <td className="px-3 py-2 text-text-soft">{m.operario ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {lote.estado === 'secado' && !m.anulada_at && (
+                          <ModalTrigger
+                            label="Anular"
+                            className="rounded-lg border border-line-2 text-xs font-semibold px-2.5 py-1 hover:border-red hover:text-red"
+                            title="Anular carga de manicura"
+                          >
+                            <AnularManicuraForm
+                              id={m.id}
+                              loteId={lote.id}
+                              resumen={`${fmtFecha(m.fecha)} · ${uno(m.strain)?.name ?? ''} · ${fmtGramos(Number(m.peso_seco))}`}
+                            />
+                          </ModalTrigger>
+                        )}
+                      </td>
                     </tr>
                   ),
                 )}

@@ -102,7 +102,7 @@ export default async function SalasPage() {
       supabase.from('stock_general').select('strain_id, grams, strain:strains(name, item_type)').gt('grams', 0),
       supabase.from('lote_pesajes').select('strain_id, peso_seco, lote:lotes(id, numero, codigo, estado)').gt('peso_seco', 0),
       supabase.from('tenants').select('lote_prefijo').eq('id', profile.tenantId).maybeSingle(),
-      supabase.from('lote_manicuras').select('lote_id, strain_id, peso_seco, peso_trim, plantas, fecha'),
+      supabase.from('lote_manicuras').select('lote_id, strain_id, peso_seco, peso_trim, plantas, fecha').is('anulada_at', null),
     ]);
 
   const prefijo: string | null = tenantRow?.lote_prefijo ?? null;
@@ -628,7 +628,12 @@ function SecadoLotes({
                 <span>
                   Manicura: {hechas}/{plantas} plantas · {fmtGramos(seco)} a stock
                 </span>
-                <span>{ultima ? `Última: ${fmtFecha(ultima)}` : 'Sin cargar'}</span>
+                <span>
+                  {ultima ? `Última: ${fmtFecha(ultima)} · ` : ''}
+                  <Link href={`/panel/salas/lotes/${l.id}#manicura`} className="text-accent hover:underline">
+                    {ultima ? 'ver / anular cargas' : 'sin cargas'}
+                  </Link>
+                </span>
               </div>
               <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
                 <div className="h-full bg-amber" style={{ width: `${pct}%` }} />

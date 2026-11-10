@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
 import { fmtGramos, hoyAR, type GrupoPlantas } from '@/lib/cultivo';
 import {
+  anularManicura,
   cargarPlantas,
   cortarEsquejes,
   cosecharLote,
@@ -1176,6 +1177,42 @@ export function TerminarSecadoForm({
       <MsgError msg={error} />
       <button type="button" disabled={pending || totalSeco <= 0} onClick={() => enviar(() => terminarSecado(loteId))} className={btnCls}>
         {pending ? 'Cerrando…' : 'Terminar secado y cerrar lote'}
+      </button>
+    </div>
+  );
+}
+
+// ── Anular una carga de manicura ───────────────────────────────────────────
+
+export function AnularManicuraForm({ id, loteId, resumen }: { id: string; loteId: string; resumen: string }) {
+  const { pending, error, setError, enviar } = useEnvio();
+  const [motivo, setMotivo] = useState('');
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-soft">
+        Se anula la carga <strong>{resumen}</strong>. Se descuenta del stock general lo que había sumado y de los totales del
+        lote. La carga queda en el historial marcada como anulada.
+      </p>
+      <div>
+        <label className={labelCls}>Motivo</label>
+        <input
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ej.: peso mal cargado, genética equivocada…"
+          className={inputCls}
+        />
+      </div>
+      <MsgError msg={error} />
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (!motivo.trim()) return setError('Indicá el motivo de la anulación.');
+          enviar(() => anularManicura(id, loteId, motivo));
+        }}
+        className="w-full rounded-lg bg-red text-white font-semibold text-sm py-2 disabled:opacity-60"
+      >
+        {pending ? 'Anulando…' : 'Anular carga'}
       </button>
     </div>
   );
