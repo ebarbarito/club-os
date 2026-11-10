@@ -184,20 +184,53 @@ export async function enviarLoteAStock(
   return {};
 }
 
+export async function cortarEsquejes(datos: {
+  salaId: string;
+  items: { strainId: string; plants: number }[];
+  loteId: string | null;
+  destinoId: string | null;
+  fecha: string;
+  nota: string;
+}): Promise<Res & { loteId?: string }> {
+  const p = await perfil(false);
+  if ('error' in p) return { error: p.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('cultivo_cortar_esquejes', {
+    p_sala_id: datos.salaId,
+    p_items: datos.items.map((i) => ({ strain_id: i.strainId, plants: i.plants })),
+    p_lote: datos.loteId,
+    p_destino: datos.destinoId,
+    p_fecha: datos.fecha || null,
+    p_nota: datos.nota || null,
+  });
+  if (error) return { error: error.message };
+  refrescar();
+  return { loteId: data as string };
+}
+
 export async function editarLote(
   loteId: string,
-  datos: { numero: number; floraInicio: string; diasFlora: number; secadoInicio: string | null; notas: string },
+  datos: {
+    numero: number;
+    corteFecha: string | null;
+    salaDestinoId: string | null;
+    floraInicio: string | null;
+    diasFlora: number;
+    secadoInicio: string | null;
+    notas: string;
+  },
 ): Promise<Res> {
   const p = await perfil(false);
   if ('error' in p) return { error: p.error };
   if (!Number.isInteger(datos.numero) || datos.numero <= 0) return { error: 'Número de lote inválido' };
-  if (!datos.floraInicio) return { error: 'Indicá la fecha de inicio de flora' };
   const supabase = await createClient();
   const { error } = await supabase
     .from('lotes')
     .update({
       numero: datos.numero,
-      flora_inicio: datos.floraInicio,
+      corte_fecha: datos.corteFecha || null,
+      sala_destino_id: datos.salaDestinoId || null,
+      flora_inicio: datos.floraInicio || null,
       dias_flora: datos.diasFlora > 0 ? datos.diasFlora : DIAS_FLORA_DEFAULT,
       secado_inicio: datos.secadoInicio || null,
       notas: datos.notas.trim() || null,

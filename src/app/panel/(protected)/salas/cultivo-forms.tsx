@@ -3,9 +3,10 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModalClose } from '@/components/modal-trigger';
-import { codigoLote, fmtGramos, hoyAR, type GrupoPlantas } from '@/lib/cultivo';
+import { fmtGramos, hoyAR, type GrupoPlantas } from '@/lib/cultivo';
 import {
   cargarPlantas,
+  cortarEsquejes,
   cosecharLote,
   descartarPlantas,
   editarLote,
@@ -59,17 +60,20 @@ export function CargarPlantasForm({
   salaId,
   tipo,
   strains,
-  loteNumero,
-  proximoLote,
+  loteCodigo,
+  proximoCodigo,
 }: {
   salaId: string;
   tipo: string;
   strains: Strain[];
-  loteNumero: number | null;
-  proximoLote: number;
+  loteCodigo: string | null;
+  proximoCodigo: string;
 }) {
   const { pending, error, setError, enviar } = useEnvio();
-  const [rows, setRows] = useState([{ strainId: '', plants: '', esMadre: false }]);
+  // En la sala de madres este formulario carga solo madres; los esquejes
+  // entran con "Cortar esquejes" (ahí nace el lote).
+  const soloMadres = tipo === 'madres';
+  const [rows, setRows] = useState([{ strainId: '', plants: '', esMadre: soloMadres }]);
   const [nota, setNota] = useState('');
 
   function update(i: number, patch: Partial<(typeof rows)[number]>) {
@@ -79,7 +83,7 @@ export function CargarPlantasForm({
   function submit() {
     const items = rows
       .filter((r) => r.strainId && Number(r.plants) > 0)
-      .map((r) => ({ strainId: r.strainId, plants: Math.round(Number(r.plants)), esMadre: r.esMadre }));
+      .map((r) => ({ strainId: r.strainId, plants: Math.round(Number(r.plants)), esMadre: soloMadres }));
     if (items.length === 0) {
       setError('Elegí la genética y la cantidad de plantas.');
       return;
@@ -90,12 +94,12 @@ export function CargarPlantasForm({
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
-        {tipo === 'madres'
-          ? 'Esquejes recién cortados o plantas madre nuevas.'
+        {soloMadres
+          ? 'Plantas madre nuevas. Los esquejes se cargan con "✂ Cortar esquejes", que es donde nace el lote.'
           : tipo === 'flora'
-            ? loteNumero
-              ? `Se suman al lote ${codigoLote(loteNumero)} de esta sala.`
-              : `Se crea el lote ${codigoLote(proximoLote)} con fecha de inicio de flora hoy.`
+            ? loteCodigo
+              ? `Se suman al lote ${loteCodigo} de esta sala.`
+              : `Se crea el lote ${proximoCodigo} con fecha de inicio de flora hoy.`
             : 'Plantas que entran a la sala sin venir de otra sala (por ejemplo, para corregir el conteo).'}
       </p>
 
@@ -118,12 +122,6 @@ export function CargarPlantasForm({
             onChange={(e) => update(i, { plants: e.target.value })}
             className={`${inputCls} w-24`}
           />
-          {tipo === 'madres' && (
-            <label className="flex items-center gap-1 text-xs text-text-soft">
-              <input type="checkbox" checked={row.esMadre} onChange={(e) => update(i, { esMadre: e.target.checked })} />
-              Madre
-            </label>
-          )}
           {rows.length > 1 && (
             <button type="button" onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))} className="text-red text-xs">
               Quitar
@@ -133,7 +131,7 @@ export function CargarPlantasForm({
       ))}
       <button
         type="button"
-        onClick={() => setRows((p) => [...p, { strainId: '', plants: '', esMadre: false }])}
+        onClick={() => setRows((p) => [...p, { strainId: '', plants: '', esMadre: soloMadres }])}
         className="text-accent text-xs font-semibold"
       >
         + Agregar genética
@@ -146,7 +144,7 @@ export function CargarPlantasForm({
 
       <MsgError msg={error} />
       <button type="button" disabled={pending} onClick={submit} className={btnCls}>
-        {pending ? 'Guardando…' : 'Cargar plantas'}
+        {pending ? 'Guardando…' : soloMadres ? 'Cargar madres' : 'Cargar plantas'}
       </button>
     </div>
   );
@@ -154,21 +152,25 @@ export function CargarPlantasForm({
 
 // ── Pasar plantas a la sala siguiente ──────────────────────────────────────
 
-export type DestinoSala = { id: string; name: string; tipo: string; loteNumero: number | null; loteDia: number | null };
+export type DestinoSala = { id: string; name: string; tipo: string; loteCodigo: string | null; loteDia: number | null };
 
 export function MoverForm({
   origenId,
   grupos,
   destinos,
-  proximoLote,
+  proximoCodigo,
+  destinoSugerido,
 }: {
   origenId: string;
   grupos: GrupoPlantas[];
   destinos: DestinoSala[];
-  proximoLote: number;
+  proximoCodigo: string;
+  destinoSugerido?: string | null;
 }) {
   const { pending, error, setError, enviar } = useEnvio();
-  const [destino, setDestino] = useState(destinos[0]?.id ?? '');
+  const [destino, setDestino] = useState(
+    destinoSugerido && destinos.some((d) => d.id === destinoSugerido) ? destinoSugerido : (destinos[0]?.id ?? ''),
+  );
   const [sel, setSel] = useState<Record<string, string>>({});
 
   const dest = destinos.find((d) => d.id === destino);
@@ -224,9 +226,11 @@ export function MoverForm({
         </select>
         {dest?.tipo === 'flora' && (
           <p className="text-xs mt-1 rounded-lg bg-purple-bg text-purple px-3 py-2">
-            {dest.loteNumero
-              ? `Se suman al lote ${codigoLote(dest.loteNumero)}, que va por el día ${dest.loteDia} de flora.`
-              : `Nace el lote ${codigoLote(proximoLote)}: hoy es el día 0 de flora.`}
+            {dest.loteCodigo
+              ? `${dest.name} ya tiene el lote ${dest.loteCodigo} en flora (día ${dest.loteDia}): solo se pueden sumar plantas de ese mismo lote.`
+              : grupos.some((g) => !g.loteCodigo)
+                ? `Las plantas entran a flora con su lote; las que no tienen lote forman el ${proximoCodigo}. Hoy es el día 0 de flora.`
+                : 'Las plantas entran a flora con su lote. Hoy es el día 0 de flora.'}
           </p>
         )}
       </div>
@@ -249,7 +253,10 @@ export function MoverForm({
               <input type="checkbox" checked={on} onChange={(e) => toggle(g, e.target.checked)} />
               <span className="flex-1 text-sm text-text">
                 {g.strainName}
-                <span className="text-text-mute text-xs"> · {g.plants} plantas</span>
+                <span className="text-text-mute text-xs">
+                  {' '}
+                  · {g.plants} plantas{g.loteCodigo ? ` · ${g.loteCodigo}` : ''}
+                </span>
               </span>
               <input
                 type="number"
@@ -306,7 +313,7 @@ export function DescartarForm({ grupos }: { grupos: GrupoPlantas[] }) {
           {grupos.map((g) => (
             <option key={g.id} value={g.id}>
               {g.strainName}
-              {g.esMadre ? ' (madre)' : ''} · {g.plants} plantas
+              {g.esMadre ? ' (madre)' : g.loteCodigo ? ` · ${g.loteCodigo}` : ''} · {g.plants} plantas
             </option>
           ))}
         </select>
@@ -335,12 +342,12 @@ const DERIV_VACIA: Deriv = { humedo: '', extP: '', aceP: '', abierta: false };
 
 export function CosecharForm({
   loteId,
-  loteNumero,
+  loteCodigo,
   lineas,
   salasSecado,
 }: {
   loteId: string;
-  loteNumero: number;
+  loteCodigo: string;
   lineas: LineaLote[];
   salasSecado: { id: string; name: string }[];
 }) {
@@ -387,7 +394,7 @@ export function CosecharForm({
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
-        Cosecha del lote <strong>{codigoLote(loteNumero)}</strong>. Por cada genética podés derivar plantas a extracción o a
+        Cosecha del lote <strong>{loteCodigo}</strong>. Por cada genética podés derivar plantas a extracción o a
         aceites; el resto pasa a secado (hoy es el día 0 de secado).
       </p>
       {salasSecado.length > 1 && (
@@ -549,7 +556,7 @@ export function DesdeStockForm({
   lotes,
 }: {
   stock: { strainId: string; name: string; grams: number }[];
-  lotes: { id: string; numero: number; strainIds: string[] }[];
+  lotes: { id: string; codigo: string; strainIds: string[] }[];
 }) {
   const { pending, error, setError, enviar } = useEnvio();
   const [tipo, setTipo] = useState<'extraccion' | 'aceite'>('extraccion');
@@ -618,7 +625,7 @@ export function DesdeStockForm({
           <option value="">Sin especificar</option>
           {lotesDeGen.map((l) => (
             <option key={l.id} value={l.id}>
-              {codigoLote(l.numero)}
+              {l.codigo}
             </option>
           ))}
         </select>
@@ -639,12 +646,12 @@ export function DesdeStockForm({
 
 export function StockForm({
   loteId,
-  loteNumero,
+  loteCodigo,
   lineas,
   humedos,
 }: {
   loteId: string;
-  loteNumero: number;
+  loteCodigo: string;
   lineas: LineaLote[];
   humedos: Record<string, number | null>;
 }) {
@@ -682,7 +689,7 @@ export function StockForm({
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-soft">
-        Pesaje final del lote <strong>{codigoLote(loteNumero)}</strong>. El peso seco se suma al <strong>stock general</strong>{' '}
+        Pesaje final del lote <strong>{loteCodigo}</strong>. El peso seco se suma al <strong>stock general</strong>{' '}
         de cada genética y el lote queda cerrado con su historial.
       </p>
 
@@ -756,31 +763,67 @@ export function StockForm({
 
 export function EditarLoteForm({
   lote,
+  salasFlora,
 }: {
-  lote: { id: string; numero: number; floraInicio: string; diasFlora: number; secadoInicio: string | null; notas: string | null; estado: string };
+  lote: {
+    id: string;
+    numero: number;
+    codigo: string;
+    corteFecha: string | null;
+    salaDestinoId: string | null;
+    floraInicio: string | null;
+    diasFlora: number;
+    secadoInicio: string | null;
+    notas: string | null;
+    estado: string;
+  };
+  salasFlora: { id: string; name: string }[];
 }) {
   const { pending, error, enviar } = useEnvio();
   const [numeroLote, setNumeroLote] = useState(String(lote.numero));
-  const [floraInicio, setFloraInicio] = useState(lote.floraInicio);
+  const [corteFecha, setCorteFecha] = useState(lote.corteFecha ?? '');
+  const [destino, setDestino] = useState(lote.salaDestinoId ?? '');
+  const [floraInicio, setFloraInicio] = useState(lote.floraInicio ?? '');
   const [diasFlora, setDiasFlora] = useState(String(lote.diasFlora));
   const [secadoInicio, setSecadoInicio] = useState(lote.secadoInicio ?? '');
   const [notas, setNotas] = useState(lote.notas ?? '');
+  const antesDeFlora = lote.estado === 'esquejes' || lote.estado === 'vege';
 
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
         <label className={labelCls}>Número de lote</label>
         <input type="number" min="1" value={numeroLote} onChange={(e) => setNumeroLote(e.target.value)} className={inputCls} />
+        <p className="text-text-mute text-xs mt-1">Hoy: {lote.codigo}</p>
       </div>
+      <div>
+        <label className={labelCls}>Fecha de corte de esquejes</label>
+        <input type="date" max={hoyAR()} value={corteFecha} onChange={(e) => setCorteFecha(e.target.value)} className={inputCls} />
+      </div>
+      {antesDeFlora && (
+        <div className="col-span-2">
+          <label className={labelCls}>Sala de flora de destino</label>
+          <select value={destino} onChange={(e) => setDestino(e.target.value)} className={inputCls}>
+            <option value="">Sin definir</option>
+            {salasFlora.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!antesDeFlora && (
+        <div>
+          <label className={labelCls}>Inicio 12/12 (día 0 de flora)</label>
+          <input type="date" max={hoyAR()} value={floraInicio} onChange={(e) => setFloraInicio(e.target.value)} className={inputCls} />
+        </div>
+      )}
       <div>
         <label className={labelCls}>Días de flora estimados</label>
         <input type="number" min="1" value={diasFlora} onChange={(e) => setDiasFlora(e.target.value)} className={inputCls} />
       </div>
-      <div>
-        <label className={labelCls}>Inicio de flora</label>
-        <input type="date" max={hoyAR()} value={floraInicio} onChange={(e) => setFloraInicio(e.target.value)} className={inputCls} />
-      </div>
-      {lote.estado !== 'flora' && (
+      {(lote.estado === 'secado' || lote.estado === 'cerrado') && (
         <div>
           <label className={labelCls}>Inicio de secado</label>
           <input type="date" max={hoyAR()} value={secadoInicio} onChange={(e) => setSecadoInicio(e.target.value)} className={inputCls} />
@@ -799,7 +842,9 @@ export function EditarLoteForm({
             enviar(() =>
               editarLote(lote.id, {
                 numero: Math.round(Number(numeroLote)),
-                floraInicio,
+                corteFecha: corteFecha || null,
+                salaDestinoId: antesDeFlora ? destino || null : lote.salaDestinoId,
+                floraInicio: antesDeFlora ? null : floraInicio || null,
                 diasFlora: Math.round(Number(diasFlora)),
                 secadoInicio: secadoInicio || null,
                 notas,
@@ -811,6 +856,133 @@ export function EditarLoteForm({
           {pending ? 'Guardando…' : 'Guardar'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Cortar esquejes: nace el lote ──────────────────────────────────────────
+
+export function CortarEsquejesForm({
+  salaId,
+  madres,
+  lotesAbiertos,
+  salasFlora,
+  proximoCodigo,
+}: {
+  salaId: string;
+  madres: { strainId: string; name: string; plants: number }[];
+  lotesAbiertos: { id: string; codigo: string; destino: string | null; estado: string }[];
+  salasFlora: { id: string; name: string }[];
+  proximoCodigo: string;
+}) {
+  const { pending, error, setError, enviar } = useEnvio();
+  const [loteId, setLoteId] = useState(''); // '' = lote nuevo
+  const [destino, setDestino] = useState(salasFlora[0]?.id ?? '');
+  const [fecha, setFecha] = useState(hoyAR());
+  const [rows, setRows] = useState([{ strainId: '', plants: '' }]);
+  const [nota, setNota] = useState('');
+
+  function update(i: number, patch: Partial<(typeof rows)[number]>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  function submit() {
+    const items = rows
+      .filter((r) => r.strainId && Number(r.plants) > 0)
+      .map((r) => ({ strainId: r.strainId, plants: Math.round(Number(r.plants)) }));
+    if (items.length === 0) return setError('Elegí la madre y cuántos esquejes cortaste.');
+    if (!loteId && !destino) return setError('Elegí la sala de flora de destino.');
+    enviar(() =>
+      cortarEsquejes({ salaId, items, loteId: loteId || null, destinoId: loteId ? null : destino || null, fecha, nota }),
+    );
+  }
+
+  if (madres.length === 0) {
+    return (
+      <p className="text-sm text-text-soft">
+        No hay madres cargadas en esta sala. Cargalas primero con &quot;+ Madres&quot;: cada esqueje queda asociado a la madre de
+        la que se cortó.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className={labelCls}>Lote</label>
+        <select value={loteId} onChange={(e) => setLoteId(e.target.value)} className={inputCls}>
+          <option value="">Lote nuevo · {proximoCodigo}</option>
+          {lotesAbiertos.map((l) => (
+            <option key={l.id} value={l.id}>
+              Sumar a {l.codigo}
+              {l.destino ? ` (destino ${l.destino})` : ''}
+              {l.estado === 'vege' ? ' · ya en vege' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!loteId && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Sala de flora de destino</label>
+            <select value={destino} onChange={(e) => setDestino(e.target.value)} className={inputCls}>
+              {salasFlora.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Fecha de corte</label>
+            <input type="date" max={hoyAR()} value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <p className={labelCls}>Madre de origen y esquejes cortados</p>
+        {rows.map((row, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <select value={row.strainId} onChange={(e) => update(i, { strainId: e.target.value })} className={`${inputCls} flex-1 min-w-40`}>
+              <option value="">Madre…</option>
+              {madres.map((m) => (
+                <option key={m.strainId} value={m.strainId}>
+                  {m.name} ({m.plants} madre{m.plants !== 1 ? 's' : ''})
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              placeholder="Esquejes"
+              value={row.plants}
+              onChange={(e) => update(i, { plants: e.target.value })}
+              className={`${inputCls} w-24`}
+            />
+            {rows.length > 1 && (
+              <button type="button" onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))} className="text-red text-xs">
+                Quitar
+              </button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={() => setRows((p) => [...p, { strainId: '', plants: '' }])} className="text-accent text-xs font-semibold">
+          + Agregar madre
+        </button>
+      </div>
+
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <input value={nota} onChange={(e) => setNota(e.target.value)} className={inputCls} />
+      </div>
+
+      <MsgError msg={error} />
+      <button type="button" disabled={pending} onClick={submit} className={btnCls}>
+        {pending ? 'Guardando…' : loteId ? 'Sumar esquejes al lote' : `Crear ${proximoCodigo} con estos esquejes`}
+      </button>
     </div>
   );
 }

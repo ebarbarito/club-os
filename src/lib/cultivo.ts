@@ -1,6 +1,8 @@
 // Recorrido del cultivo: madres y esquejes → vege → flora → secado → stock.
-// El lote nace al entrar a flora y viaja entero hasta stock (ver migración
-// 0064_cultivo_lotes.sql).
+// El lote (tanda) nace al cortar los esquejes de las madres y viaja hasta
+// stock con el mismo número (migraciones 0064 y 0070). Su código sigue la
+// planilla de trazabilidad: GL-CUL-013; al entrar a flora se muestra con la
+// sala ("GL-CUL-013 · 420").
 
 export type TipoSala = 'madres' | 'vege' | 'flora' | 'secado';
 
@@ -28,9 +30,34 @@ export const DESTINOS: Record<string, TipoSala[]> = {
   vege: ['flora'],
 };
 
-export function codigoLote(numero: number) {
-  return `L-${String(numero).padStart(3, '0')}`;
+// Código de un lote con el prefijo del club (el mismo que arma la base).
+export function codigoLote(numero: number, prefijo: string | null | undefined) {
+  return `${prefijo || 'CUL'}-${String(numero).padStart(3, '0')}`;
 }
+
+// Sigla corta de una sala para el nombre del lote: "Floración Sala 3" → "S3",
+// "420" → "420", "Invernadero" → "Invernadero".
+export function siglaSala(nombre: string | null | undefined): string {
+  if (!nombre) return '';
+  const m = nombre.match(/sala\s*(\d+)/i);
+  if (m) return `S${m[1]}`;
+  return nombre.trim();
+}
+
+// Nombre del lote como se muestra: el código, y desde que entró a flora,
+// la sala ("GL-CUL-013 · 420").
+export function nombreLote(codigo: string, salaFlora: string | null | undefined) {
+  const sigla = siglaSala(salaFlora);
+  return sigla ? `${codigo} · ${sigla}` : codigo;
+}
+
+export const ESTADO_LOTE: Record<string, { label: string; color: 'blue' | 'green' | 'purple' | 'amber' | 'gray' }> = {
+  esquejes: { label: 'Esquejes', color: 'blue' },
+  vege: { label: 'En vege', color: 'green' },
+  flora: { label: 'En flora', color: 'purple' },
+  secado: { label: 'En secado', color: 'amber' },
+  cerrado: { label: 'Cerrado', color: 'gray' },
+};
 
 // Fecha de hoy en Argentina, "YYYY-MM-DD".
 export function hoyAR(): string {
@@ -81,6 +108,7 @@ export type GrupoPlantas = {
   strainName: string;
   plants: number;
   loteId: string | null;
+  loteCodigo: string | null;
   esMadre: boolean;
   ingresoAt: string;
 };
@@ -88,9 +116,13 @@ export type GrupoPlantas = {
 export type LoteResumen = {
   id: string;
   numero: number;
-  estado: 'flora' | 'secado' | 'cerrado';
+  codigo: string;
+  estado: 'esquejes' | 'vege' | 'flora' | 'secado' | 'cerrado';
   salaId: string | null;
-  floraInicio: string;
+  salaFloraId: string | null;
+  salaDestinoId: string | null;
+  corteFecha: string | null;
+  floraInicio: string | null;
   diasFlora: number;
   secadoInicio: string | null;
   notas: string | null;

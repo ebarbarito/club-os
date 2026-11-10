@@ -5,7 +5,7 @@ import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { ROLES } from '@/lib/roles';
 import { Badge } from '@/components/badge';
 import { fmtDateTime } from '@/lib/format';
-import { codigoLote, diaDeEtapa, diasEntre, fmtFecha, fmtGramos } from '@/lib/cultivo';
+import { ESTADO_LOTE, diaDeEtapa, diasEntre, fmtFecha, fmtGramos, nombreLote } from '@/lib/cultivo';
 
 const TIPO_MOV: Record<string, string> = {
   alta: 'Carga',
@@ -92,16 +92,13 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
   const cierre: string | null = lote.cerrado_at ? new Date(lote.cerrado_at).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : null;
   // Fin de flora: el pase a secado, o el cierre si todo se derivó a procesos.
   const finFlora: string | null = lote.secado_inicio ?? cierre;
-  const diasFlora = finFlora ? diasEntre(lote.flora_inicio, finFlora) : diaDeEtapa(lote.flora_inicio);
+  const enFlora = Boolean(lote.flora_inicio);
+  const diasFlora = !enFlora ? 0 : finFlora ? diasEntre(lote.flora_inicio, finFlora) : diaDeEtapa(lote.flora_inicio);
   const conSecado = Boolean(lote.secado_inicio);
   const diasSecado = lote.secado_inicio ? (cierre ? diasEntre(lote.secado_inicio, cierre) : diaDeEtapa(lote.secado_inicio)) : null;
 
-  const ESTADO: Record<string, { label: string; color: 'purple' | 'amber' | 'gray' }> = {
-    flora: { label: 'En flora', color: 'purple' },
-    secado: { label: 'En secado', color: 'amber' },
-    cerrado: { label: 'Cerrado', color: 'gray' },
-  };
-  const e = ESTADO[lote.estado] ?? ESTADO.cerrado;
+  const e = ESTADO_LOTE[lote.estado] ?? ESTADO_LOTE.cerrado;
+  const nombre = nombreLote(lote.codigo ?? `${lote.numero}`, lote.sala_flora_id ? salaNombre.get(lote.sala_flora_id) : null);
 
   return (
     <div className="max-w-4xl">
@@ -109,22 +106,34 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
         ← Salas & Cultivo
       </Link>
       <div className="flex flex-wrap items-center gap-3 mt-2 mb-4">
-        <h1 className="font-display text-2xl font-bold text-text">Lote {codigoLote(lote.numero)}</h1>
+        <h1 className="font-display text-2xl font-bold text-text">{nombre}</h1>
         <Badge label={e.label} color={e.color} />
       </div>
+      <p className="text-text-soft text-sm mb-4">
+        Corte de esquejes: {fmtFecha(lote.corte_fecha)}
+        {lote.sala_destino_id ? ` · Destino: ${nombreSala(lote.sala_destino_id)}` : ''}
+      </p>
       {lote.notas && <p className="text-text-soft text-sm mb-4 whitespace-pre-wrap">{lote.notas}</p>}
 
       {/* Recorrido */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <div className="rounded-xl border border-line bg-surface p-4">
           <p className="text-xs font-semibold uppercase text-purple">Flora</p>
-          <p className="font-display font-bold text-text">{nombreSala(lote.sala_flora_id)}</p>
-          <p className="text-sm text-text-soft">
-            {fmtFecha(lote.flora_inicio)} → {finFlora ? fmtFecha(finFlora) : 'hoy'}
-          </p>
-          <p className="text-sm text-text">
-            {lote.estado === 'flora' ? `Día ${diasFlora} de ${lote.dias_flora}` : `${diasFlora} días`}
-          </p>
+          {enFlora ? (
+            <>
+              <p className="font-display font-bold text-text">{nombreSala(lote.sala_flora_id)}</p>
+              <p className="text-sm text-text-soft">
+                {fmtFecha(lote.flora_inicio)} → {finFlora ? fmtFecha(finFlora) : 'hoy'}
+              </p>
+              <p className="text-sm text-text">
+                {lote.estado === 'flora' ? `Día ${diasFlora} de ${lote.dias_flora}` : `${diasFlora} días`}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-text-mute">
+              Todavía en {lote.estado === 'esquejes' ? 'esquejes' : 'vege'} (en {nombreSala(lote.sala_id)})
+            </p>
+          )}
         </div>
         <div className={`rounded-xl border p-4 ${lote.secado_inicio ? 'border-line bg-surface' : 'border-dashed border-line-2'}`}>
           <p className="text-xs font-semibold uppercase text-amber-tx">Secado y manicura</p>
@@ -149,7 +158,7 @@ export default async function LotePage({ params }: { params: Promise<{ id: strin
               <p className="font-display font-bold text-text">{fmtGramos(totSeco)}</p>
               <p className="text-sm text-text-soft">Ingresó el {fmtFecha(cierre)}</p>
               <p className="text-sm text-text">
-                Ciclo total: {diasEntre(lote.flora_inicio, cierre)} días
+                Ciclo total: {diasEntre(lote.corte_fecha ?? lote.flora_inicio, cierre)} días
               </p>
             </>
           ) : (

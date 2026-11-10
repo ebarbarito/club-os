@@ -11,6 +11,8 @@ import {
   TIPO_COLOR,
   codigoLote,
   diaDeEtapa,
+  nombreLote,
+  ESTADO_LOTE,
   fmtFecha,
   fmtGramos,
   sumarDias,
@@ -23,6 +25,7 @@ import { SalaForm } from './sala-form';
 import {
   CargarPlantasForm,
   CosecharForm,
+  CortarEsquejesForm,
   DescartarForm,
   DesdeStockForm,
   EditarLoteForm,
@@ -67,6 +70,7 @@ export default async function SalasPage() {
     { data: productoRows },
     { data: stockRows },
     { data: lotePesajesCerrados },
+    { data: tenantRow },
   ] = await Promise.all([
       supabase
         .from('salas')
@@ -79,20 +83,25 @@ export default async function SalasPage() {
         .gt('plants', 0),
       supabase
         .from('lotes')
-        .select('id, numero, estado, sala_id, sala_flora_id, flora_inicio, dias_flora, secado_inicio, cerrado_at, notas')
+        .select(
+          'id, numero, codigo, estado, sala_id, sala_flora_id, sala_destino_id, corte_fecha, flora_inicio, dias_flora, secado_inicio, cerrado_at, notas',
+        )
         .order('numero', { ascending: false })
         .limit(60),
       supabase.from('strains').select('id, name').eq('item_type', 'genetica').neq('status', 'inactiva').order('name'),
       supabase.from('lote_pesajes').select('lote_id, strain_id, plantas, peso_humedo, peso_seco'),
       supabase
         .from('lote_procesos')
-        .select('id, lote_id, origen, tipo, plantas, peso_entrada, created_at, strain:strains!lote_procesos_strain_id_fkey(name), lote:lotes(numero)')
+        .select('id, lote_id, origen, tipo, plantas, peso_entrada, created_at, strain:strains!lote_procesos_strain_id_fkey(name), lote:lotes(numero, codigo)')
         .eq('estado', 'pendiente')
         .order('created_at'),
       supabase.from('strains').select('id, name').neq('status', 'inactiva').order('name'),
       supabase.from('stock_general').select('strain_id, grams, strain:strains(name, item_type)').gt('grams', 0),
-      supabase.from('lote_pesajes').select('strain_id, peso_seco, lote:lotes(id, numero, estado)').gt('peso_seco', 0),
+      supabase.from('lote_pesajes').select('strain_id, peso_seco, lote:lotes(id, numero, codigo, estado)').gt('peso_seco', 0),
+      supabase.from('tenants').select('lote_prefijo').eq('id', profile.tenantId).maybeSingle(),
     ]);
+
+  const prefijo: string | null = tenantRow?.lote_prefijo ?? null;
 
   const salas: Sala[] = salaRows ?? [];
   const strains: { id: string; name: string }[] = strainRows ?? [];
@@ -117,6 +126,7 @@ export default async function SalasPage() {
         strainName: strain?.name ?? '—',
         plants: r.plants,
         loteId: r.lote_id,
+        loteCodigo: null as string | null,
         esMadre: r.es_madre,
         ingresoAt: r.ingreso_at,
       };
@@ -124,14 +134,17 @@ export default async function SalasPage() {
   );
   grupos.sort((a, b) => a.strainName.localeCompare(b.strainName, 'es'));
 
-  const lotes: (LoteResumen & { salaFloraId: string | null; cerradoAt: string | null })[] = (loteRows ?? []).map(
+  const lotes: (LoteResumen & { cerradoAt: string | null })[] = (loteRows ?? []).map(
     (l: {
       id: string;
       numero: number;
+      codigo: string | null;
       estado: LoteResumen['estado'];
       sala_id: string | null;
       sala_flora_id: string | null;
-      flora_inicio: string;
+      sala_destino_id: string | null;
+      corte_fecha: string | null;
+      flora_inicio: string | null;
       dias_flora: number;
       secado_inicio: string | null;
       cerrado_at: string | null;
@@ -139,9 +152,12 @@ export default async function SalasPage() {
     }) => ({
       id: l.id,
       numero: l.numero,
+      codigo: l.codigo ?? codigoLote(l.numero, prefijo),
       estado: l.estado,
       salaId: l.sala_id,
       salaFloraId: l.sala_flora_id,
+      salaDestinoId: l.sala_destino_id,
+      corteFecha: l.corte_fecha,
       floraInicio: l.flora_inicio,
       diasFlora: l.dias_flora,
       secadoInicio: l.secado_inicio,
@@ -163,14 +179,14 @@ export default async function SalasPage() {
       peso_entrada: number | null;
       created_at: string;
       strain: { name: string } | { name: string }[] | null;
-      lote: { numero: number } | { numero: number }[] | null;
+      lote: { numero: number; codigo: string | null } | { numero: number; codigo: string | null }[] | null;
     }) => {
       const strain = Array.isArray(r.strain) ? r.strain[0] : r.strain;
       const lote = Array.isArray(r.lote) ? r.lote[0] : r.lote;
       return {
         id: r.id,
         loteId: r.lote_id,
-        loteNumero: lote?.numero ?? null,
+        loteCodigo: lote ? (lote.codigo ?? codigoLote(lote.numero, prefijo)) : null,
         origen: r.origen,
         tipo: r.tipo,
         strainName: strain?.name ?? '—',
@@ -190,21 +206,36 @@ export default async function SalasPage() {
     })
     .filter((r: { itemType?: string }) => r.itemType === 'genetica')
     .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'es'));
-  const lotesPorId = new Map<string, { id: string; numero: number; strainIds: string[] }>();
-  for (const r of (lotePesajesCerrados ?? []) as {
-    strain_id: string;
-    lote: { id: string; numero: number; estado: string } | { id: string; numero: number; estado: string }[] | null;
-  }[]) {
+  type LoteMin = { id: string; numero: number; codigo: string | null; estado: string };
+  const lotesPorId = new Map<string, { id: string; numero: number; codigo: string; strainIds: string[] }>();
+  for (const r of (lotePesajesCerrados ?? []) as { strain_id: string; lote: LoteMin | LoteMin[] | null }[]) {
     const l = Array.isArray(r.lote) ? r.lote[0] : r.lote;
     if (!l || l.estado !== 'cerrado') continue;
-    const prev = lotesPorId.get(l.id) ?? { id: l.id, numero: l.numero, strainIds: [] };
+    const prev = lotesPorId.get(l.id) ?? { id: l.id, numero: l.numero, codigo: l.codigo ?? codigoLote(l.numero, prefijo), strainIds: [] };
     prev.strainIds.push(r.strain_id);
     lotesPorId.set(l.id, prev);
   }
   const lotesCerrados = [...lotesPorId.values()].sort((a, b) => b.numero - a.numero);
 
-  const proximoLote = Math.max(0, ...lotes.map((l) => l.numero)) + 1;
+  const proximoCodigo = codigoLote(Math.max(0, ...lotes.map((l) => l.numero)) + 1, prefijo);
   const salaNombre = new Map(salas.map((s) => [s.id, s.name]));
+  const loteById = new Map(lotes.map((l) => [l.id, l]));
+  // Nombre a mostrar: código, y desde flora la sala ("GL-CUL-013 · 420").
+  const nombreDe = (l: { codigo: string; salaFloraId: string | null }) =>
+    nombreLote(l.codigo, l.salaFloraId ? salaNombre.get(l.salaFloraId) : null);
+  for (const g of grupos) {
+    const l = g.loteId ? loteById.get(g.loteId) : null;
+    g.loteCodigo = l ? nombreDe(l) : null;
+  }
+  const salasFlora = salas.filter((s) => s.tipo === 'flora').map((s) => ({ id: s.id, name: s.name }));
+  const lotesAbiertos = lotes
+    .filter((l) => l.estado === 'esquejes' || l.estado === 'vege')
+    .map((l) => ({
+      id: l.id,
+      codigo: l.codigo,
+      destino: l.salaDestinoId ? (salaNombre.get(l.salaDestinoId) ?? null) : null,
+      estado: l.estado,
+    }));
   const loteEnFlora = (salaId: string) => lotes.find((l) => l.salaId === salaId && l.estado === 'flora') ?? null;
   const lineasDeLote = (loteId: string) => {
     const porStrain = new Map<string, { strainId: string; strainName: string; plants: number }>();
@@ -221,7 +252,7 @@ export default async function SalasPage() {
       .filter((d) => d.id !== sala.id && (DESTINOS[sala.tipo] ?? []).includes(d.tipo as TipoSala))
       .map((d) => {
         const l = d.tipo === 'flora' ? loteEnFlora(d.id) : null;
-        return { id: d.id, name: d.name, tipo: d.tipo, loteNumero: l?.numero ?? null, loteDia: l ? diaDeEtapa(l.floraInicio) : null };
+        return { id: d.id, name: d.name, tipo: d.tipo, loteCodigo: l ? nombreDe(l) : null, loteDia: l ? diaDeEtapa(l.floraInicio) : null };
       })
       // Primero la sala siguiente directa (vege antes que flora).
       .sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'vege' ? -1 : 1));
@@ -234,7 +265,7 @@ export default async function SalasPage() {
         <div>
           <h1 className="font-display text-2xl font-bold text-text">Salas & Cultivo</h1>
           <p className="text-text-soft text-sm">
-            Madres y esquejes → Vege → Flora → Secado → Stock. El lote nace al entrar a flora.
+            Madres y esquejes → Vege → Flora → Secado → Stock. El lote nace al cortar los esquejes.
           </p>
         </div>
         {isAdmin && (
@@ -264,7 +295,7 @@ export default async function SalasPage() {
               </div>
 
               {s.tipo === 'flora' && (
-                <FloraResumen lote={lote} />
+                <FloraResumen lote={lote} nombre={lote ? nombreDe(lote) : ''} />
               )}
 
               {s.tipo === 'secado' ? (
@@ -273,9 +304,18 @@ export default async function SalasPage() {
                   lineasDeLote={lineasDeLote}
                   pesajes={pesajes}
                   salaFloraNombre={(id) => (id ? salaNombre.get(id) ?? '—' : '—')}
+                  nombreDe={nombreDe}
+                  salasFlora={salasFlora}
                 />
               ) : (
-                <ListaPlantas grupos={enSala} tipo={s.tipo} />
+                <ListaPlantas
+                  grupos={enSala}
+                  tipo={s.tipo}
+                  destinoDe={(loteId) => {
+                    const d = loteById.get(loteId)?.salaDestinoId;
+                    return d ? (salaNombre.get(d) ?? null) : null;
+                  }}
+                />
               )}
 
               {s.capacity > 0 && (
@@ -293,16 +333,38 @@ export default async function SalasPage() {
               )}
 
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-line">
+                {s.tipo === 'madres' && (
+                  <ModalTrigger label="✂ Cortar esquejes" className={btnPri} title={`Cortar esquejes — ${s.name}`}>
+                    <CortarEsquejesForm
+                      salaId={s.id}
+                      madres={enSala
+                        .filter((g) => g.esMadre)
+                        .map((g) => ({ strainId: g.strainId, name: g.strainName, plants: g.plants }))}
+                      lotesAbiertos={lotesAbiertos}
+                      salasFlora={salasFlora}
+                      proximoCodigo={proximoCodigo}
+                    />
+                  </ModalTrigger>
+                )}
                 {(s.tipo === 'madres' || s.tipo === 'vege') && (
                   <ModalTrigger label="Pasar a… →" className={btnPri} title={`Pasar plantas desde ${s.name}`}>
-                    <MoverForm origenId={s.id} grupos={movibles} destinos={destinos} proximoLote={proximoLote} />
+                    <MoverForm
+                      origenId={s.id}
+                      grupos={movibles}
+                      destinos={destinos}
+                      proximoCodigo={proximoCodigo}
+                      destinoSugerido={
+                        // Desde vege, la sala de destino que el lote eligió al cortar.
+                        movibles.map((g) => (g.loteId ? loteById.get(g.loteId)?.salaDestinoId : null)).find(Boolean) ?? null
+                      }
+                    />
                   </ModalTrigger>
                 )}
                 {s.tipo === 'flora' && lote && (
-                  <ModalTrigger label="Cosechar →" className={btnPri} title={`Cosechar ${codigoLote(lote.numero)}`}>
+                  <ModalTrigger label="Cosechar →" className={btnPri} title={`Cosechar ${nombreDe(lote)}`}>
                     <CosecharForm
                       loteId={lote.id}
-                      loteNumero={lote.numero}
+                      loteCodigo={nombreDe(lote)}
                       lineas={lineasDeLote(lote.id)}
                       salasSecado={salasSecado}
                     />
@@ -310,22 +372,22 @@ export default async function SalasPage() {
                 )}
                 {s.tipo !== 'secado' && (
                   <ModalTrigger
-                    label={s.tipo === 'madres' ? '+ Esquejes / madres' : '+ Cargar plantas'}
+                    label={s.tipo === 'madres' ? '+ Madres' : '+ Cargar plantas'}
                     className={btnSec}
-                    title={`Cargar plantas en ${s.name}`}
+                    title={s.tipo === 'madres' ? `Cargar madres en ${s.name}` : `Cargar plantas en ${s.name}`}
                   >
                     <CargarPlantasForm
                       salaId={s.id}
                       tipo={s.tipo}
                       strains={strains}
-                      loteNumero={lote?.numero ?? null}
-                      proximoLote={proximoLote}
+                      loteCodigo={lote ? nombreDe(lote) : null}
+                      proximoCodigo={proximoCodigo}
                     />
                   </ModalTrigger>
                 )}
                 {lote && (
-                  <ModalTrigger label="Editar lote" className={btnSec} title={`Editar ${codigoLote(lote.numero)}`}>
-                    <EditarLoteForm lote={lote} />
+                  <ModalTrigger label="Editar lote" className={btnSec} title={`Editar ${nombreDe(lote)}`}>
+                    <EditarLoteForm lote={lote} salasFlora={salasFlora} />
                   </ModalTrigger>
                 )}
                 {s.tipo !== 'secado' && enSala.length > 0 && (
@@ -382,9 +444,9 @@ export default async function SalasPage() {
             {procesos.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
                 <Badge label={p.tipo === 'extraccion' ? 'Extracción' : 'Aceites'} color={p.tipo === 'extraccion' ? 'blue' : 'amber'} />
-                {p.loteId && p.loteNumero ? (
+                {p.loteId && p.loteCodigo ? (
                   <Link href={`/panel/salas/lotes/${p.loteId}`} className="font-semibold text-accent hover:underline">
-                    {codigoLote(p.loteNumero)}
+                    {p.loteCodigo}
                   </Link>
                 ) : (
                   <span className="font-semibold text-text-soft">Stock</span>
@@ -398,7 +460,7 @@ export default async function SalasPage() {
                 <ModalTrigger
                   label="Cargar resultado"
                   className={btnPri}
-                  title={`Resultado — ${p.loteNumero ? codigoLote(p.loteNumero) : 'desde stock'}`}
+                  title={`Resultado — ${p.loteCodigo ?? 'desde stock'}`}
                 >
                   <ProcesoForm proceso={p} productos={productos} />
                 </ModalTrigger>
@@ -408,18 +470,18 @@ export default async function SalasPage() {
         )}
       </section>
 
-      <LotesTabla lotes={lotes} grupos={grupos} pesajes={pesajes} salaNombre={salaNombre} />
+      <LotesTabla lotes={lotes} grupos={grupos} pesajes={pesajes} salaNombre={salaNombre} nombreDe={nombreDe} />
     </div>
   );
 }
 
 // ── Piezas de la tarjeta ───────────────────────────────────────────────────
 
-function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | null }) | null }) {
-  if (!lote) {
+function FloraResumen({ lote, nombre }: { lote: (LoteResumen & { cerradoAt: string | null }) | null; nombre: string }) {
+  if (!lote || !lote.floraInicio) {
     return (
       <p className="rounded-lg bg-surface-2 text-text-soft text-sm px-3 py-2 mb-3">
-        Sala libre. El próximo lote nace cuando pasen plantas desde vege.
+        Sala libre. El próximo lote entra cuando pasen sus plantas desde vege.
       </p>
     );
   }
@@ -431,7 +493,7 @@ function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | nul
     <div className="rounded-lg bg-purple-bg px-3 py-2.5 mb-3">
       <div className="flex items-baseline justify-between gap-2">
         <Link href={`/panel/salas/lotes/${lote.id}`} className="font-display font-bold text-purple hover:underline">
-          Lote {codigoLote(lote.numero)}
+          {nombre}
         </Link>
         <span className="font-display text-2xl font-bold text-purple leading-none">
           Día {dia} <span className="text-sm font-semibold">de {lote.diasFlora}</span>
@@ -450,10 +512,24 @@ function FloraResumen({ lote }: { lote: (LoteResumen & { cerradoAt: string | nul
   );
 }
 
-function ListaPlantas({ grupos, tipo }: { grupos: GrupoPlantas[]; tipo: string }) {
+function ListaPlantas({
+  grupos,
+  tipo,
+  destinoDe,
+}: {
+  grupos: GrupoPlantas[];
+  tipo: string;
+  destinoDe: (loteId: string) => string | null;
+}) {
   if (grupos.length === 0) return <p className="text-text-mute text-sm">Sin plantas.</p>;
   const madres = grupos.filter((g) => g.esMadre);
   const resto = grupos.filter((g) => !g.esMadre);
+  // En esquejes y vege las plantas se agrupan por lote.
+  const porLote = new Map<string, GrupoPlantas[]>();
+  for (const g of resto) {
+    const k = g.loteId ?? '';
+    porLote.set(k, [...(porLote.get(k) ?? []), g]);
+  }
   const conDias = tipo === 'madres' || tipo === 'vege';
   const fila = (g: GrupoPlantas) => (
     <li key={g.id} className="flex justify-between gap-2">
@@ -472,14 +548,21 @@ function ListaPlantas({ grupos, tipo }: { grupos: GrupoPlantas[]; tipo: string }
           <ul className="max-h-40 overflow-y-auto">{madres.map(fila)}</ul>
         </div>
       )}
-      {resto.length > 0 && (
-        <div>
-          {tipo === 'madres' && (
-            <p className="text-xs font-semibold text-text-mute uppercase">Esquejes · {resto.reduce((s, g) => s + g.plants, 0)}</p>
-          )}
-          <ul className="max-h-56 overflow-y-auto">{resto.map(fila)}</ul>
-        </div>
-      )}
+      {tipo === 'flora'
+        ? resto.length > 0 && <ul className="max-h-56 overflow-y-auto">{resto.map(fila)}</ul>
+        : [...porLote.entries()].map(([loteId, gs]) => {
+            const destino = loteId ? destinoDe(loteId) : null;
+            return (
+              <div key={loteId || 'sin-lote'}>
+                <p className="text-xs font-semibold text-text-mute uppercase">
+                  {gs[0].loteCodigo ?? (tipo === 'madres' ? 'Esquejes sin lote' : 'Sin lote')} ·{' '}
+                  {gs.reduce((s, g) => s + g.plants, 0)}
+                  {destino ? <span className="normal-case font-normal"> → {destino}</span> : null}
+                </p>
+                <ul className="max-h-56 overflow-y-auto">{gs.map(fila)}</ul>
+              </div>
+            );
+          })}
     </div>
   );
 }
@@ -489,11 +572,15 @@ function SecadoLotes({
   lineasDeLote,
   pesajes,
   salaFloraNombre,
+  nombreDe,
+  salasFlora,
 }: {
-  lotes: (LoteResumen & { salaFloraId: string | null })[];
+  lotes: LoteResumen[];
   lineasDeLote: (id: string) => { strainId: string; strainName: string; plants: number }[];
   pesajes: { lote_id: string; strain_id: string; peso_humedo: number | null }[];
   salaFloraNombre: (id: string | null) => string;
+  nombreDe: (l: { codigo: string; salaFloraId: string | null }) => string;
+  salasFlora: { id: string; name: string }[];
 }) {
   if (lotes.length === 0) return <p className="text-text-mute text-sm">Sin lotes secándose.</p>;
   return (
@@ -508,7 +595,7 @@ function SecadoLotes({
           <div key={l.id} className="rounded-lg border border-line-2 p-3">
             <div className="flex items-baseline justify-between gap-2">
               <Link href={`/panel/salas/lotes/${l.id}`} className="font-display font-bold text-amber-tx hover:underline">
-                Lote {codigoLote(l.numero)}
+                {nombreDe(l)}
               </Link>
               <span className="font-display text-xl font-bold text-amber-tx">Día {diaDeEtapa(l.secadoInicio)}</span>
             </div>
@@ -516,11 +603,11 @@ function SecadoLotes({
               De {salaFloraNombre(l.salaFloraId)} · {plantas} plantas · {lineas.length} genéticas
             </p>
             <div className="flex flex-wrap gap-2">
-              <ModalTrigger label="Pesar y enviar a stock" className={btnPri} title={`Pesaje final — ${codigoLote(l.numero)}`}>
-                <StockForm loteId={l.id} loteNumero={l.numero} lineas={lineas} humedos={humedos} />
+              <ModalTrigger label="Pesar y enviar a stock" className={btnPri} title={`Pesaje final — ${nombreDe(l)}`}>
+                <StockForm loteId={l.id} loteCodigo={nombreDe(l)} lineas={lineas} humedos={humedos} />
               </ModalTrigger>
-              <ModalTrigger label="Editar lote" className={btnSec} title={`Editar ${codigoLote(l.numero)}`}>
-                <EditarLoteForm lote={l} />
+              <ModalTrigger label="Editar lote" className={btnSec} title={`Editar ${nombreDe(l)}`}>
+                <EditarLoteForm lote={l} salasFlora={salasFlora} />
               </ModalTrigger>
             </div>
           </div>
@@ -535,18 +622,15 @@ function LotesTabla({
   grupos,
   pesajes,
   salaNombre,
+  nombreDe,
 }: {
-  lotes: (LoteResumen & { salaFloraId: string | null; cerradoAt: string | null })[];
+  lotes: (LoteResumen & { cerradoAt: string | null })[];
   grupos: GrupoPlantas[];
   pesajes: { lote_id: string; plantas: number; peso_seco: number | null }[];
   salaNombre: Map<string, string>;
+  nombreDe: (l: { codigo: string; salaFloraId: string | null }) => string;
 }) {
   if (lotes.length === 0) return null;
-  const ESTADO: Record<string, { label: string; color: 'purple' | 'amber' | 'gray' }> = {
-    flora: { label: 'En flora', color: 'purple' },
-    secado: { label: 'En secado', color: 'amber' },
-    cerrado: { label: 'Cerrado', color: 'gray' },
-  };
   return (
     <section className="mt-8">
       <h2 className="font-display text-lg font-bold text-text mb-2">Lotes</h2>
@@ -557,7 +641,8 @@ function LotesTabla({
               <th className="text-left font-semibold px-3 py-2">Lote</th>
               <th className="text-left font-semibold px-3 py-2">Estado</th>
               <th className="text-left font-semibold px-3 py-2">Sala de flora</th>
-              <th className="text-left font-semibold px-3 py-2">Inicio flora</th>
+              <th className="text-left font-semibold px-3 py-2">Corte</th>
+              <th className="text-left font-semibold px-3 py-2">Día 0 flora</th>
               <th className="text-right font-semibold px-3 py-2">Plantas</th>
               <th className="text-right font-semibold px-3 py-2">Seco</th>
               <th className="text-right font-semibold px-3 py-2">g/planta</th>
@@ -571,18 +656,23 @@ function LotesTabla({
                   ? pes.reduce((s, p) => s + p.plantas, 0)
                   : grupos.filter((g) => g.loteId === l.id).reduce((s, g) => s + g.plants, 0);
               const seco = pes.reduce((s, p) => s + (Number(p.peso_seco) || 0), 0);
-              const e = ESTADO[l.estado];
+              const e = ESTADO_LOTE[l.estado] ?? ESTADO_LOTE.cerrado;
+              const salaFlora = l.salaFloraId ?? l.salaDestinoId;
               return (
                 <tr key={l.id} className="hover:bg-surface-2">
                   <td className="px-3 py-2 font-semibold">
                     <Link href={`/panel/salas/lotes/${l.id}`} className="text-accent hover:underline">
-                      {codigoLote(l.numero)}
+                      {nombreDe(l)}
                     </Link>
                   </td>
                   <td className="px-3 py-2">
                     <Badge label={e.label} color={e.color} />
                   </td>
-                  <td className="px-3 py-2 text-text-soft">{l.salaFloraId ? salaNombre.get(l.salaFloraId) ?? '—' : '—'}</td>
+                  <td className="px-3 py-2 text-text-soft">
+                    {salaFlora ? (salaNombre.get(salaFlora) ?? '—') : '—'}
+                    {!l.salaFloraId && l.salaDestinoId ? ' (destino)' : ''}
+                  </td>
+                  <td className="px-3 py-2 text-text-soft">{fmtFecha(l.corteFecha)}</td>
                   <td className="px-3 py-2 text-text-soft">{fmtFecha(l.floraInicio)}</td>
                   <td className="px-3 py-2 text-right">{plantas}</td>
                   <td className="px-3 py-2 text-right">{seco > 0 ? fmtGramos(seco) : '—'}</td>
