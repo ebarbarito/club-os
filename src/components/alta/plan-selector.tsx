@@ -56,7 +56,7 @@ export function PlanSelector({
               <span className="text-text-soft text-xs mt-1 flex-1">{p.desc}</span>
               {auto && (
                 <span className="mt-2 text-[11px] font-semibold text-accent">
-                  = {auto.nombre} · {auto.superficie}
+                  = {auto.nombre} · {auto.superficie} <span className="font-normal">(cultivo profesional)</span>
                 </span>
               )}
               {noAplica && <span className="mt-2 text-[11px] font-semibold text-text-mute">(no aplica a autocultivo)</span>}
@@ -84,7 +84,15 @@ export function PlanSelector({
                 <tr key={p.value} className="border-t border-line-2">
                   <td className="px-3 py-1.5">{p.title}</td>
                   <td className="px-3 py-1.5 font-semibold text-text">{p.autocultivo?.nombre ?? '—'}</td>
-                  <td className="px-3 py-1.5">{p.autocultivo?.superficie ?? '—'}</td>
+                  <td className="px-3 py-1.5">
+                    {p.autocultivo ? (
+                      <>
+                        {p.autocultivo.superficie} <span className="text-text-mute">(cultivo profesional)</span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="px-3 py-1.5">
                     {p.autocultivo ? `hasta ${p.autocultivo.produccion} / mes` : 'No aplica a autocultivo'}
                   </td>
