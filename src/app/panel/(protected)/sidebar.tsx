@@ -14,6 +14,7 @@ function SidebarContent({
   logoUrl,
   profile,
   nav,
+  alertas,
   pathname,
   onNavigate,
   onLogout,
@@ -22,6 +23,7 @@ function SidebarContent({
   logoUrl: string | null;
   profile: SessionProfile;
   nav: ViewId[];
+  alertas: Partial<Record<string, number>>;
   pathname: string;
   onNavigate?: () => void;
   onLogout: () => void;
@@ -54,11 +56,20 @@ function SidebarContent({
               key={view}
               href={`/panel/${view}`}
               onClick={onNavigate}
-              className={`block px-4 py-2.5 text-sm ${
+              className={`flex items-center justify-between gap-2 px-4 py-2.5 text-sm ${
                 active ? 'bg-white/10 font-semibold' : 'text-white/80 hover:bg-white/5'
               }`}
             >
-              {TITLES[view][0]}
+              <span>{TITLES[view][0]}</span>
+              {(alertas[view] ?? 0) > 0 && (
+                <span
+                  className="flex items-center gap-1.5 text-xs font-semibold text-white"
+                  title={`${alertas[view]} con acciones pendientes`}
+                >
+                  <span className="h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/30" />
+                  {alertas[view]}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -100,12 +111,15 @@ export function Sidebar({
   logoUrl,
   profile,
   nav,
+  alertas = {},
 }: {
   tenantName: string;
   logoUrl: string | null;
   profile: SessionProfile;
   nav: ViewId[];
+  alertas?: Partial<Record<string, number>>;
 }) {
+  const hayAlertas = Object.values(alertas).some((n) => (n ?? 0) > 0);
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -124,9 +138,10 @@ export function Sidebar({
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir menú"
-          className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/10"
+          className="relative h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/10"
         >
           ☰
+          {hayAlertas && <span className="absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-red ring-2 ring-green-900" />}
         </button>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -147,6 +162,7 @@ export function Sidebar({
               logoUrl={logoUrl}
               profile={profile}
               nav={nav}
+              alertas={alertas}
               pathname={pathname}
               onNavigate={() => setOpen(false)}
               onLogout={handleLogout}
@@ -162,6 +178,7 @@ export function Sidebar({
           logoUrl={logoUrl}
           profile={profile}
           nav={nav}
+          alertas={alertas}
           pathname={pathname}
           onLogout={handleLogout}
         />

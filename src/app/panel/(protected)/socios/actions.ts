@@ -172,3 +172,21 @@ export async function softDeleteMember(memberId: string) {
   revalidatePath('/panel/socios');
   return {};
 }
+
+// Registra que se mandó (o copió) el mensaje de bienvenida desde la ficha:
+// apaga la alerta de "Enviar bienvenida".
+export async function marcarBienvenidaEnviada(memberId: string) {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== 'admin') return { error: 'Solo un admin puede hacer esto' };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('members')
+    .update({ bienvenida_enviada_at: new Date().toISOString() })
+    .eq('id', memberId)
+    .is('bienvenida_enviada_at', null);
+  if (error) return { error: error.message };
+  revalidatePath('/panel/socios');
+  revalidatePath(`/panel/socios/${memberId}`);
+  revalidatePath('/panel', 'layout');
+  return {};
+}

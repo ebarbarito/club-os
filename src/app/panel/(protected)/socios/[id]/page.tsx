@@ -8,6 +8,7 @@ import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
 import { ADICIONALES, ENTREGAS, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
 import { MensajesSocio } from './mensajes-socio';
+import { accionPendiente, esperandoAlSocio } from '@/lib/alta/pendientes';
 import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plantilla } from '@/lib/alta/mensajes';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
@@ -109,6 +110,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     .filter((p): p is Plantilla => p != null)
     .map((p) => ({ id: p.id, titulo: p.titulo, texto: rellenar(p.texto, ctxMensajes) }));
 
+  const pendiente = accionPendiente(member);
+  const esperando = esperandoAlSocio(member);
+
   async function validate() {
     'use server';
     await setMemberStatus(id, 'valid');
@@ -132,6 +136,26 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <Badge label={meta.label} color={meta.color} />
       </div>
 
+      {pendiente && (
+        <div className="flex items-start gap-2 rounded-lg border border-red/40 bg-red/5 px-4 py-3 mb-4 text-sm">
+          <span className="mt-1 h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/20 shrink-0" />
+          <p>
+            <strong className="text-red">Pendiente: {pendiente.label}.</strong>{' '}
+            <span className="text-text-soft">{pendiente.detalle}</span>
+            {pendiente.key === 'validar' && (
+              <a href="#validar" className="ml-1 text-accent hover:underline">
+                Ir a validar ↓
+              </a>
+            )}
+          </p>
+        </div>
+      )}
+      {esperando && (
+        <p className="rounded-lg bg-surface-2 text-text-soft px-4 py-2.5 mb-4 text-sm">
+          Esperando que el socio complete la segunda parte. Si hace falta, podés reenviarle el link.
+        </p>
+      )}
+
       <MensajesSocio
         key={`${member.status}-${member.etapa2_enviada_at ?? ''}`}
         memberId={id}
@@ -139,6 +163,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         mensajes={mensajes}
         etapa2EnviadaAt={member.etapa2_enviada_at ? fmtDateTime(member.etapa2_enviada_at) : null}
         puedeGenerarLink={member.status === 'preinscripto'}
+        alerta={pendiente && pendiente.key !== 'validar' ? pendiente.label : null}
       />
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
@@ -293,7 +318,13 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {(member.status === 'pending' || member.status === 'draft' || member.status === 'preinscripto') && (
-        <div className="flex gap-2">
+        <div id="validar" className="flex flex-wrap items-center gap-2 scroll-mt-4">
+          {pendiente?.key === 'validar' && (
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-red mr-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/20" />
+              Revisá y validá
+            </span>
+          )}
           <form action={reject}>
             <button className="rounded-lg border border-red text-red font-semibold text-sm px-4 py-2">
               Rechazar

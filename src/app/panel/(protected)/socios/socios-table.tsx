@@ -10,6 +10,7 @@ import { EditMemberForm } from './edit-member-form';
 import { DeleteMemberForm } from './delete-member-form';
 import { EnviarSegundaParte } from './enviar-segunda-parte';
 import { ADICIONALES, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
+import { accionPendiente, esperandoAlSocio } from '@/lib/alta/pendientes';
 
 const REPROCANN_LABEL: Record<string, string> = { vigente: 'Vigente', tramite: 'En trámite', no: 'Sin REPROCANN' };
 const REPROCANN_TYPE_LABEL: Record<string, string> = { autocultivador: 'Autocultivador', paciente: 'Paciente' };
@@ -64,6 +65,9 @@ type Member = {
   plan_solicitado?: string | null;
   tramite_reprocann?: string | null;
   adicionales_solicitados?: string[] | null;
+  etapa2_enviada_at?: string | null;
+  etapa2_completada_at?: string | null;
+  bienvenida_enviada_at?: string | null;
 };
 
 function planCell(plan: string | null | undefined, adicionales: string[] | null | undefined): string {
@@ -115,13 +119,19 @@ export function SociosTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((m) => (
+            {filtered.map((m) => {
+              const pendiente = accionPendiente(m);
+              const esperando = esperandoAlSocio(m);
+              return (
               <tr key={m.id} className="border-t border-line hover:bg-surface-2">
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.member_number ?? '—'}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap">
-                  <Link href={`/panel/socios/${m.id}`} className="font-medium text-text hover:text-accent">
+                  <Link href={`/panel/socios/${m.id}`} className="inline-flex items-center gap-2 font-medium text-text hover:text-accent">
+                    {pendiente && <span className="h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/20" title={pendiente.detalle} />}
                     {m.name}
                   </Link>
+                  {pendiente && <span className="block text-xs font-semibold text-red">{pendiente.label}</span>}
+                  {esperando && <span className="block text-xs text-text-mute">Esperando la 2ª parte del socio</span>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.dni}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft max-w-[220px] truncate" title={m.address ?? m.zona ?? ''}>
@@ -161,7 +171,8 @@ export function SociosTable({
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-4 py-10 text-center text-text-mute">

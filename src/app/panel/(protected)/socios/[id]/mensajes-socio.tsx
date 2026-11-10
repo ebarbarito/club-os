@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { generarLinkEtapa2 } from '../actions';
+import { generarLinkEtapa2, marcarBienvenidaEnviada } from '../actions';
 import { linkWhatsApp, telefonoWhatsApp } from '@/lib/alta/opciones';
 
 export type MensajeFicha = { id: string; titulo: string; texto: string };
@@ -19,12 +19,15 @@ export function MensajesSocio({
   mensajes,
   etapa2EnviadaAt,
   puedeGenerarLink,
+  alerta,
 }: {
   memberId: string;
   phone: string | null;
   mensajes: MensajeFicha[];
   etapa2EnviadaAt: string | null;
   puedeGenerarLink: boolean;
+  // Acción pendiente del club que se resuelve mandando este mensaje.
+  alerta?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -43,6 +46,10 @@ export function MensajesSocio({
   const telValido = telefonoWhatsApp(phone) != null;
 
   async function resolverTexto(): Promise<string | null> {
+    if (seleccion === 'bienvenida') {
+      // Al mandar o copiar la bienvenida se apaga la alerta.
+      await marcarBienvenidaEnviada(memberId);
+    }
     if (!puedeGenerarLink) {
       if (!llevaLink) return texto;
       setError('El link de la segunda parte solo se puede generar mientras el socio está pre-inscripto.');
@@ -72,7 +79,7 @@ export function MensajesSocio({
       const wa = linkWhatsApp(phone, final);
       if (win) win.location.href = wa;
       else window.location.href = wa;
-      if (puedeGenerarLink) router.refresh();
+      if (puedeGenerarLink || alerta) router.refresh();
     });
   }
 
@@ -88,14 +95,16 @@ export function MensajesSocio({
       } catch {
         setError('No se pudo copiar. Seleccioná el texto a mano.');
       }
-      if (puedeGenerarLink) router.refresh();
+      if (puedeGenerarLink || alerta) router.refresh();
     });
   }
 
   return (
-    <div className="rounded-xl border border-accent/40 bg-surface p-5 mb-4">
-      <p className="text-xs font-semibold text-text-mute uppercase mb-3">
+    <div className={`rounded-xl border bg-surface p-5 mb-4 ${alerta ? 'border-red/50' : 'border-accent/40'}`}>
+      <p className="flex items-center gap-2 text-xs font-semibold text-text-mute uppercase mb-3">
+        {alerta && <span className="h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/20" />}
         Mensaje de WhatsApp{mensajes.length === 1 ? ` · ${mensajes[0].titulo}` : ''}
+        {alerta && <span className="normal-case font-semibold text-red">· {alerta}</span>}
       </p>
 
       {mensajes.length > 1 && (

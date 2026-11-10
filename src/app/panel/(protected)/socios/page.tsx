@@ -10,6 +10,7 @@ import { headers } from 'next/headers';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { parseDatosMensajes, plantilla, rellenar } from '@/lib/alta/mensajes';
 import { fmtDateTime } from '@/lib/format';
+import { contarPendientesAlta } from '@/lib/alta/pendientes-server';
 
 const TABS = [
   { key: 'todos', label: 'Todos' },
@@ -35,7 +36,13 @@ export default async function SociosPage({
   const supabase = await createClient();
   let query = supabase.from('members').select('*').is('deleted_at', null).order('member_number', { ascending: true, nullsFirst: false });
   if (activeTab !== 'todos') query = query.eq('status', activeTab);
-  const { data: members } = await query;
+  const [{ data: members }, pendientes] = await Promise.all([query, contarPendientesAlta(supabase)]);
+  const alertaTab: Record<string, number> = {
+    todos: pendientes.total,
+    preinscripto: pendientes.preinscripto,
+    pending: pendientes.pending,
+    valid: pendientes.valid,
+  };
 
   // Mensaje de la segunda parte para el botón "Enviar 2ª parte" de cada
   // pre-inscripto. El link personal se genera recién al tocar el botón.
@@ -94,18 +101,24 @@ export default async function SociosPage({
         </div>
       </div>
 
-      <div className="flex gap-1 mb-4 border-b border-line">
+      <div className="flex flex-wrap gap-1 mb-4 border-b border-line">
         {TABS.map((tab) => (
           <Link
             key={tab.key}
             href={tab.key === 'todos' ? '/panel/socios' : `/panel/socios?status=${tab.key}`}
-            className={`px-3 py-2 text-sm border-b-2 -mb-px ${
+            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 -mb-px ${
               activeTab === tab.key
                 ? 'border-accent text-accent font-semibold'
                 : 'border-transparent text-text-soft hover:text-text'
             }`}
           >
             {tab.label}
+            {(alertaTab[tab.key] ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-red" title="Con acciones pendientes">
+                <span className="h-2 w-2 rounded-full bg-red" />
+                {alertaTab[tab.key]}
+              </span>
+            )}
           </Link>
         ))}
       </div>
