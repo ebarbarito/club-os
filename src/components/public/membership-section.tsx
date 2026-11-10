@@ -34,6 +34,7 @@ export function MembershipSection() {
               <p className={`text-sm flex-1 ${destacado ? 'text-white/80' : 'text-text-soft'}`}>{p.desc}</p>
               <p className={`mt-4 font-semibold text-lg ${destacado ? 'text-gold' : 'text-accent'}`}>{p.precio}</p>
               <p className={`text-xs ${destacado ? 'text-white/60' : 'text-text-mute'}`}>cuota mensual</p>
+              <p className={`text-xs ${destacado ? 'text-white/60' : 'text-text-mute'}`}>(incluye cuota social)</p>
             </div>
           );
         })}

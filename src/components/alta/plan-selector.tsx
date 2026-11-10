@@ -62,6 +62,7 @@ export function PlanSelector({
               {noAplica && <span className="mt-2 text-[11px] font-semibold text-text-mute">(no aplica a autocultivo)</span>}
               <span className="mt-3 font-semibold text-accent text-sm">{p.precio}</span>
               <span className="text-text-mute text-[11px]">cuota mensual</span>
+              <span className="text-text-mute text-[11px]">(incluye cuota social)</span>
             </label>
           );
         })}
