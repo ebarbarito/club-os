@@ -32,7 +32,6 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
   const [plan, setPlan] = useState('');
   const [adicionales, setAdicionales] = useState<string[]>([]);
   const [reprocann, setReprocann] = useState<string>('vigente');
-  const [tramite, setTramite] = useState('');
   const [tipo, setTipo] = useState('paciente');
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -49,7 +48,6 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
     const formData = new FormData(e.currentTarget);
     setError(null);
     if (!plan) return fallar('Elegí un plan', 'plan_solicitado');
-    if (reprocann !== 'vigente' && !tramite) return fallar('Contanos cómo vas a tramitar tu REPROCANN', 'tramite_reprocann');
     startTransition(async () => {
       const res = await createMemberPublic(formData);
       if (res?.error) {
@@ -69,7 +67,7 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           El equipo de {tenantName} va a revisar tus datos y te va a escribir por WhatsApp para mandarte la segunda
           parte: indicación médica y firma de la documentación.
         </p>
-        {reprocann !== 'vigente' && tramite === 'acompanado' && (
+        {reprocann === 'no' && (
           <p className="text-text-soft mt-3">
             Para tu REPROCANN, el equipo de <strong>CLINICANN</strong> te va a contactar a la brevedad.
           </p>
@@ -240,36 +238,18 @@ export function AltaSocioForm({ tenantName }: { tenantName: string }) {
           </div>
         ) : (
           <div className="mt-4">
-            <p className="text-sm font-medium text-text mb-2">¿Cómo querés hacer el trámite? {req}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TRAMITES_REPROCANN.map((t) => (
-                <label
-                  key={t.value}
-                  className={`rounded-lg border p-3 cursor-pointer ${tramite === t.value ? 'border-accent bg-surface-2' : 'border-line-2'}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="tramite_reprocann"
-                      value={t.value}
-                      checked={tramite === t.value}
-                      onChange={() => setTramite(t.value)}
-                      className="mt-1"
-                    />
-                    <p className="font-semibold text-text text-sm">{t.title}</p>
-                  </div>
-                </label>
+            {reprocann === 'no' &&
+              TRAMITES_REPROCANN.filter((t) => t.value === 'acompanado').map((t) => (
+                <div key={t.value} className="rounded-lg bg-surface-2 border border-line-2 px-4 py-3">
+                  <input type="hidden" name="tramite_reprocann" value={t.value} />
+                  <p className="font-semibold text-text text-sm mb-2">Te acompañamos con el trámite</p>
+                  <ul className="list-disc pl-4 space-y-1.5 text-sm text-text-soft">
+                    {t.info.map((linea, i) => (
+                      <li key={i}>{linea.replaceAll('[CLUB]', tenantName)}</li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </div>
-            {TRAMITES_REPROCANN.filter((t) => t.value === tramite).map((t) => (
-              <div key={t.value} className="rounded-lg bg-surface-2 border border-line-2 px-4 py-3 mt-3">
-                <ul className="list-disc pl-4 space-y-1.5 text-sm text-text-soft">
-                  {t.info.map((linea, i) => (
-                    <li key={i}>{linea.replaceAll('[CLUB]', tenantName)}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
             <p className="text-text-mute text-xs mt-3">
               Queda asentado como pendiente: lo completás en la segunda parte del formulario.
             </p>

@@ -139,10 +139,9 @@ export async function createMemberPublic(formData: FormData) {
   if (tipoInscripcion === 'autocultivador' && plan === 'medicinal') {
     return { error: 'El plan Medicinal no aplica al autocultivo: elegí BASIC, STANDARD o FULL GREEN', campo: 'plan_solicitado' };
   }
-  const tramite = str(formData, 'tramite_reprocann');
-  if (!tieneReprocann && (!tramite || !['propio', 'acompanado'].includes(tramite))) {
-    return { error: 'Contanos cómo vas a tramitar tu REPROCANN', campo: 'tramite_reprocann' };
-  }
+  // Sin REPROCANN, el club acompaña el trámite (CLINICANN); ya no se ofrece
+  // "lo tramito por mi cuenta". Si ya está en trámite, queda como pendiente.
+  const tramite = reprocann === 'no' ? 'acompanado' : null;
   if (tieneReprocann && (!str(formData, 'repr_num') || !str(formData, 'repr_exp'))) {
     return {
         error: 'Completá el número y el vencimiento de tu credencial REPROCANN',
@@ -182,7 +181,7 @@ export async function createMemberPublic(formData: FormData) {
       reprocann_type: tipoInscripcion,
       repr_num: tieneReprocann ? str(formData, 'repr_num') : null,
       repr_exp: tieneReprocann ? str(formData, 'repr_exp') : null,
-      tramite_reprocann: tieneReprocann ? null : tramite,
+      tramite_reprocann: tramite,
       consiente_datos: true,
       status: 'preinscripto',
     })
