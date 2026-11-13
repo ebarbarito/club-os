@@ -14,8 +14,7 @@ import { ADICIONALES, PLANES, labelDe } from './opciones';
 // ── Datos del club ─────────────────────────────────────────────────────────
 
 export const CAMPOS_DATOS = [
-  { key: 'direccion', label: 'Dirección de la sede', placeholder: 'Calle 123, Monte Grande' },
-  { key: 'horario_retiro', label: 'Días y horarios de retiro', placeholder: 'martes y jueves de 14 a 19 h' },
+  { key: 'horario_atencion', label: 'Días y horarios de atención', placeholder: 'Lunes a sábado de 14 a 19 h' },
 ] as const;
 
 export type DatosMensajes = Partial<Record<(typeof CAMPOS_DATOS)[number]['key'], string>>;
@@ -75,10 +74,18 @@ Una vez completo, coordinamos tu alta y tu primer retiro 🗓️`,
     titulo: 'Bienvenida',
     texto: `🎉 ¡Te damos la bienvenida a [CLUB], [NOMBRE]!
 
-Ya sos parte del club 💚 Algunos datos útiles:
-📍 *Dirección:* [DIRECCIÓN]
-🕒 *Horarios de retiro:* [HORARIO DE RETIRO]
-🌐 *Nuestro sitio:* [LINK SITIO]
+Ya sos parte del club 💚 Tu inscripción quedó completa.
+
+📦 ¿Cómo recibís tu dispensa?
+Podés elegir entre:
+
+Envío a domicilio (también llegamos al interior del país)
+Retiro coordinado en nuestra sede
+
+Por este medio coordinamos con vos la modalidad, el día y el horario.
+🕒 *Días y horarios de atención:* [HORARIO DE ATENCIÓN]
+
+🌐 Nuestro sitio: [LINK SITIO]
 💬 Ante cualquier duda, este es tu canal directo con nosotros.
 
 ¡Gracias por elegirnos! 🌿`,
@@ -130,8 +137,7 @@ export function rellenar(texto: string, ctx: Contexto): string {
   const vars: Record<string, string | null | undefined> = {
     CLUB: ctx.club,
     'TU NOMBRE': ctx.operador,
-    DIRECCIÓN: d.direccion,
-    'HORARIO DE RETIRO': d.horario_retiro,
+    'HORARIO DE ATENCIÓN': d.horario_atencion,
     PLANES: planesTexto(),
     'LINK PRE-INSCRIPCIÓN': ctx.linkPreinscripcion,
     'LINK SITIO': ctx.linkSitio,
