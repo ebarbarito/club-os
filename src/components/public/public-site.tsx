@@ -40,6 +40,9 @@ function Nav({ tenant, onOpenCart }: { tenant: Tenant; onOpenCart: () => void })
         {statusMeta && (
           <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${statusMeta.cls}`}>{statusMeta.label}</span>
         )}
+        <Link href="/socios" className="text-sm font-semibold text-text hover:text-accent">
+          Soy socio
+        </Link>
         {!member && (
           <Link href="/alta-socio" className="text-sm font-semibold text-amber-tx hover:text-gold">
             Darme de alta

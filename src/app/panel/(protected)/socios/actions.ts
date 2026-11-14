@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { emitirClaveProvisoria, mailValido } from '@/lib/socios/acceso';
 
 export async function createMember(formData: FormData, submitAs: 'draft' | 'pending') {
   const profile = await getSessionProfile();
@@ -189,4 +191,37 @@ export async function marcarBienvenidaEnviada(memberId: string) {
   revalidatePath(`/panel/socios/${memberId}`);
   revalidatePath('/panel', 'layout');
   return {};
+}
+
+// Manda al socio (validado) una clave provisoria por mail para ingresar al
+// sitio de socios con su DNI.
+export async function enviarAccesoSocio(memberId: string): Promise<{ error?: string; email?: string }> {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== 'admin') return { error: 'Solo un admin puede enviar el acceso' };
+
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from('members')
+    .select('id, name, email, status')
+    .eq('id', memberId)
+    .eq('tenant_id', profile.tenantId)
+    .maybeSingle();
+  if (!member) return { error: 'Socio no encontrado' };
+  if (member.status !== 'valid') return { error: 'Solo los socios validados pueden ingresar al sitio' };
+  if (!mailValido(member.email)) return { error: 'El socio no tiene un mail válido cargado. Cargalo en la ficha.' };
+
+  const { data: tenant } = await supabase.from('tenants').select('id, slug, name').eq('id', profile.tenantId).single();
+  if (!tenant) return { error: 'Club no encontrado' };
+  const base = publicUrlForSlug(tenant.slug) ?? (await requestOrigin());
+
+  const res = await emitirClaveProvisoria(createAdminClient(), {
+    tenant: { id: tenant.id, name: tenant.name },
+    member: { id: member.id, name: member.name, email: member.email },
+    baseUrl: base,
+    porAdmin: true,
+  });
+  if (res.error) return { error: res.error };
+
+  revalidatePath(`/panel/socios/${memberId}`);
+  return { email: member.email };
 }

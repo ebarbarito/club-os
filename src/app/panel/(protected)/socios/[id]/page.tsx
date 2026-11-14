@@ -8,6 +8,8 @@ import { fmtDate, fmtDateTime, money } from '@/lib/format';
 import { setMemberStatus } from '../actions';
 import { ADICIONALES, ENTREGAS, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
 import { MensajesSocio } from './mensajes-socio';
+import { AccesoSocio } from './acceso-socio';
+import { mailValido } from '@/lib/socios/acceso';
 import { accionPendiente, esperandoAlSocio } from '@/lib/alta/pendientes';
 import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plantilla } from '@/lib/alta/mensajes';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
@@ -165,6 +167,15 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         puedeGenerarLink={member.status === 'preinscripto'}
         alerta={pendiente && pendiente.key !== 'validar' ? pendiente.label : null}
       />
+
+      {member.status === 'valid' && (
+        <AccesoSocio
+          memberId={id}
+          email={member.email}
+          puedeEnviar={profile?.role === 'admin' && mailValido(member.email)}
+          {...(await estadoAcceso(id))}
+        />
+      )}
 
       <div className="rounded-xl border border-line bg-surface p-5 mb-4">
         <p className="text-xs font-semibold text-text-mute uppercase mb-3">Datos personales</p>
@@ -339,4 +350,32 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       )}
     </div>
   );
+}
+
+// Estado del acceso al sitio de socios (sin exponer hashes).
+async function estadoAcceso(memberId: string): Promise<{ estado: string; detalle: string | null }> {
+  const { data } = await createAdminClient()
+    .from('member_accesos')
+    .select('password_at, clave_temp_enviada_at, clave_temp_expira, ultimo_ingreso_at, bloqueado_hasta')
+    .eq('member_id', memberId)
+    .maybeSingle();
+  if (!data) return { estado: 'Sin acceso todavía', detalle: 'Nunca pidió clave' };
+  const ahora = Date.now();
+  if (data.bloqueado_hasta && new Date(data.bloqueado_hasta).getTime() > ahora) {
+    return { estado: 'Bloqueado por intentos fallidos', detalle: `hasta ${fmtDateTime(data.bloqueado_hasta)}` };
+  }
+  if (data.password_at) {
+    return {
+      estado: 'Activo',
+      detalle: data.ultimo_ingreso_at ? `último ingreso ${fmtDateTime(data.ultimo_ingreso_at)}` : null,
+    };
+  }
+  if (data.clave_temp_enviada_at) {
+    const vigente = data.clave_temp_expira && new Date(data.clave_temp_expira).getTime() > ahora;
+    return {
+      estado: vigente ? 'Clave provisoria enviada' : 'Clave provisoria vencida',
+      detalle: `enviada ${fmtDateTime(data.clave_temp_enviada_at)}`,
+    };
+  }
+  return { estado: 'Sin acceso todavía', detalle: null };
 }
