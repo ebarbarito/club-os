@@ -25,6 +25,8 @@ export function IngresarForm({ clubName }: { clubName: string }) {
           : 'Te mandamos una clave provisoria al mail que tenés registrado en el club.'}
       </p>
 
+      {/* Panel y sitio de socios comparten dominio: sin autocompletar, para que
+          el navegador no ponga el usuario del panel (un mail) en el DNI. */}
       {modo === 'ingresar' ? (
         <form action={accionIngreso} className="space-y-4">
           <div>
@@ -33,17 +35,17 @@ export function IngresarForm({ clubName }: { clubName: string }) {
               id="dni"
               name="dni"
               inputMode="numeric"
-              autoComplete="username"
+              autoComplete="off"
               placeholder="Sin puntos"
               required
               value={dni}
-              onChange={(e) => setDni(e.target.value)}
+              onChange={(e) => setDni(e.target.value.replace(/[^\d.\s-]/g, ''))}
               className={inputCls}
             />
           </div>
           <div>
             <label className={labelCls} htmlFor="clave">Contraseña</label>
-            <input id="clave" name="clave" type="password" autoComplete="current-password" required className={inputCls} />
+            <input id="clave" name="clave" type="password" autoComplete="off" required className={inputCls} />
             <p className="text-text-mute text-xs mt-1">Si recibiste una clave provisoria por mail, escribila acá.</p>
           </div>
           {estadoIngreso?.error && (
@@ -68,11 +70,11 @@ export function IngresarForm({ clubName }: { clubName: string }) {
               id="dni-clave"
               name="dni"
               inputMode="numeric"
-              autoComplete="username"
+              autoComplete="off"
               placeholder="Sin puntos"
               required
               value={dni}
-              onChange={(e) => setDni(e.target.value)}
+              onChange={(e) => setDni(e.target.value.replace(/[^\d.\s-]/g, ''))}
               className={inputCls}
             />
           </div>
