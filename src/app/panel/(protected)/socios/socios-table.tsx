@@ -10,7 +10,7 @@ import { EditMemberForm } from './edit-member-form';
 import { DeleteMemberForm } from './delete-member-form';
 import { EnviarSegundaParte } from './enviar-segunda-parte';
 import { ADICIONALES, PLANES, TRAMITES_REPROCANN, labelDe } from '@/lib/alta/opciones';
-import { accionPendiente, esperandoAlSocio } from '@/lib/alta/pendientes';
+import { accionPendiente, textoEsperando } from '@/lib/alta/pendientes';
 
 const REPROCANN_LABEL: Record<string, string> = { vigente: 'Vigente', tramite: 'En trámite', no: 'Sin REPROCANN' };
 const REPROCANN_TYPE_LABEL: Record<string, string> = { autocultivador: 'Autocultivador', paciente: 'Paciente' };
@@ -67,6 +67,7 @@ type Member = {
   adicionales_solicitados?: string[] | null;
   etapa2_enviada_at?: string | null;
   etapa2_completada_at?: string | null;
+  derivado_clinicann_at?: string | null;
   bienvenida_enviada_at?: string | null;
 };
 
@@ -121,7 +122,7 @@ export function SociosTable({
           <tbody>
             {filtered.map((m) => {
               const pendiente = accionPendiente(m);
-              const esperando = esperandoAlSocio(m);
+              const esperando = textoEsperando(m);
               return (
               <tr key={m.id} className="border-t border-line hover:bg-surface-2">
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.member_number ?? '—'}</td>
@@ -131,7 +132,7 @@ export function SociosTable({
                     {m.name}
                   </Link>
                   {pendiente && <span className="block text-xs font-semibold text-red">{pendiente.label}</span>}
-                  {esperando && <span className="block text-xs text-text-mute">Esperando la 2ª parte del socio</span>}
+                  {esperando && <span className="block text-xs text-text-mute">{esperando}</span>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft">{m.dni}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-text-soft max-w-[220px] truncate" title={m.address ?? m.zona ?? ''}>

@@ -15,6 +15,9 @@ import { ADICIONALES, PLANES, labelDe } from './opciones';
 
 export const CAMPOS_DATOS = [
   { key: 'horario_atencion', label: 'Días y horarios de atención', placeholder: 'Lunes a sábado de 14 a 19 h' },
+  // Se muestra en la tablet de la sede cuando se deriva a alguien sin
+  // REPROCANN (no se usa en los mensajes de WhatsApp).
+  { key: 'contacto_clinicann', label: 'Contacto de Clinicann (derivaciones en la sede)', placeholder: 'WhatsApp 11 1234-5678 · clinicann.com' },
 ] as const;
 
 export type DatosMensajes = Partial<Record<(typeof CAMPOS_DATOS)[number]['key'], string>>;

@@ -83,17 +83,23 @@ export default async function SociosPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-text">Socios</h1>
           <p className="text-text-soft">Altas, validaciones y padrón</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/panel/socios/export"
             className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
           >
             Exportar CSV
+          </Link>
+          <Link
+            href="/panel/sede"
+            className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
+          >
+            Alta en sede (tablet)
           </Link>
           <ModalTrigger label="+ Nueva alta" title="Alta de socio">
             <CreateMemberForm />

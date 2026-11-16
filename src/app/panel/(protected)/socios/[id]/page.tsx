@@ -10,7 +10,7 @@ import { ADICIONALES, ENTREGAS, PLANES, TRAMITES_REPROCANN, labelDe } from '@/li
 import { MensajesSocio } from './mensajes-socio';
 import { AccesoSocio } from './acceso-socio';
 import { mailValido } from '@/lib/socios/acceso';
-import { accionPendiente, esperandoAlSocio } from '@/lib/alta/pendientes';
+import { accionPendiente, textoEsperando } from '@/lib/alta/pendientes';
 import { mensajesParaEstado, parseDatosMensajes, plantilla, rellenar, type Plantilla } from '@/lib/alta/mensajes';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
@@ -113,7 +113,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     .map((p) => ({ id: p.id, titulo: p.titulo, texto: rellenar(p.texto, ctxMensajes) }));
 
   const pendiente = accionPendiente(member);
-  const esperando = esperandoAlSocio(member);
+  const esperando = textoEsperando(member);
 
   async function validate() {
     'use server';
@@ -134,6 +134,11 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         <div>
           <h1 className="font-display text-2xl font-bold text-text">{member.name}</h1>
           <p className="text-text-soft">DNI {member.dni} · Alta {fmtDate(member.alta_date)}</p>
+          {member.alta_canal === 'sede' && (
+            <p className="text-text-mute text-sm">
+              Alta en la sede (tablet){member.alta_asistida_por ? ` · asistió ${member.alta_asistida_por}` : ''}
+            </p>
+          )}
         </div>
         <Badge label={meta.label} color={meta.color} />
       </div>
@@ -154,7 +159,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       )}
       {esperando && (
         <p className="rounded-lg bg-surface-2 text-text-soft px-4 py-2.5 mb-4 text-sm">
-          Esperando que el socio complete la segunda parte. Si hace falta, podés reenviarle el link.
+          {member.derivado_clinicann_at
+            ? `Se inscribió en la sede sin REPROCANN y quedó derivado a Clinicann (${fmtDate(member.derivado_clinicann_at)}). Validalo cuando tenga la credencial.`
+            : 'Esperando que el socio complete la segunda parte. Si hace falta, podés reenviarle el link.'}
         </p>
       )}
 

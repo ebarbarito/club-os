@@ -8,12 +8,15 @@
 //
 // Mientras la 2ª parte está enviada y el socio no la completó, la pelota está
 // del lado del socio: no es alerta (se muestra como "esperando al socio").
+// Lo mismo con quien se inscribió en la sede sin REPROCANN y quedó derivado a
+// Clinicann: se valida cuando tenga la credencial.
 
 export type EstadoAlta = {
   status: string;
   etapa2_enviada_at?: string | null;
   etapa2_completada_at?: string | null;
   bienvenida_enviada_at?: string | null;
+  derivado_clinicann_at?: string | null;
 };
 
 export type AccionPendiente = { key: 'segunda-parte' | 'validar' | 'bienvenida'; label: string; detalle: string };
@@ -26,7 +29,7 @@ export function accionPendiente(m: EstadoAlta): AccionPendiente | null {
       detalle: 'Revisá los datos de la pre-inscripción y mandale el link de la segunda parte.',
     };
   }
-  if (m.status === 'pending') {
+  if (m.status === 'pending' && !m.derivado_clinicann_at) {
     return {
       key: 'validar',
       label: 'Validar',
@@ -40,7 +43,14 @@ export function accionPendiente(m: EstadoAlta): AccionPendiente | null {
 }
 
 export function esperandoAlSocio(m: EstadoAlta): boolean {
-  return m.status === 'preinscripto' && Boolean(m.etapa2_enviada_at) && !m.etapa2_completada_at;
+  return textoEsperando(m) !== null;
+}
+
+// Qué se está esperando del socio (sin punto rojo), o null.
+export function textoEsperando(m: EstadoAlta): string | null {
+  if (m.status === 'preinscripto' && m.etapa2_enviada_at && !m.etapa2_completada_at) return 'Esperando la 2ª parte del socio';
+  if (m.status === 'pending' && m.derivado_clinicann_at) return 'Derivado a Clinicann · esperando el REPROCANN';
+  return null;
 }
 
 // Punto de color (clases Tailwind) para marcar una acción pendiente.

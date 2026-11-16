@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'dispensador' | 'cultivo';
+export type Role = 'admin' | 'dispensador' | 'cultivo' | 'sede';
 
 export type ViewId =
   | 'dispensas'
@@ -16,7 +16,8 @@ export type ViewId =
   | 'asientos'
   | 'empleados'
   | 'historial'
-  | 'proveedores';
+  | 'proveedores'
+  | 'sede';
 
 export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav: ViewId[] }> = {
   admin: {
@@ -40,6 +41,14 @@ export const ROLES: Record<Role, { name: string; desc: string; home: ViewId; nav
     home: 'salas',
     nav: ['salas', 'sensores'],
   },
+  // Usuario general de la tablet de la sede (lo usan varios responsables):
+  // solo el alta en sede, a pantalla completa (/panel/sede).
+  sede: {
+    name: 'Tablet de la sede',
+    desc: 'Alta de socios en la sede, en la tablet',
+    home: 'sede',
+    nav: ['sede'],
+  },
 };
 
 export const TITLES: Record<ViewId, [string, string]> = {
@@ -59,6 +68,7 @@ export const TITLES: Record<ViewId, [string, string]> = {
   empleados: ['Empleados', 'Remuneración pactada, adelantos y saldo disponible'],
   historial: ['Historial', 'Dispensas por socio, fecha, forma de pago y artículo'],
   proveedores: ['Proveedores', 'Cuenta corriente y pagos a proveedores'],
+  sede: ['Alta en sede', 'Inscripción en la tablet de la sede'],
 };
 
 export function isViewId(value: string): value is ViewId {

@@ -46,6 +46,7 @@ export function CreateUserForm() {
           <option value="admin">Administrador</option>
           <option value="dispensador">Dispensador/a</option>
           <option value="cultivo">Cultivo</option>
+          <option value="sede">Tablet de la sede (usuario general)</option>
         </select>
       </div>
 

@@ -6,7 +6,7 @@ export async function contarPendientesAlta(supabase: SupabaseClient) {
   const base = () => supabase.from('members').select('id', { count: 'exact', head: true }).is('deleted_at', null);
   const [a, b, c] = await Promise.all([
     base().eq('status', 'preinscripto').is('etapa2_enviada_at', null),
-    base().eq('status', 'pending'),
+    base().eq('status', 'pending').is('derivado_clinicann_at', null),
     base().eq('status', 'valid').not('etapa2_completada_at', 'is', null).is('bienvenida_enviada_at', null),
   ]);
   const preinscripto = a.count ?? 0;

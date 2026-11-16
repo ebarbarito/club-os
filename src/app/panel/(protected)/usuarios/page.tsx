@@ -12,6 +12,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrador',
   dispensador: 'Dispensador/a',
   cultivo: 'Cultivo',
+  sede: 'Tablet de la sede',
 };
 
 export default async function UsuariosPage() {
