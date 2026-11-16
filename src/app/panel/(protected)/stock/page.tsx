@@ -8,6 +8,7 @@ import { AdjustDispensaStockForm } from './adjust-dispensa-stock-form';
 import { StockMovements } from './stock-movements';
 import { DispensaHistory } from './dispensa-history';
 import { HideZeroToggle } from './hide-zero-toggle';
+import { ImprimirStockForm } from './imprimir-form';
 
 type SortKey = 'articulo' | 'dispensa' | 'general' | 'total';
 
@@ -110,6 +111,24 @@ export default async function StockPage({
           <h1 className="font-display text-2xl font-bold text-text">Stock</h1>
           <p className="text-text-soft">Inventario por artículo</p>
         </div>
+        <ModalTrigger
+          label="🖨 Imprimir"
+          className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
+          title="Imprimir stock"
+        >
+          <ImprimirStockForm
+            esAdmin={profile?.role === 'admin'}
+            articulos={[...strainMap.values()]
+              .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+              .map((s) => ({
+                id: s.id,
+                nombre: `${s.code ? `${s.code} · ` : ''}${s.name}`,
+                esGenetica: s.item_type === 'genetica',
+                dispensa: Number(dispensaByStrain.get(s.id) ?? 0),
+                general: Number(generalByStrain.get(s.id) ?? 0),
+              }))}
+          />
+        </ModalTrigger>
       </div>
 
       {profile?.role === 'admin' && (
