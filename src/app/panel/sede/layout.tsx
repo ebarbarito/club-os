@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
@@ -19,16 +20,16 @@ export default async function SedeLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex min-h-screen flex-1 flex-col bg-bg font-sans">
       <header className="flex items-center justify-between gap-4 bg-green-900 px-5 py-3 text-white">
-        <div className="flex items-center gap-3">
+        <Link href="/panel/sede" className="flex items-center gap-3" aria-label="Inicio de la tablet">
           {tenant.logo_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={tenant.logo_url} alt="" className="h-10 w-auto object-contain" />
           )}
           <div>
             <p className="font-display text-lg font-bold leading-tight">{tenant.name}</p>
-            <p className="text-xs text-white/70">Alta en sede</p>
+            <p className="text-xs text-white/70">Sede · tocá acá para volver al inicio</p>
           </div>
-        </div>
+        </Link>
         <SalirSede esAdmin={profile.role === 'admin'} />
       </header>
       <main className="flex-1">{children}</main>

@@ -96,7 +96,7 @@ export default async function SociosPage({
             Exportar CSV
           </Link>
           <Link
-            href="/panel/sede"
+            href="/panel/sede/alta"
             className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
           >
             Alta en sede (tablet)

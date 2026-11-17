@@ -144,7 +144,7 @@ export function AltaWizard({
   // Terminada el alta, la tablet vuelve sola al inicio (no quedan datos a la vista).
   useEffect(() => {
     if (!hecho) return;
-    const t = setTimeout(() => window.location.reload(), 90_000);
+    const t = setTimeout(() => window.location.assign('/panel/sede'), 90_000);
     return () => clearTimeout(t);
   }, [hecho]);
 
@@ -282,13 +282,22 @@ export function AltaWizard({
             )}
           </>
         )}
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-10 rounded-2xl bg-accent text-white text-lg font-bold px-8 py-4"
-        >
-          Nueva inscripción
-        </button>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-2xl bg-accent text-white text-lg font-bold px-8 py-4"
+          >
+            Nueva inscripción
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.assign('/panel/sede')}
+            className="rounded-2xl border-2 border-line-2 text-text text-lg font-bold px-8 py-4"
+          >
+            Volver al inicio
+          </button>
+        </div>
         <p className="text-text-mute text-sm mt-3">La pantalla vuelve sola al inicio en un minuto y medio.</p>
       </div>
     );
