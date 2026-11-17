@@ -127,6 +127,11 @@ export default async function DispensaPage({
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-text">{member?.name ?? '—'}</div>
                       <div className="text-text-mute text-xs">DNI {member?.dni}</div>
+                      {o.canal === 'tablet' && (
+                        <span className="mt-1 inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-accent">
+                          Pedido en la tablet
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft">
                       {o.items?.map((it: { grams: number; strain: { name: string } | { name: string }[] | null }, i: number) => {
@@ -137,6 +142,7 @@ export default async function DispensaPage({
                           </div>
                         );
                       })}
+                      {o.nota && <div className="mt-1 text-xs italic text-text-mute">“{o.nota}”</div>}
                     </td>
                     <td className="px-4 py-2.5 text-text-soft capitalize">{o.delivery}</td>
                     <td className="px-4 py-2.5 text-text-soft capitalize">{o.method ?? '—'}</td>

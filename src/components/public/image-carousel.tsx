@@ -1,15 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { FotoEnPreparacion } from '@/components/foto-en-preparacion';
 
 export function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
   const [index, setIndex] = useState(0);
 
   if (images.length === 0) {
     return (
-      <div className="h-40 rounded-lg bg-surface-3 flex items-center justify-center text-text-mute text-xs mb-3">
-        Sin foto
-      </div>
+      <FotoEnPreparacion className="h-40 rounded-lg mb-3" />
     );
   }
 
