@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
 import { ROLES } from '@/lib/roles';
-import { SalirSede } from './salir-sede';
+import { Marca } from '@/components/public/marca';
+import { CabeceraSede } from './cabecera-sede';
 
 // Tablet de la sede: pantalla completa, sin el menú del panel. Entra el
 // usuario general "sede" (y un admin, para probar o asistir).
@@ -17,22 +17,13 @@ export default async function SedeLayout({ children }: { children: React.ReactNo
   const tenant = slug ? await getTenantBySlug(slug) : null;
   if (!tenant || tenant.id !== profile.tenantId) redirect('/panel/login');
 
+  // Con los colores, tipografías y texturas del manual de marca del club.
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-bg font-sans">
-      <header className="flex items-center justify-between gap-4 bg-green-900 px-5 py-3 text-white">
-        <Link href="/panel/sede" className="flex items-center gap-3" aria-label="Inicio de la tablet">
-          {tenant.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={tenant.logo_url} alt="" className="h-10 w-auto object-contain" />
-          )}
-          <div>
-            <p className="font-display text-lg font-bold leading-tight">{tenant.name}</p>
-            <p className="text-xs text-white/70">Sede · tocá acá para volver al inicio</p>
-          </div>
-        </Link>
-        <SalirSede esAdmin={profile.role === 'admin'} />
-      </header>
-      <main className="flex-1">{children}</main>
-    </div>
+    <Marca tenant={tenant}>
+      <div className="flex min-h-screen flex-1 flex-col bg-bg font-sans">
+        <CabeceraSede nombre={tenant.name} logoUrl={tenant.logo_url} esAdmin={profile.role === 'admin'} />
+        <main className="flex-1">{children}</main>
+      </div>
+    </Marca>
   );
 }

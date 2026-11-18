@@ -19,6 +19,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // club no debería entrar acá aunque RLS ya le bloquee los datos.
   if (!tenant || tenant.id !== profile.tenantId) redirect('/panel/login');
 
+  // La tablet de la sede (usuario general) no entra al sistema de gestión:
+  // solo ve su inicio con Alta de socios y Pedidos.
+  if (profile.role === 'sede') redirect('/panel/sede');
+
   const role = ROLES[profile.role];
 
   // Punto de color en "Socios" cuando hay algo pendiente del lado del club
