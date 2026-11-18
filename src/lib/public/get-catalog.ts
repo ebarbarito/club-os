@@ -1,4 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { topesDelClub } from '@/lib/pedidos/disponibilidad';
+import { TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
 
 export type CatalogItem = {
   id: string;
@@ -8,6 +10,8 @@ export type CatalogItem = {
   cbd: number | null;
   price_per_gram: number;
   available: boolean;
+  // Máximo para reservar (≤ 40 g; no se muestra, guía la cantidad).
+  maxGrams: number;
   crossInfo: string | null;
   composition: string | null;
   aroma: string | null;
@@ -25,10 +29,11 @@ export type CatalogItem = {
 // una reserva (ver createReservation).
 export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
   const admin = createAdminClient();
+  const topes = await topesDelClub(admin, tenantId);
   const { data } = await admin
     .from('strains')
     .select(
-      'id, name, type, thc, cbd, price_per_gram, status, cross_info, composition, aroma, effects, description, images, stock(grams)',
+      'id, name, type, thc, cbd, price_per_gram, status, cross_info, composition, aroma, effects, description, images',
     )
     .eq('tenant_id', tenantId)
     .eq('item_type', 'genetica')
@@ -36,7 +41,8 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
     .order('name');
 
   return (data ?? []).map((s) => {
-    const stock = Array.isArray(s.stock) ? s.stock[0] : s.stock;
+    // Disponible = 70% de dispensa + general (mínimo 30 g), menos lo ya pedido.
+    const tope = topes.get(s.id)?.tope ?? 0;
     return {
       id: s.id,
       name: s.name,
@@ -44,7 +50,8 @@ export async function getCatalog(tenantId: string): Promise<CatalogItem[]> {
       thc: s.thc,
       cbd: s.cbd,
       price_per_gram: s.price_per_gram,
-      available: s.status === 'activa' && (stock?.grams ?? 0) > 0,
+      available: tope > 0,
+      maxGrams: Math.min(tope, TOPE_GRAMOS_PEDIDO),
       crossInfo: s.cross_info,
       composition: s.composition,
       aroma: s.aroma,

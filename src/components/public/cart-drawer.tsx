@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { money } from '@/lib/format';
 import { createReservation } from '@/lib/public/actions';
 import { useStore } from './store';
+import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { cart, removeFromCart, setGrams, clearCart, member } = useStore();
@@ -13,7 +14,9 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   const [done, setDone] = useState(false);
 
   const total = cart.reduce((s, l) => s + l.grams * l.pricePerGram, 0);
-  const canConfirm = member?.status === 'valid' && cart.length > 0;
+  const gramosTotales = cart.reduce((s, l) => s + l.grams, 0);
+  const pasaTope = gramosTotales > TOPE_GRAMOS_PEDIDO;
+  const canConfirm = member?.status === 'valid' && cart.length > 0 && !pasaTope;
 
   function submit(formData: FormData) {
     if (!member) return;
@@ -82,7 +85,9 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                     </div>
                     <input
                       type="number"
-                      min={1}
+                      min={PASO_GRAMOS}
+                      step={PASO_GRAMOS}
+                      max={TOPE_GRAMOS_PEDIDO}
                       value={l.grams}
                       onChange={(e) => setGrams(l.strainId, Number(e.target.value))}
                       className="w-16 rounded-lg border border-line-2 px-2 py-1 text-sm"
@@ -96,6 +101,9 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   <span>Total</span>
                   <span>{money(total)}</span>
                 </div>
+                <p className={`text-xs ${pasaTope ? 'text-red font-semibold' : 'text-text-mute'}`}>
+                  {gramosTotales} de {TOPE_GRAMOS_PEDIDO} g por reserva{pasaTope ? ' · bajá la cantidad para poder confirmar' : ''}
+                </p>
               </div>
             )}
 

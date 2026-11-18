@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { ImageCarousel } from '@/components/public/image-carousel';
+import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
 import { confirmarPedido, crearClaveTablet, identificarSocio, pedirClaveTablet } from './actions';
 
 export type ArticuloCatalogo = {
@@ -11,6 +12,8 @@ export type ArticuloCatalogo = {
   esGenetica: boolean;
   precio: number;
   disponible: boolean;
+  // Máximo que se puede pedir (g o unidades); no se muestra.
+  tope: number;
   imagenes: string[];
 };
 
@@ -69,11 +72,30 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   const visibles = catalogo.filter((a) => (seccion === 'geneticas' ? a.esGenetica : !a.esGenetica));
   const hayAccesorios = catalogo.some((a) => !a.esGenetica);
 
-  function cambiar(id: string, delta: number) {
-    setCarrito((prev) => {
-      const n = Math.max(0, Math.round(((prev[id] ?? 0) + delta) * 10) / 10);
-      return { ...prev, [id]: n };
-    });
+  const gramosGeneticas = lineas.filter((l) => l.art.esGenetica).reduce((acc, l) => acc + l.cantidad, 0);
+
+  // ¿Se puede sumar un paso más de este artículo? (tope propio y 40 g en total)
+  function puedeSumar(a: ArticuloCatalogo) {
+    const paso = a.esGenetica ? PASO_GRAMOS : 1;
+    const actual = carrito[a.id] ?? 0;
+    if (actual + paso > a.tope) return false;
+    if (a.esGenetica && gramosGeneticas + paso > TOPE_GRAMOS_PEDIDO) return false;
+    return true;
+  }
+
+  function sumar(a: ArticuloCatalogo) {
+    if (!puedeSumar(a)) return;
+    const paso = a.esGenetica ? PASO_GRAMOS : 1;
+    setCarrito((prev) => ({ ...prev, [a.id]: (prev[a.id] ?? 0) + paso }));
+  }
+
+  function restar(a: ArticuloCatalogo) {
+    const paso = a.esGenetica ? PASO_GRAMOS : 1;
+    setCarrito((prev) => ({ ...prev, [a.id]: Math.max(0, (prev[a.id] ?? 0) - paso) }));
+  }
+
+  function quitar(id: string) {
+    setCarrito((prev) => ({ ...prev, [id]: 0 }));
   }
 
   function ingresar() {
@@ -249,7 +271,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
                   {cantidad} {art.esGenetica ? 'g' : 'u.'} · {pesos(art.precio * cantidad)}
                 </p>
               </div>
-              <button type="button" onClick={() => cambiar(art.id, -cantidad)} className="rounded-xl border-2 border-line-2 px-4 py-2 font-semibold text-red">
+              <button type="button" onClick={() => quitar(art.id)} className="rounded-xl border-2 border-line-2 px-4 py-2 font-semibold text-red">
                 Quitar
               </button>
             </div>
@@ -283,6 +305,10 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
         <div>
           <p className="text-text-soft">Hola, {nombre}</p>
           <h1 className="font-display text-3xl font-bold text-text">Elegí tu pedido</h1>
+          <p className={`mt-1 font-semibold ${gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? 'text-amber-tx' : 'text-text-soft'}`}>
+            Llevás {gramosGeneticas} de {TOPE_GRAMOS_PEDIDO} g
+            {gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? ' · llegaste al tope del pedido' : ''}
+          </p>
         </div>
         {hayAccesorios && (
           <div className="flex rounded-2xl border-2 border-line-2 p-1">
@@ -326,10 +352,10 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => cambiar(a.id, -1)}
+                        onClick={() => restar(a)}
                         disabled={cant <= 0}
-                        className="h-12 w-12 rounded-xl border-2 border-line-2 text-2xl font-bold disabled:opacity-40"
-                        aria-label={`Quitar 1 ${unidad}`}
+                        className="h-14 w-14 rounded-xl border-2 border-line-2 text-3xl font-bold disabled:opacity-40"
+                        aria-label={`Restar ${a.esGenetica ? PASO_GRAMOS : 1} ${unidad}`}
                       >
                         −
                       </button>
@@ -338,27 +364,15 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
                       </span>
                       <button
                         type="button"
-                        onClick={() => cambiar(a.id, 1)}
-                        className="h-12 w-12 rounded-xl border-2 border-accent text-2xl font-bold text-accent"
-                        aria-label={`Agregar 1 ${unidad}`}
+                        onClick={() => sumar(a)}
+                        disabled={!puedeSumar(a)}
+                        className="h-14 w-14 rounded-xl border-2 border-accent text-3xl font-bold text-accent disabled:opacity-40"
+                        aria-label={`Sumar ${a.esGenetica ? PASO_GRAMOS : 1} ${unidad}`}
                       >
                         +
                       </button>
                     </div>
-                    {a.esGenetica && (
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {[5, 10, 20].map((g) => (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => cambiar(a.id, g)}
-                            className="rounded-lg bg-surface-2 py-2 text-sm font-semibold text-text"
-                          >
-                            +{g} g
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {a.esGenetica && <p className="mt-1.5 text-center text-xs text-text-mute">De a {PASO_GRAMOS} g</p>}
                   </div>
                 )}
               </div>
@@ -370,7 +384,23 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center gap-3">
-          <button type="button" onClick={() => window.location.assign('/panel/sede')} className={btnSecundario}>
+          <button
+            type="button"
+            onClick={() => window.location.assign('/panel/sede')}
+            className={btnSecundario}
+            title="Sale y vuelve a la pantalla principal"
+          >
+            Salir
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCarrito({});
+              setError(null);
+            }}
+            disabled={cantidadArticulos === 0}
+            className={`${btnSecundario} disabled:opacity-40`}
+          >
             Cancelar
           </button>
           <button

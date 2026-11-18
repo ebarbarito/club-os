@@ -8,6 +8,8 @@ import { ADICIONALES, ENTREGAS, PLANES } from '@/lib/alta/opciones';
 import { aplicarDatosEtapa2, documentosParaSocio, personalizarDocumento } from '@/lib/alta/documentos';
 import { parseMedicoClub, type MedicoClub } from '@/lib/alta/medico';
 import { DOCUMENT_FIELDS_ETAPA2, guardarDocumentos, guardarFirma } from '@/lib/alta/guardar';
+import { topesDelClub } from '@/lib/pedidos/disponibilidad';
+import { problemaDelPedido } from '@/lib/pedidos/reglas';
 
 // El tenant se resuelve server-side a partir del Host (vía proxy.ts,
 // header x-club-os-tenant-slug) — nunca de un campo que mande el cliente.
@@ -431,25 +433,13 @@ export async function createReservation(formData: FormData) {
     return { error: 'Necesitás ser socio validado para confirmar una reserva' };
   }
 
-  // El stock no se muestra en el sitio público, pero igual se valida acá
-  // — sin revelar el número exacto disponible, solo si alcanza o no.
-  const { data: stockRows } = await admin
-    .from('stock')
-    .select('strain_id, grams, strain:strains(name)')
-    .eq('tenant_id', tenant.id)
-    .in(
-      'strain_id',
-      items.map((it) => it.strainId),
-    );
-  const stockByStrain = new Map((stockRows ?? []).map((r) => [r.strain_id, r]));
-  for (const it of items) {
-    const row = stockByStrain.get(it.strainId);
-    const strainField = row?.strain;
-    const strain = Array.isArray(strainField) ? strainField[0] : strainField;
-    if (!row || row.grams < it.grams) {
-      return { error: `${strain?.name ?? 'Uno de los productos'} no tiene stock suficiente para la cantidad pedida` };
-    }
-  }
+  // Disponibilidad: 70% de dispensa + general (mínimo 30 g), menos lo ya
+  // pedido; tope de 40 g por reserva y de a 5 g. No revela cuánto hay.
+  const problema = problemaDelPedido(
+    items.map((it) => ({ strainId: it.strainId, cantidad: Number(it.grams) })),
+    await topesDelClub(admin, tenant.id),
+  );
+  if (problema) return { error: problema };
 
   const { data: order, error: orderError } = await admin
     .from('orders')

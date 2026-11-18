@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { money } from '@/lib/format';
+import { PASO_GRAMOS } from '@/lib/pedidos/reglas';
 import { useStore } from './store';
 import { ImageCarousel } from './image-carousel';
 import { Eyebrow } from './eyebrow';
@@ -60,20 +61,25 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
               </span>
             </div>
             <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                defaultValue={1}
+              <select
+                defaultValue={PASO_GRAMOS}
                 disabled={!item.available}
                 onChange={(e) => setGrams((prev) => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                className="w-16 rounded-lg border border-line-2 px-2 py-1.5 text-sm"
-              />
+                className="w-20 rounded-lg border border-line-2 px-2 py-1.5 text-sm"
+                aria-label="Gramos"
+              >
+                {Array.from({ length: Math.max(1, item.maxGrams / PASO_GRAMOS) }, (_, i) => (i + 1) * PASO_GRAMOS).map((g) => (
+                  <option key={g} value={g}>
+                    {g} g
+                  </option>
+                ))}
+              </select>
               <button
                 disabled={!item.available}
                 onClick={() =>
                   addToCart(
                     { strainId: item.id, name: item.name, pricePerGram: item.price_per_gram },
-                    grams[item.id] ?? 1,
+                    grams[item.id] ?? PASO_GRAMOS,
                   )
                 }
                 className="flex-1 rounded-lg bg-accent text-white text-sm font-semibold py-1.5 disabled:opacity-50"

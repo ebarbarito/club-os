@@ -6,6 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { publicUrlForSlug } from '@/lib/tenant/resolve';
 import { emitirClaveProvisoria, mailValido } from '@/lib/socios/acceso';
 import { problemaClaveNueva, soloDigitos } from '@/lib/socios/clave';
+import { topesDelClub } from '@/lib/pedidos/disponibilidad';
+import { problemaDelPedido } from '@/lib/pedidos/reglas';
 import { emitirTicket, guardarClaveDefinitiva, leerTicket, socioPorDni, verificarIngreso } from '@/lib/socios/ingreso';
 
 async function tenantDeLaTablet() {
@@ -91,24 +93,12 @@ export async function confirmarPedido(
   const { data: member } = await admin.from('members').select('status').eq('id', memberId).eq('tenant_id', tenantId).maybeSingle();
   if (!member || member.status !== 'valid') return { error: 'Solo los socios validados pueden hacer pedidos' };
 
-  // Disponibilidad: se valida sin mostrar cuánto hay.
-  const { data: filas } = await admin
-    .from('strains')
-    .select('id, name, status, stock(grams)')
-    .eq('tenant_id', tenantId)
-    .in(
-      'id',
-      limpios.map((i) => i.strainId),
-    );
-  type Fila = { id: string; name: string; status: string; stock: { grams: number } | { grams: number }[] | null };
-  const porId = new Map(((filas ?? []) as Fila[]).map((f) => [f.id, f]));
-  for (const it of limpios) {
-    const f = porId.get(it.strainId);
-    const stock = f ? (Array.isArray(f.stock) ? f.stock[0] : f.stock) : null;
-    if (!f || f.status !== 'activa' || Number(stock?.grams ?? 0) < it.cantidad) {
-      return { error: `${f?.name ?? 'Uno de los productos'} no tiene disponible la cantidad pedida` };
-    }
-  }
+  // Disponibilidad (70% de dispensa + general, mínimo 30 g, tope 40 g, de a 5 g).
+  const problema = problemaDelPedido(
+    limpios.map((i) => ({ strainId: i.strainId, cantidad: Number(i.cantidad) })),
+    await topesDelClub(admin, tenantId),
+  );
+  if (problema) return { error: problema };
 
   const { data: order, error } = await admin
     .from('orders')
