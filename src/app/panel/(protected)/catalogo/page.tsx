@@ -7,6 +7,7 @@ import { Badge } from '@/components/badge';
 import { money } from '@/lib/format';
 import { StrainForm } from './strain-form';
 import { StrainImages } from './strain-images';
+import { FotosLote } from './fotos-lote';
 
 const STATUS_META: Record<string, { label: string; color: 'green' | 'amber' | 'gray' }> = {
   activa: { label: 'Activa', color: 'green' },
@@ -30,15 +31,24 @@ export default async function CatalogoPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-text">Catálogo</h1>
           <p className="text-text-soft">Artículos del club (genéticas y accesorios) — alimentan Stock y Dispensa</p>
         </div>
         {isAdmin && (
-          <ModalTrigger label="+ Nuevo artículo" title="Nuevo artículo">
-            <StrainForm />
-          </ModalTrigger>
+          <div className="flex flex-wrap gap-2">
+            <ModalTrigger
+              label="📷 Subir fotos en lote"
+              title="Subir fotos en lote"
+              className="rounded-lg border border-line-2 text-sm font-semibold px-4 py-2 hover:border-accent hover:text-accent"
+            >
+              <FotosLote />
+            </ModalTrigger>
+            <ModalTrigger label="+ Nuevo artículo" title="Nuevo artículo">
+              <StrainForm />
+            </ModalTrigger>
+          </div>
         )}
       </div>
 

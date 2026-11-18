@@ -158,3 +158,63 @@ export async function removeStrainImage(strainId: string, url: string) {
   revalidatePath('/');
   return {};
 }
+
+// "Juan Pérez #4" → "juanperez4": para emparejar archivos con artículos.
+function clave(s: string) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+// Fotos en lote: cada archivo se asigna al artículo cuyo nombre coincide con
+// el nombre del archivo (sin extensión, sin acentos ni signos). La foto nueva
+// queda primera; con "reemplazar", se sacan las que tenía.
+export async function subirFotoPorNombre(formData: FormData): Promise<{ error?: string; articulo?: string }> {
+  const profile = await getSessionProfile();
+  if (!profile) return { error: 'No autenticado' };
+  requireAdmin(profile.role);
+
+  const file = formData.get('foto');
+  if (!(file instanceof File) || file.size === 0) return { error: 'Archivo vacío' };
+  const reemplazar = formData.get('reemplazar') === '1';
+  const buscado = clave(file.name.replace(/\.[^.]+$/, ''));
+  if (!buscado) return { error: 'El archivo no tiene nombre' };
+
+  const admin = createAdminClient();
+  const { data: articulos } = await admin
+    .from('strains')
+    .select('id, name, images')
+    .eq('tenant_id', profile.tenantId);
+  const art = (articulos ?? []).find((a) => clave(String(a.name)) === buscado);
+  if (!art) return { error: 'No hay ningún artículo con ese nombre' };
+
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `catalogo/${profile.tenantId}/${art.id}/${randomUUID()}.${ext}`;
+  const { error: uploadError } = await admin.storage.from('media').upload(path, file, { contentType: file.type || 'image/jpeg' });
+  if (uploadError) return { error: uploadError.message };
+  const url = admin.storage.from('media').getPublicUrl(path).data.publicUrl;
+
+  const actuales = ((art.images as string[] | null) ?? []).filter((u) => u !== url);
+  const { error } = await admin
+    .from('strains')
+    .update({ images: reemplazar ? [url] : [url, ...actuales] })
+    .eq('id', art.id);
+  if (error) return { error: error.message };
+
+  if (reemplazar) {
+    // Borra del almacenamiento las fotos reemplazadas de este artículo.
+    const viejas = actuales
+      .map((u) => u.split('/storage/v1/object/public/media/')[1])
+      .filter((p): p is string => Boolean(p));
+    if (viejas.length) await admin.storage.from('media').remove(viejas);
+  }
+  return { articulo: String(art.name) };
+}
+
+export async function refrescarCatalogo() {
+  revalidatePath('/panel/catalogo');
+  revalidatePath('/');
+  revalidatePath('/panel/sede/pedidos');
+}

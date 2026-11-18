@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { FotoEnPreparacion } from '@/components/foto-en-preparacion';
 
 // Fotos de una genética: se ven completas (sin recortar) en un recuadro
-// cuadrado; tocando la foto se abre grande para verla bien.
+// vertical 4:5 (el formato de las fichas del club); tocando la foto se abre grande para verla bien.
 export function ImageCarousel({ images, alt, esGenetica = true }: { images: string[]; alt: string; esGenetica?: boolean }) {
   const [index, setIndex] = useState(0);
   const [grande, setGrande] = useState(false);
@@ -21,7 +21,7 @@ export function ImageCarousel({ images, alt, esGenetica = true }: { images: stri
   }, [grande, images.length]);
 
   if (images.length === 0) {
-    return <FotoEnPreparacion className="aspect-square w-full rounded-lg mb-3" esGenetica={esGenetica} />;
+    return <FotoEnPreparacion className="aspect-[4/5] w-full rounded-lg mb-3" esGenetica={esGenetica} />;
   }
 
   const flechas = (tam: string) =>
@@ -54,7 +54,7 @@ export function ImageCarousel({ images, alt, esGenetica = true }: { images: stri
 
   return (
     <>
-      <div className="relative mb-3 aspect-square overflow-hidden rounded-lg bg-surface-3">
+      <div className="relative mb-3 aspect-[4/5] overflow-hidden rounded-lg bg-surface-3">
         <button type="button" onClick={() => setGrande(true)} className="block h-full w-full" aria-label={`Ver ${alt} en grande`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={images[index]} alt={alt} loading="lazy" className="h-full w-full object-contain" />
