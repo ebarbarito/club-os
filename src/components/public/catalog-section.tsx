@@ -36,24 +36,24 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {filtered.map((item) => (
-          <div key={item.id} className="rounded-xl border border-line bg-surface p-4">
+          <div key={item.id} className="flex flex-col rounded-xl border border-line bg-surface p-4">
             <ImageCarousel images={item.images} alt={item.name} />
-            <div className="flex items-start justify-between mb-1">
-              <h3 className="font-display font-bold text-text">{item.name}</h3>
-              <span className="text-xs rounded-full bg-surface-3 px-2 py-0.5 text-text-soft">{item.type}</span>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="font-display text-xl font-bold text-text leading-tight">{item.name}</h3>
+              <span className="shrink-0 text-xs rounded-full bg-surface-3 px-2 py-0.5 text-text-soft">{item.type}</span>
             </div>
-            {item.crossInfo && <p className="text-text-mute text-xs mb-1">{item.crossInfo}</p>}
+            {item.crossInfo && <p className="text-text-mute text-sm mb-1">{item.crossInfo}</p>}
             {(item.thc || item.cbd) && (
               <p className="text-text-mute text-xs mb-1">
                 {item.thc ? `THC ${item.thc}%` : ''} {item.cbd ? `· CBD ${item.cbd}%` : ''}
               </p>
             )}
-            {item.aroma && <p className="text-text-soft text-xs mb-1">{item.aroma}</p>}
-            {item.effects && <p className="text-accent text-xs font-medium mb-2">{item.effects}</p>}
-            {item.description && <p className="text-text-soft text-xs mb-3">{item.description}</p>}
-            <div className="flex items-center justify-between mb-3">
+            {item.aroma && <p className="text-text-soft text-sm mb-1">{item.aroma}</p>}
+            {item.effects && <p className="text-accent text-sm font-medium mb-2">{item.effects}</p>}
+            {item.description && <p className="text-text-soft text-sm mb-3">{item.description}</p>}
+            <div className="mt-auto flex items-center justify-between mb-3">
               <span className="font-semibold text-text">{money(item.price_per_gram)}/g</span>
               <span className={`text-xs ${item.available ? 'text-accent' : 'text-red'}`}>
                 {item.available ? 'Disponible' : 'Sin stock'}

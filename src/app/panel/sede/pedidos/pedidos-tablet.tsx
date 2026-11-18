@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { FotoEnPreparacion } from '@/components/foto-en-preparacion';
+import { ImageCarousel } from '@/components/public/image-carousel';
 import { confirmarPedido, crearClaveTablet, identificarSocio, pedirClaveTablet } from './actions';
 
 export type ArticuloCatalogo = {
@@ -11,7 +11,7 @@ export type ArticuloCatalogo = {
   esGenetica: boolean;
   precio: number;
   disponible: boolean;
-  imagen: string | null;
+  imagenes: string[];
 };
 
 type Paso = 'ingreso' | 'primera-vez' | 'crear-clave' | 'catalogo' | 'revision' | 'listo';
@@ -300,7 +300,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {visibles.map((a) => {
           const cant = carrito[a.id] ?? 0;
           const unidad = a.esGenetica ? 'g' : 'u.';
@@ -309,13 +309,10 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
               key={a.id}
               className={`flex flex-col overflow-hidden rounded-2xl border-2 bg-surface ${cant > 0 ? 'border-accent' : 'border-line'} ${a.disponible ? '' : 'opacity-50'}`}
             >
-              {a.imagen ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.imagen} alt="" className="h-36 w-full object-cover" />
-              ) : (
-                <FotoEnPreparacion className="h-36 w-full" esGenetica={a.esGenetica} />
-              )}
-              <div className="flex flex-1 flex-col p-4">
+              <div className="px-3 pt-3">
+                <ImageCarousel images={a.imagenes} alt={a.nombre} esGenetica={a.esGenetica} />
+              </div>
+              <div className="flex flex-1 flex-col px-4 pb-4">
                 <p className="text-lg font-bold text-text leading-tight">{a.nombre}</p>
                 <p className="text-text-soft text-sm">
                   {a.tipo && a.esGenetica ? `${a.tipo} · ` : ''}

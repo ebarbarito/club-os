@@ -27,7 +27,7 @@ export default async function SedePedidosPage() {
       esGenetica: s.item_type === 'genetica',
       precio: Number(s.price_per_gram) || 0,
       disponible: s.status === 'activa' && Number(stock?.grams ?? 0) > 0,
-      imagen: imgs[0] ?? null,
+      imagenes: imgs,
     };
   });
 
