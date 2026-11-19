@@ -73,7 +73,6 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   const visibles = catalogo
     .filter((a) => (seccion === 'geneticas' ? a.esGenetica : !a.esGenetica))
     .sort((a, b) => Number(b.disponible) - Number(a.disponible) || a.nombre.localeCompare(b.nombre, 'es'));
-  const hayAccesorios = catalogo.some((a) => !a.esGenetica);
 
   const gramosGeneticas = lineas.filter((l) => l.art.esGenetica).reduce((acc, l) => acc + l.cantidad, 0);
 
@@ -304,29 +303,57 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   // ── Catálogo ──────────────────────────────────────────────────────────
   return (
     <div className="mx-auto max-w-5xl px-5 pt-6 pb-36">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-        <div>
-          <p className="text-text-soft">Hola, {nombre}</p>
-          <h1 className="font-display text-3xl font-bold text-text">Elegí tu pedido</h1>
-          <p className={`mt-1 font-semibold ${gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? 'text-amber-tx' : 'text-text-soft'}`}>
-            Llevás {gramosGeneticas} de {TOPE_GRAMOS_PEDIDO} g
-            {gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? ' · llegaste al tope del pedido' : ''}
-          </p>
-        </div>
-        {hayAccesorios && (
-          <div className="flex rounded-2xl border-2 border-line-2 p-1">
-            {(['geneticas', 'accesorios'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSeccion(s)}
-                className={`rounded-xl px-5 py-2.5 text-lg font-bold ${seccion === s ? 'bg-accent text-white' : 'text-text-soft'}`}
-              >
-                {s === 'geneticas' ? 'Genéticas' : 'Accesorios'}
-              </button>
-            ))}
+      {/* Encabezado fijo: siempre visible al bajar por el catálogo. */}
+      <div className="sticky top-0 z-10 -mx-5 mb-5 border-b border-line bg-bg/95 px-5 py-3 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-text-soft">Hola, {nombre}</p>
+            <h1 className="font-display text-3xl font-bold text-text leading-tight">Elegí tu pedido</h1>
+            <p className={`font-semibold ${gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? 'text-amber-tx' : 'text-text-soft'}`}>
+              Llevás {gramosGeneticas} de {TOPE_GRAMOS_PEDIDO} g
+              {gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? ' · llegaste al tope' : ''}
+            </p>
           </div>
-        )}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex rounded-2xl border-2 border-line-2 bg-surface p-1">
+              {(['geneticas', 'accesorios'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setSeccion(s);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className={`rounded-xl px-5 py-2.5 text-lg font-bold ${seccion === s ? 'bg-accent text-white' : 'text-text-soft'}`}
+                >
+                  {s === 'geneticas' ? 'Genéticas' : 'Accesorios'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setPaso('revision');
+              }}
+              disabled={cantidadArticulos === 0}
+              className="relative flex items-center gap-2 rounded-2xl border-2 border-accent bg-surface px-4 py-2.5 text-lg font-bold text-accent disabled:opacity-40"
+              aria-label="Ver carrito"
+            >
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 8H6.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="9.5" cy="20" r="1.4" />
+                <circle cx="17.5" cy="20" r="1.4" />
+              </svg>
+              Carrito
+              {cantidadArticulos > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-sm text-white">
+                  {cantidadArticulos}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
