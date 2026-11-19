@@ -22,6 +22,8 @@ export default async function SedePedidosPage() {
     topesDelClub(admin, profile.tenantId),
   ]);
 
+  // Solo lo que se puede pedir: lo sin stock no se muestra y vuelve solo
+  // al catálogo cuando se carga stock de nuevo (se calcula en cada visita).
   const catalogo: ArticuloCatalogo[] = (data ?? []).map((s) => {
     const imgs = (s.images as string[] | null) ?? [];
     // Hasta cuánto se puede pedir (no se muestra: solo guía los botones).
@@ -38,5 +40,5 @@ export default async function SedePedidosPage() {
     };
   });
 
-  return <PedidosTablet catalogo={catalogo} />;
+  return <PedidosTablet catalogo={catalogo.filter((a) => a.disponible)} />;
 }

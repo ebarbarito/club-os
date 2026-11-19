@@ -469,7 +469,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
             </div>
           );
         })}
-        {visibles.length === 0 && <p className="text-text-soft">No hay artículos en esta sección.</p>}
+        {visibles.length === 0 && <p className="text-text-soft">Por ahora no hay artículos disponibles en esta sección.</p>}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur px-5 py-4">
