@@ -3,10 +3,32 @@ import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { ORDER_STATUS, nextOrderStatus } from '@/lib/status-meta';
-import { RegisterDispensaForm } from './register-dispensa-form';
+import { RegisterDispensaForm, type ItemRow } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
-import { ConfirmDeliveryForm } from './confirm-delivery-form';
 import { DispensaRow } from './dispensa-row';
+
+type ItemPedido = {
+  grams: number;
+  strain_id: string | null;
+  strain: { name: string; price_per_gram: number } | { name: string; price_per_gram: number }[] | null;
+};
+
+// Artículos del pedido como filas de la dispensa (precio de lista actual).
+function filasDelPedido(items: ItemPedido[]): ItemRow[] {
+  return items
+    .filter((it) => it.strain_id && it.grams > 0)
+    .map((it) => {
+      const strain = Array.isArray(it.strain) ? it.strain[0] : it.strain;
+      return {
+        strainId: it.strain_id!,
+        description: strain?.name ?? '',
+        quantity: String(it.grams),
+        unitPrice: String(strain?.price_per_gram ?? 0),
+        bonif1: '0',
+        bonif2: '0',
+      };
+    });
+}
 
 export default async function DispensaPage({
   searchParams,
@@ -22,7 +44,7 @@ export default async function DispensaPage({
     await Promise.all([
       supabase
         .from('orders')
-        .select('*, member:members(name, dni), items:order_items(grams, strain:strains(name, price_per_gram))')
+        .select('*, member:members(name, dni), items:order_items(grams, strain_id, strain:strains(name, price_per_gram))')
         .order('created_at', { ascending: false }),
       supabase
         .from('dispensas')
@@ -151,13 +173,31 @@ export default async function DispensaPage({
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       {next === 'entregado' ? (
+                        // Al entregar se registra la dispensa: socio y artículos del pedido ya
+                        // cargados, solo falta elegir cómo paga. Al guardarla, el pedido pasa a Entregado.
+                        <div className="inline-block text-left">
                         <ModalTrigger
-                          label={`→ ${ORDER_STATUS.entregado.label}`}
-                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                          title="Confirmar entrega"
+                          label="Registrar dispensa"
+                          className="rounded-lg bg-accent text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90"
+                          title={`Registrar dispensa · ${member?.name ?? 'Socio'}`}
+                          size="xl"
                         >
-                          <ConfirmDeliveryForm orderId={o.id} defaultMethod={o.method} />
+                          <RegisterDispensaForm
+                            members={allMembers ?? []}
+                            items={items}
+                            accounts={accounts}
+                            creditsByMember={creditsByMember}
+                            virtualAccountId={cuotaSocialAccountId}
+                            generalCreditsByMember={generalCreditsByMember}
+                            generalAccountId={generalAccountId}
+                            pendingCuotasByMember={pendingCuotasByMember}
+                            orderId={o.id}
+                            initialMemberId={o.member_id}
+                            initialNote={o.nota ?? ''}
+                            initialRows={filasDelPedido(o.items ?? [])}
+                          />
                         </ModalTrigger>
+                        </div>
                       ) : (
                         next && (
                           <AdvanceButton

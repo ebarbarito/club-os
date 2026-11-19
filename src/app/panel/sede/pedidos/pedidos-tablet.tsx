@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useAtras } from '../use-atras';
 import { ImageCarousel } from '@/components/public/image-carousel';
 import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
 import { confirmarPedido, crearClaveTablet, identificarSocio, pedirClaveTablet } from './actions';
@@ -48,31 +49,23 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   carritoRef.current = carrito;
 
   // El botón "atrás" de la tablet: desde el carrito vuelve al catálogo sin
-  // perder nada; desde el catálogo pregunta antes de descartar el pedido.
-  useEffect(() => {
-    if (paso === 'catalogo' || paso === 'revision' || paso === 'crear-clave') {
-      window.history.pushState({ pedidos: paso }, '');
+  // perder nada; con el socio adentro, pregunta siempre antes de salir.
+  useAtras(() => {
+    const p = pasoRef.current;
+    if (p === 'revision') {
+      setPaso('catalogo');
+      return true;
     }
-  }, [paso]);
-  useEffect(() => {
-    function atras() {
-      const p = pasoRef.current;
-      if (p === 'revision') {
-        setPaso('catalogo');
-        return;
-      }
-      if (p === 'catalogo' || p === 'crear-clave') {
-        const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
-        if (hayAlgo && !window.confirm('¿Salir y descartar el pedido?')) {
-          window.history.pushState({ pedidos: p }, '');
-          return;
-        }
-        window.location.assign('/panel/sede');
-      }
+    if (p === 'catalogo' || p === 'crear-clave') {
+      const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
+      const pregunta = hayAlgo
+        ? '¿Salir? Se descarta el pedido y se cierra tu sesión.'
+        : '¿Salir? Se cierra tu sesión y vas a tener que volver a ingresar con tu DNI.';
+      if (!window.confirm(pregunta)) return true;
     }
-    window.addEventListener('popstate', atras);
-    return () => window.removeEventListener('popstate', atras);
-  }, []);
+    window.location.assign('/panel/sede');
+    return false;
+  });
 
   // Vuelta al inicio por inactividad (no quedan datos del socio a la vista).
   useEffect(() => {

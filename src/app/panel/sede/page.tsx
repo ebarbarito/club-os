@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getTenantBySlug } from '@/lib/tenant/get-tenant';
+import { GuardiaInicio } from './guardia-inicio';
 
 export const metadata = { title: 'Sede' };
 
@@ -35,6 +36,7 @@ export default async function SedeInicioPage() {
       className="min-h-[calc(100vh-4.75rem)] text-white"
       style={{ backgroundImage: 'var(--gl-trama-oscura), linear-gradient(135deg, #006838 0%, #053a1c 55%, #05221c 100%)' }}
     >
+      <GuardiaInicio />
       <div className="mx-auto flex min-h-[calc(100vh-4.75rem)] max-w-5xl flex-col justify-center px-6 py-10">
         <div className="mb-10 text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gold">{tenant?.name ?? 'Club'}</p>

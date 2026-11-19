@@ -9,6 +9,7 @@ import { aplicarDatosEtapa2, personalizarDocumento, type DocumentoAdhesion } fro
 import type { MedicoClub } from '@/lib/alta/medico';
 import { FotoInput } from './foto-input';
 import { altaEnSede } from './actions';
+import { useAtras } from '../use-atras';
 
 // Tamaños pensados para tablet: campos y botones grandes.
 const inputCls = `w-full rounded-xl border-2 border-line-2 bg-surface px-4 py-3 text-lg outline-none focus:border-accent ${CAMPO_INVALIDO}`;
@@ -140,6 +141,26 @@ export function AltaWizard({
     );
   }, [docsBase, campos, tipo, plan, adicionales, reprocann, tenantName]);
   const aceptados = textos.map((t, i) => aceptadoTexto[i] === t);
+
+  // Flecha "atrás" del navegador: vuelve al paso anterior; en el primero
+  // pregunta antes de salir (se perdería lo cargado).
+  const pasoRef = useRef(paso);
+  pasoRef.current = paso;
+  const hechoRef = useRef(hecho);
+  hechoRef.current = hecho;
+  useAtras(() => {
+    if (!hechoRef.current) {
+      if (pasoRef.current > 0) {
+        setError(null);
+        setPaso((p) => Math.max(p - 1, 0));
+        window.scrollTo({ top: 0 });
+        return true;
+      }
+      if (!window.confirm('¿Salir del alta? Se pierde lo que cargaste.')) return true;
+    }
+    window.location.assign('/panel/sede');
+    return false;
+  });
 
   // Terminada el alta, la tablet vuelve sola al inicio (no quedan datos a la vista).
   useEffect(() => {

@@ -59,6 +59,7 @@ export function RegisterDispensaForm({
   generalCreditsByMember = {},
   generalAccountId,
   pendingCuotasByMember = {},
+  orderId,
 }: {
   members: SearchableMember[];
   items: CatalogItem[];
@@ -74,6 +75,8 @@ export function RegisterDispensaForm({
   generalCreditsByMember?: Record<string, number>;
   generalAccountId?: string | null;
   pendingCuotasByMember?: Record<string, PendingCuota[]>;
+  /** Dispensa de un pedido: al registrarla, el pedido queda Entregado. */
+  orderId?: string;
 }) {
   const router = useRouter();
   const close = useModalClose();
@@ -222,6 +225,7 @@ export function RegisterDispensaForm({
 
     const formData = new FormData();
     if (mode === 'edit' && dispensaId) formData.set('dispensa_id', dispensaId);
+    if (orderId) formData.set('order_id', orderId);
     formData.set('member_id', memberId);
     formData.set('suggested_amount', String(suggestedTotal));
     formData.set('note', note);
@@ -278,7 +282,7 @@ export function RegisterDispensaForm({
           value={memberId}
           onChange={setMemberId}
           onSelected={() => itemRefs.current[0]?.focus()}
-          autoFocus
+          autoFocus={!initialMemberId}
         />
         {memberNotValid && (
           <p className="mt-1.5 text-xs font-medium text-amber-tx">

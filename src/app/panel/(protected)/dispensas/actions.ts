@@ -35,6 +35,16 @@ export async function registerDispensa(formData: FormData) {
     p_note: String(formData.get('note') ?? '').trim() || null,
   });
   if (error) return { error: error.message };
+  // Si viene de un pedido, el pedido queda entregado (la dispensa ya descontó el stock).
+  const orderId = String(formData.get('order_id') ?? '');
+  if (orderId) {
+    const { error: errPedido } = await supabase
+      .from('orders')
+      .update({ status: 'entregado' })
+      .eq('id', orderId)
+      .in('status', ['listo', 'enviando']);
+    if (errPedido) return { error: `La dispensa se registró, pero el pedido no pasó a Entregado: ${errPedido.message}` };
+  }
   revalidatePath('/panel/dispensas');
   revalidatePath('/panel/stock');
   revalidatePath('/panel/caja');
