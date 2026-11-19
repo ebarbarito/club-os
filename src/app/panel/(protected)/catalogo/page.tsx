@@ -27,7 +27,20 @@ export default async function CatalogoPage() {
   const isAdmin = profile.role === 'admin';
 
   const supabase = await createClient();
-  const { data: strains } = await supabase.from('strains').select('*').order('name');
+  const [{ data: rows }, { data: disp }, { data: gral }] = await Promise.all([
+    supabase.from('strains').select('*').order('name'),
+    supabase.from('stock').select('strain_id, grams'),
+    supabase.from('stock_general').select('strain_id, grams'),
+  ]);
+  // Stock real (dispensa + general). Primero los artículos con stock.
+  const stockTotal = new Map<string, number>();
+  for (const r of [...(disp ?? []), ...(gral ?? [])] as { strain_id: string; grams: number }[]) {
+    stockTotal.set(r.strain_id, (stockTotal.get(r.strain_id) ?? 0) + Number(r.grams || 0));
+  }
+  const conStock = (id: string) => (stockTotal.get(id) ?? 0) > 0;
+  const strains = [...(rows ?? [])].sort(
+    (a, b) => Number(conStock(b.id)) - Number(conStock(a.id)) || String(a.name).localeCompare(String(b.name), 'es'),
+  );
 
   return (
     <div>
@@ -60,12 +73,13 @@ export default async function CatalogoPage() {
               <th className="px-4 py-2.5 font-medium">Artículo</th>
               <th className="px-4 py-2.5 font-medium">Tipo</th>
               <th className="px-4 py-2.5 font-medium">Precio</th>
+              <th className="px-4 py-2.5 font-medium text-right">Stock</th>
               <th className="px-4 py-2.5 font-medium">Estado</th>
               {isAdmin && <th className="px-4 py-2.5 font-medium"></th>}
             </tr>
           </thead>
           <tbody>
-            {(strains ?? []).map((s) => (
+            {strains.map((s) => (
               <tr key={s.id} className="border-t border-line">
                 <td className="px-4 py-2.5 text-text-mute">{s.code ?? '—'}</td>
                 <td className="px-4 py-2.5">
@@ -74,6 +88,9 @@ export default async function CatalogoPage() {
                 </td>
                 <td className="px-4 py-2.5 text-text-soft">{ITEM_TYPE_LABEL[s.item_type]}</td>
                 <td className="px-4 py-2.5 text-text-soft">{money(s.price_per_gram)}</td>
+                <td className={`px-4 py-2.5 text-right tabular-nums ${conStock(s.id) ? 'text-text' : 'text-text-mute'}`}>
+                  {(stockTotal.get(s.id) ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} {s.item_type === 'genetica' ? 'g' : 'u.'}
+                </td>
                 <td className="px-4 py-2.5">
                   <Badge label={STATUS_META[s.status].label} color={STATUS_META[s.status].color} />
                 </td>
