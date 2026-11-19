@@ -83,15 +83,28 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                       <p className="font-medium text-text text-sm">{l.name}</p>
                       <p className="text-text-mute text-xs">{money(l.pricePerGram)}/g</p>
                     </div>
-                    <input
-                      type="number"
-                      min={PASO_GRAMOS}
-                      step={PASO_GRAMOS}
-                      max={TOPE_GRAMOS_PEDIDO}
-                      value={l.grams}
-                      onChange={(e) => setGrams(l.strainId, Number(e.target.value))}
-                      className="w-16 rounded-lg border border-line-2 px-2 py-1 text-sm"
-                    />
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          l.grams - PASO_GRAMOS <= 0 ? removeFromCart(l.strainId) : setGrams(l.strainId, l.grams - PASO_GRAMOS)
+                        }
+                        className="h-8 w-8 rounded-lg border border-line-2 font-bold"
+                        aria-label={`Restar ${PASO_GRAMOS} g`}
+                      >
+                        −
+                      </button>
+                      <span className="w-12 text-center text-sm font-semibold tabular-nums">{l.grams} g</span>
+                      <button
+                        type="button"
+                        onClick={() => setGrams(l.strainId, l.grams + PASO_GRAMOS)}
+                        disabled={gramosTotales + PASO_GRAMOS > TOPE_GRAMOS_PEDIDO}
+                        className="h-8 w-8 rounded-lg border border-accent font-bold text-accent disabled:opacity-40"
+                        aria-label={`Sumar ${PASO_GRAMOS} g`}
+                      >
+                        +
+                      </button>
+                    </div>
                     <button onClick={() => removeFromCart(l.strainId)} className="text-red text-xs">
                       Quitar
                     </button>

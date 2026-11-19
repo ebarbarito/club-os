@@ -294,15 +294,39 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   if (paso === 'revision') {
     return (
       <div className="mx-auto max-w-3xl px-6 pt-8 pb-36">
-        <h1 className="font-display text-3xl font-bold text-text mb-6">Revisá tu pedido</h1>
+        <h1 className="font-display text-3xl font-bold text-text">Revisá tu pedido</h1>
+        <p className={`mb-6 font-semibold ${gramosGeneticas >= TOPE_GRAMOS_PEDIDO ? 'text-amber-tx' : 'text-text-soft'}`}>
+          Llevás {gramosGeneticas} de {TOPE_GRAMOS_PEDIDO} g
+        </p>
         <div className="rounded-2xl border border-line bg-surface divide-y divide-line">
           {lineas.map(({ art, cantidad }) => (
-            <div key={art.id} className="flex items-center gap-4 px-5 py-4">
-              <div className="flex-1">
+            <div key={art.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
+              <div className="min-w-40 flex-1">
                 <p className="text-lg font-bold text-text">{art.nombre}</p>
-                <p className="text-text-soft">
-                  {cantidad} {art.esGenetica ? 'g' : 'u.'} · {pesos(art.precio * cantidad)}
-                </p>
+                <p className="text-text-soft">{pesos(art.precio * cantidad)}</p>
+              </div>
+              {/* Cambiar la cantidad acá mismo, con las mismas reglas del catálogo. */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => restar(art)}
+                  className="h-12 w-12 rounded-xl border-2 border-line-2 text-2xl font-bold"
+                  aria-label={`Restar ${art.esGenetica ? PASO_GRAMOS : 1} ${art.esGenetica ? 'g' : 'u.'}`}
+                >
+                  −
+                </button>
+                <span className="w-16 text-center text-xl font-bold tabular-nums">
+                  {cantidad} {art.esGenetica ? 'g' : 'u.'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => sumar(art)}
+                  disabled={!puedeSumar(art)}
+                  className="h-12 w-12 rounded-xl border-2 border-accent text-2xl font-bold text-accent disabled:opacity-40"
+                  aria-label={`Sumar ${art.esGenetica ? PASO_GRAMOS : 1} ${art.esGenetica ? 'g' : 'u.'}`}
+                >
+                  +
+                </button>
               </div>
               <button type="button" onClick={() => quitar(art.id)} className="rounded-xl border-2 border-line-2 px-4 py-2 font-semibold text-red">
                 Quitar
