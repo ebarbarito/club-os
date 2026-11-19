@@ -60,29 +60,38 @@ export function CatalogSection({ catalog }: { catalog: CatalogItem[] }) {
                 {item.available ? 'Disponible' : 'Sin stock'}
               </span>
             </div>
-            <div className="flex gap-2">
-              <select
-                defaultValue={PASO_GRAMOS}
-                disabled={!item.available}
-                onChange={(e) => setGrams((prev) => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                className="w-20 rounded-lg border border-line-2 px-2 py-1.5 text-sm"
-                aria-label="Gramos"
-              >
-                {Array.from({ length: Math.max(1, item.maxGrams / PASO_GRAMOS) }, (_, i) => (i + 1) * PASO_GRAMOS).map((g) => (
-                  <option key={g} value={g}>
-                    {g} g
-                  </option>
-                ))}
-              </select>
+            {/* Cantidad: arranca en 0 y va de a 5 g hasta lo disponible. */}
+            <div className="flex items-center gap-2">
               <button
-                disabled={!item.available}
-                onClick={() =>
+                type="button"
+                disabled={!item.available || (grams[item.id] ?? 0) <= 0}
+                onClick={() => setGrams((prev) => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] ?? 0) - PASO_GRAMOS) }))}
+                className="h-9 w-9 rounded-lg border border-line-2 text-lg font-bold disabled:opacity-40"
+                aria-label={`Restar ${PASO_GRAMOS} g`}
+              >
+                −
+              </button>
+              <span className="w-12 text-center text-sm font-semibold tabular-nums">{grams[item.id] ?? 0} g</span>
+              <button
+                type="button"
+                disabled={!item.available || (grams[item.id] ?? 0) + PASO_GRAMOS > item.maxGrams}
+                onClick={() => setGrams((prev) => ({ ...prev, [item.id]: (prev[item.id] ?? 0) + PASO_GRAMOS }))}
+                className="h-9 w-9 rounded-lg border border-accent text-lg font-bold text-accent disabled:opacity-40"
+                aria-label={`Sumar ${PASO_GRAMOS} g`}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                disabled={!item.available || (grams[item.id] ?? 0) <= 0}
+                onClick={() => {
                   addToCart(
                     { strainId: item.id, name: item.name, pricePerGram: item.price_per_gram },
-                    grams[item.id] ?? PASO_GRAMOS,
-                  )
-                }
-                className="flex-1 rounded-lg bg-accent text-white text-sm font-semibold py-1.5 disabled:opacity-50"
+                    grams[item.id] ?? 0,
+                  );
+                  setGrams((prev) => ({ ...prev, [item.id]: 0 }));
+                }}
+                className="flex-1 rounded-lg bg-accent text-white text-sm font-semibold py-2 disabled:opacity-50"
               >
                 Reservar
               </button>
