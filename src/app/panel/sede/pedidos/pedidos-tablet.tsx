@@ -27,6 +27,49 @@ const btnSecundario = 'rounded-2xl border-2 border-line-2 text-text text-lg font
 const pesos = (n: number) => n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 const INACTIVIDAD_MS = 120_000;
 
+// Sesión del socio en la tablet guardada en sessionStorage: refrescar la
+// página no lo saca ni le borra el pedido. Se borra al salir, al terminar o
+// por inactividad (y si pasó más que el tiempo de inactividad, no se usa).
+const CLAVE_SESION = 'sede-pedido-sesion';
+const PASOS_CON_SOCIO: Paso[] = ['crear-clave', 'catalogo', 'revision'];
+type SesionGuardada = {
+  guardado: number;
+  paso: Paso;
+  ticket: string;
+  nombre: string;
+  carrito: Record<string, number>;
+  seccion: 'geneticas' | 'accesorios';
+  nota: string;
+};
+function leerSesion(): SesionGuardada | null {
+  try {
+    const raw = window.sessionStorage.getItem(CLAVE_SESION);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as SesionGuardada;
+    if (!s || Date.now() - s.guardado > INACTIVIDAD_MS || !PASOS_CON_SOCIO.includes(s.paso) || !s.ticket) {
+      borrarSesion();
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+function guardarSesion(s: Omit<SesionGuardada, 'guardado'>) {
+  try {
+    window.sessionStorage.setItem(CLAVE_SESION, JSON.stringify({ ...s, guardado: Date.now() }));
+  } catch {
+    // sin storage: sigue sin recuperación
+  }
+}
+function borrarSesion() {
+  try {
+    window.sessionStorage.removeItem(CLAVE_SESION);
+  } catch {
+    // nada
+  }
+}
+
 // El socio, solo en la tablet: se identifica, arma el pedido y lo deja para
 // que lo preparen. Si nadie toca la pantalla un rato, vuelve al inicio.
 export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
@@ -47,6 +90,51 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   const carritoRef = useRef(carrito);
   pasoRef.current = paso;
   carritoRef.current = carrito;
+  const saliendo = useRef(false);
+  const [listoSesion, setListoSesion] = useState(false);
+
+  // Recupera la sesión del socio si se refrescó la página.
+  useEffect(() => {
+    const g = leerSesion();
+    if (g) {
+      setTicket(g.ticket);
+      setNombre(g.nombre);
+      setCarrito(g.carrito);
+      setSeccion(g.seccion);
+      setNota(g.nota);
+      setPaso(g.paso);
+    }
+    setListoSesion(true);
+  }, []);
+  useEffect(() => {
+    if (!listoSesion) return;
+    if (PASOS_CON_SOCIO.includes(paso) && ticket) guardarSesion({ paso, ticket, nombre, carrito, seccion, nota });
+    else borrarSesion();
+  }, [listoSesion, paso, ticket, nombre, carrito, seccion, nota]);
+  // Cerrar la pestaña con el socio adentro: el navegador pide confirmación.
+  useEffect(() => {
+    if (!PASOS_CON_SOCIO.includes(paso)) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      if (saliendo.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', aviso);
+    return () => window.removeEventListener('beforeunload', aviso);
+  }, [paso]);
+
+  function irAPortada() {
+    saliendo.current = true;
+    borrarSesion();
+    window.location.assign('/panel/sede');
+  }
+
+  function preguntaSalir(): string {
+    const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
+    return hayAlgo
+      ? '¿Salir? Se descarta el pedido y se cierra tu sesión.'
+      : '¿Salir? Se cierra tu sesión y vas a tener que volver a ingresar con tu DNI.';
+  }
 
   // El botón "atrás" de la tablet: desde el carrito vuelve al catálogo sin
   // perder nada; con el socio adentro, pregunta siempre antes de salir.
@@ -56,27 +144,17 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
       setPaso('catalogo');
       return true;
     }
-    if (p === 'catalogo' || p === 'crear-clave') {
-      const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
-      const pregunta = hayAlgo
-        ? '¿Salir? Se descarta el pedido y se cierra tu sesión.'
-        : '¿Salir? Se cierra tu sesión y vas a tener que volver a ingresar con tu DNI.';
-      if (!window.confirm(pregunta)) return true;
-    }
-    window.location.assign('/panel/sede');
+    if (PASOS_CON_SOCIO.includes(p) && !window.confirm(preguntaSalir())) return true;
+    irAPortada();
     return false;
   });
 
   // Botón "Inicio" del encabezado: con el socio adentro, pregunta antes.
   useGuardiaSalida(() => {
-    const p = pasoRef.current;
-    if (p !== 'catalogo' && p !== 'revision' && p !== 'crear-clave') return true;
-    const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
-    return window.confirm(
-      hayAlgo
-        ? '¿Salir? Se descarta el pedido y se cierra tu sesión.'
-        : '¿Salir? Se cierra tu sesión y vas a tener que volver a ingresar con tu DNI.',
-    );
+    if (PASOS_CON_SOCIO.includes(pasoRef.current) && !window.confirm(preguntaSalir())) return false;
+    saliendo.current = true;
+    borrarSesion();
+    return true;
   });
 
   // Vuelta al inicio por inactividad (no quedan datos del socio a la vista).
@@ -88,7 +166,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
     window.addEventListener('keydown', tocar);
     const t = setInterval(() => {
       const limite = paso === 'listo' ? 20_000 : INACTIVIDAD_MS;
-      if (Date.now() - ultimoToque.current > limite) window.location.assign('/panel/sede');
+      if (Date.now() - ultimoToque.current > limite) irAPortada();
     }, 5_000);
     return () => {
       window.removeEventListener('pointerdown', tocar);
@@ -288,7 +366,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
         <div className="mb-4 text-7xl" aria-hidden>✅</div>
         <h1 className="font-display text-3xl font-bold text-text">¡Listo, {nombre}!</h1>
         <p className="mt-2 text-xl text-text-soft">Tu pedido quedó cargado. Acercate al mostrador para retirarlo.</p>
-        <button type="button" onClick={() => window.location.assign('/panel/sede')} className={`${btnPrimario} mt-10`}>
+        <button type="button" onClick={irAPortada} className={`${btnPrimario} mt-10`}>
           Terminar
         </button>
       </div>
@@ -476,7 +554,9 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <button
             type="button"
-            onClick={() => window.location.assign('/panel/sede')}
+            onClick={() => {
+              if (window.confirm(preguntaSalir())) irAPortada();
+            }}
             className={btnSecundario}
             title="Sale y vuelve a la pantalla principal"
           >
@@ -485,6 +565,8 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
           <button
             type="button"
             onClick={() => {
+              const hayAlgo = Object.values(carrito).some((c) => c > 0);
+              if (hayAlgo && !window.confirm('¿Vaciar todo lo que elegiste?')) return;
               setCarrito({});
               setError(null);
             }}
