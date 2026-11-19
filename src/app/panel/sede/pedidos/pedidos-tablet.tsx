@@ -42,6 +42,37 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   const [carrito, setCarrito] = useState<Record<string, number>>({});
   const [nota, setNota] = useState('');
   const ultimoToque = useRef(Date.now());
+  const pasoRef = useRef(paso);
+  const carritoRef = useRef(carrito);
+  pasoRef.current = paso;
+  carritoRef.current = carrito;
+
+  // El botón "atrás" de la tablet: desde el carrito vuelve al catálogo sin
+  // perder nada; desde el catálogo pregunta antes de descartar el pedido.
+  useEffect(() => {
+    if (paso === 'catalogo' || paso === 'revision' || paso === 'crear-clave') {
+      window.history.pushState({ pedidos: paso }, '');
+    }
+  }, [paso]);
+  useEffect(() => {
+    function atras() {
+      const p = pasoRef.current;
+      if (p === 'revision') {
+        setPaso('catalogo');
+        return;
+      }
+      if (p === 'catalogo' || p === 'crear-clave') {
+        const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
+        if (hayAlgo && !window.confirm('¿Salir y descartar el pedido?')) {
+          window.history.pushState({ pedidos: p }, '');
+          return;
+        }
+        window.location.assign('/panel/sede');
+      }
+    }
+    window.addEventListener('popstate', atras);
+    return () => window.removeEventListener('popstate', atras);
+  }, []);
 
   // Vuelta al inicio por inactividad (no quedan datos del socio a la vista).
   useEffect(() => {
