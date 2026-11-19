@@ -9,7 +9,7 @@ import { aplicarDatosEtapa2, personalizarDocumento, type DocumentoAdhesion } fro
 import type { MedicoClub } from '@/lib/alta/medico';
 import { FotoInput } from './foto-input';
 import { altaEnSede } from './actions';
-import { useAtras } from '../use-atras';
+import { useAtras, useGuardiaSalida } from '../use-atras';
 import { borrarBorrador, guardarBorrador, leerBorrador } from './borrador';
 
 // Tamaños pensados para tablet: campos y botones grandes.
@@ -169,6 +169,15 @@ export function AltaWizard({
     borrarBorrador();
     window.location.assign('/panel/sede');
   }
+
+  // Botón "Inicio" del encabezado.
+  useGuardiaSalida(() => {
+    const hayDatos = paso > 0 || Object.keys(campos).some((k) => ['nombre', 'apellido', 'dni', 'email'].includes(k) && campos[k]);
+    if (!hecho && hayDatos && !window.confirm('¿Salir del alta? Se pierde lo que cargaste.')) return false;
+    saliendo.current = true;
+    borrarBorrador();
+    return true;
+  });
 
   function empezarDeNuevo() {
     if (!window.confirm('¿Descartar la inscripción recuperada y empezar una nueva?')) return;

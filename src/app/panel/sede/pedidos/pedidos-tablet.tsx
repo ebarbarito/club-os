@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useAtras } from '../use-atras';
+import { useAtras, useGuardiaSalida } from '../use-atras';
 import { ImageCarousel } from '@/components/public/image-carousel';
 import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
 import { confirmarPedido, crearClaveTablet, identificarSocio, pedirClaveTablet } from './actions';
@@ -65,6 +65,18 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
     }
     window.location.assign('/panel/sede');
     return false;
+  });
+
+  // Botón "Inicio" del encabezado: con el socio adentro, pregunta antes.
+  useGuardiaSalida(() => {
+    const p = pasoRef.current;
+    if (p !== 'catalogo' && p !== 'revision' && p !== 'crear-clave') return true;
+    const hayAlgo = Object.values(carritoRef.current).some((c) => c > 0);
+    return window.confirm(
+      hayAlgo
+        ? '¿Salir? Se descarta el pedido y se cierra tu sesión.'
+        : '¿Salir? Se cierra tu sesión y vas a tener que volver a ingresar con tu DNI.',
+    );
   });
 
   // Vuelta al inicio por inactividad (no quedan datos del socio a la vista).

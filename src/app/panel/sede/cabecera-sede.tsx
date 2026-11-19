@@ -2,13 +2,15 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { puedeSalir } from './use-atras';
 import { createClient } from '@/lib/supabase/client';
 
 // Encabezado de la tablet. El usuario general de la sede no tiene botones
 // para salir ni para ir al sistema de gestión: la sesión se cierra
 // manteniendo apretado el logo unos segundos (lo sabe el equipo, no el socio).
-// Un admin que la use para probar ve "Volver al panel" y "Salir".
+// Fuera de la portada aparece "Inicio", que vuelve a los dos botones
+// (preguntando antes si hay algo cargado). Un admin ve además "Salir".
 export function CabeceraSede({
   nombre,
   logoUrl,
@@ -19,6 +21,12 @@ export function CabeceraSede({
   esAdmin: boolean;
 }) {
   const router = useRouter();
+  const enPortada = usePathname() === '/panel/sede';
+
+  function irAlInicio() {
+    if (!puedeSalir()) return;
+    window.location.assign('/panel/sede');
+  }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const largo = useRef(false);
 
@@ -53,7 +61,7 @@ export function CabeceraSede({
         onPointerCancel={soltar}
         onContextMenu={(e) => e.preventDefault()}
         onClick={(e) => {
-          if (largo.current) e.preventDefault();
+          if (largo.current || !puedeSalir()) e.preventDefault();
         }}
         draggable={false}
       >
@@ -64,16 +72,22 @@ export function CabeceraSede({
           <span className="font-display text-2xl">{nombre}</span>
         )}
       </Link>
-      {esAdmin && (
-        <div className="flex items-center gap-2">
-          <Link href="/panel/socios" className="rounded-lg border border-white/30 px-3 py-2 text-sm font-semibold">
-            Volver al panel
-          </Link>
-          <button type="button" onClick={salir} className="rounded-lg border border-white/30 px-3 py-2 text-sm font-semibold">
+      <div className="flex items-center gap-2">
+        {!enPortada && (
+          <button
+            type="button"
+            onClick={irAlInicio}
+            className="rounded-xl border border-white/30 px-4 py-2.5 text-base font-semibold"
+          >
+            ← Inicio
+          </button>
+        )}
+        {esAdmin && (
+          <button type="button" onClick={salir} className="rounded-xl border border-white/30 px-4 py-2.5 text-base font-semibold">
             Salir
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </header>
   );
 }

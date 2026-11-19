@@ -20,3 +20,23 @@ export function useAtras(alVolver: () => boolean | void, activo = true) {
     return () => window.removeEventListener('popstate', alPop);
   }, [activo]);
 }
+
+// Botón "Inicio" del encabezado: antes de volver a la portada le pregunta a
+// la pantalla actual (alta o pedidos) si se puede salir sin perder datos.
+let guardiaActual: (() => boolean) | null = null;
+
+export function puedeSalir(): boolean {
+  return guardiaActual ? guardiaActual() : true;
+}
+
+export function useGuardiaSalida(puede: () => boolean) {
+  const ref = useRef(puede);
+  ref.current = puede;
+  useEffect(() => {
+    const fn = () => ref.current();
+    guardiaActual = fn;
+    return () => {
+      if (guardiaActual === fn) guardiaActual = null;
+    };
+  }, []);
+}
