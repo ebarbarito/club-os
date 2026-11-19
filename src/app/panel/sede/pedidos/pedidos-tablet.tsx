@@ -69,7 +69,10 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
   }
   const total = lineas.reduce((acc, l) => acc + l.art.precio * l.cantidad, 0);
   const cantidadArticulos = lineas.length;
-  const visibles = catalogo.filter((a) => (seccion === 'geneticas' ? a.esGenetica : !a.esGenetica));
+  // Primero lo disponible, después lo sin stock (alfabético dentro de cada grupo).
+  const visibles = catalogo
+    .filter((a) => (seccion === 'geneticas' ? a.esGenetica : !a.esGenetica))
+    .sort((a, b) => Number(b.disponible) - Number(a.disponible) || a.nombre.localeCompare(b.nombre, 'es'));
   const hayAccesorios = catalogo.some((a) => !a.esGenetica);
 
   const gramosGeneticas = lineas.filter((l) => l.art.esGenetica).reduce((acc, l) => acc + l.cantidad, 0);
