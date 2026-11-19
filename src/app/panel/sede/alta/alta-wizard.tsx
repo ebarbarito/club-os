@@ -10,6 +10,7 @@ import type { MedicoClub } from '@/lib/alta/medico';
 import { FotoInput } from './foto-input';
 import { altaEnSede } from './actions';
 import { useAtras } from '../use-atras';
+import { borrarBorrador, guardarBorrador, leerBorrador } from './borrador';
 
 // Tamaños pensados para tablet: campos y botones grandes.
 const inputCls = `w-full rounded-xl border-2 border-line-2 bg-surface px-4 py-3 text-lg outline-none focus:border-accent ${CAMPO_INVALIDO}`;
@@ -101,6 +102,80 @@ export function AltaWizard({
     ...medico,
   }));
   const [aceptadoTexto, setAceptadoTexto] = useState<string[]>([]);
+  const [consiente, setConsiente] = useState(false);
+
+  // ── Borrador: refrescar la página no borra lo cargado ─────────────────
+  const [listo, setListo] = useState(false); // ya se leyó el borrador
+  const [rellenar, setRellenar] = useState(false); // volcar los valores a los campos
+  const [recuperado, setRecuperado] = useState<string | null>(null);
+  const saliendo = useRef(false);
+  useEffect(() => {
+    const b = leerBorrador();
+    if (b) {
+      setPaso(b.paso);
+      setResponsable(b.responsable);
+      setTipo(b.tipo);
+      setPlan(b.plan);
+      setAdicionales(b.adicionales);
+      setReprocann(b.reprocann);
+      setCampos(b.campos);
+      setAceptadoTexto(b.aceptadoTexto);
+      setConsiente(b.consiente);
+      setRellenar(true);
+      const quien = `${b.campos.nombre ?? ''} ${b.campos.apellido ?? ''}`.trim();
+      if (b.paso > 0 || quien) setRecuperado(quien || 'sin nombre todavía');
+    }
+    setListo(true);
+  }, []);
+  useEffect(() => {
+    if (!rellenar) return;
+    const form = formRef.current;
+    if (form) {
+      for (const [k, v] of Object.entries(campos) as [string, string][]) {
+        if (k === 'responsable') continue;
+        const el = form.elements.namedItem(k);
+        if (
+          (el instanceof HTMLInputElement && !['file', 'checkbox', 'radio', 'hidden'].includes(el.type)) ||
+          el instanceof HTMLSelectElement ||
+          el instanceof HTMLTextAreaElement
+        ) {
+          el.value = v;
+        }
+      }
+    }
+    setRellenar(false);
+  }, [rellenar, campos]);
+  useEffect(() => {
+    if (!listo || hecho) return;
+    guardarBorrador({ paso, responsable, tipo, plan, adicionales, reprocann, campos, aceptadoTexto, consiente });
+  }, [listo, hecho, paso, responsable, tipo, plan, adicionales, reprocann, campos, aceptadoTexto, consiente]);
+  useEffect(() => {
+    if (hecho) borrarBorrador();
+  }, [hecho]);
+  // Si igual se intenta cerrar o recargar, el navegador pide confirmación.
+  useEffect(() => {
+    if (hecho) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      if (saliendo.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', aviso);
+    return () => window.removeEventListener('beforeunload', aviso);
+  }, [hecho]);
+
+  function salirAlInicio() {
+    saliendo.current = true;
+    borrarBorrador();
+    window.location.assign('/panel/sede');
+  }
+
+  function empezarDeNuevo() {
+    if (!window.confirm('¿Descartar la inscripción recuperada y empezar una nueva?')) return;
+    saliendo.current = true;
+    borrarBorrador();
+    window.location.reload();
+  }
 
   const docsBase = tipo === 'autocultivador' ? docsAutocultivador : docsPaciente;
   const textos = useMemo(() => {
@@ -158,7 +233,7 @@ export function AltaWizard({
       }
       if (!window.confirm('¿Salir del alta? Se pierde lo que cargaste.')) return true;
     }
-    window.location.assign('/panel/sede');
+    salirAlInicio();
     return false;
   });
 
@@ -204,6 +279,10 @@ export function AltaWizard({
       }
       if ((campos.dni ?? '').replace(/\D/g, '').length < 7) {
         fallar('Revisá el DNI', 'dni');
+        return false;
+      }
+      if ((campos.email ?? '').trim().toLowerCase() !== (campos.email_confirmacion ?? '').trim().toLowerCase()) {
+        fallar('Los dos correos no coinciden. Revisalos: ahí le llega la clave para entrar al sitio.', 'email_confirmacion');
         return false;
       }
     }
@@ -362,6 +441,31 @@ export function AltaWizard({
         <h1 className="font-display text-3xl font-bold text-text">{PASOS[paso].titulo}</h1>
       </div>
 
+      {recuperado && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-gold/60 bg-amber-bg px-5 py-4">
+          <p className="text-text">
+            <span className="font-bold">Recuperamos la inscripción que estaba en curso</span> ({recuperado}).
+            <span className="block text-sm text-text-soft">La firma hay que hacerla de nuevo.</span>
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setRecuperado(null)}
+              className="rounded-xl bg-accent text-white font-semibold px-4 py-2.5"
+            >
+              Seguir
+            </button>
+            <button
+              type="button"
+              onClick={empezarDeNuevo}
+              className="rounded-xl border-2 border-line-2 text-text font-semibold px-4 py-2.5"
+            >
+              Empezar de nuevo
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Responsable */}
       <div ref={ref(0)} className={vis(0)}>
         <p className="text-lg text-text-soft mb-4">¿Quién del equipo está acompañando esta inscripción?</p>
@@ -421,6 +525,29 @@ export function AltaWizard({
           <div className="sm:col-span-2">
             <label className={labelCls}>Correo electrónico {req}</label>
             <input name="email" type="email" required autoComplete="off" className={inputCls} />
+            <p className="text-text-mute text-sm mt-1">Ahí le llega la clave para entrar al sitio de socios.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Repetí el correo electrónico {req}</label>
+            <input
+              name="email_confirmacion"
+              type="email"
+              required
+              autoComplete="off"
+              onPaste={(e) => e.preventDefault()}
+              className={inputCls}
+            />
+            {campos.email_confirmacion && campos.email && (
+              <p
+                className={`text-sm mt-1 font-semibold ${
+                  campos.email.trim().toLowerCase() === campos.email_confirmacion.trim().toLowerCase() ? 'text-accent' : 'text-red'
+                }`}
+              >
+                {campos.email.trim().toLowerCase() === campos.email_confirmacion.trim().toLowerCase()
+                  ? '✓ Los correos coinciden'
+                  : 'Los correos no coinciden'}
+              </p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <label className={labelCls}>Domicilio real {req}</label>
@@ -544,14 +671,13 @@ export function AltaWizard({
             />
           </div>
           <div className="sm:col-span-2">
-            <label className={labelCls}>Diagnóstico / patología principal {reprocann === 'vigente' ? req : '(opcional)'}</label>
-            <input name="patologia" required={reprocann === 'vigente'} autoComplete="off" className={inputCls} />
+            <label className={labelCls}>Diagnóstico / patología principal (opcional)</label>
+            <input name="patologia" autoComplete="off" className={inputCls} />
           </div>
           <div>
-            <label className={labelCls}>Producto prescripto {req}</label>
+            <label className={labelCls}>Producto prescripto (opcional)</label>
             <input
               name="producto_prescripto"
-              required
               defaultValue={medico.producto_prescripto ?? ''}
               autoComplete="off"
               className={inputCls}
@@ -606,7 +732,14 @@ export function AltaWizard({
           ))}
         </div>
         <label className={`mt-5 flex items-start gap-3 rounded-2xl border-2 border-line-2 p-4 text-text-soft ${CAMPO_INVALIDO}`}>
-          <input type="checkbox" name="consiente_datos" required className="mt-1 h-5 w-5 shrink-0" />
+          <input
+            type="checkbox"
+            name="consiente_datos"
+            required
+            checked={consiente}
+            onChange={(e) => setConsiente(e.target.checked)}
+            className="mt-1 h-5 w-5 shrink-0"
+          />
           <span>
             En cumplimiento de la Ley N° 25.326, presto consentimiento expreso, libre e informado para el tratamiento de mis
             datos personales y datos sensibles de salud por parte de la Asociación, con fines de gestión administrativa de

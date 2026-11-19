@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { guardarFoto, leerFoto } from './borrador';
 
 // Foto con la cámara de la tablet. Se achica antes de enviarla (máx. 1600 px,
 // JPEG) para que el formulario completo no pese de más.
@@ -26,6 +27,26 @@ export function FotoInput({ name, label, ayuda }: { name: string; label: string;
   const [preview, setPreview] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
 
+  // Si se refrescó la página, recupera la foto ya sacada.
+  useEffect(() => {
+    const guardada = leerFoto(name);
+    if (!guardada || !ref.current) return;
+    let cancelado = false;
+    fetch(guardada)
+      .then((r) => r.blob())
+      .then((blob) => {
+        if (cancelado || !ref.current) return;
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], `${name}.jpg`, { type: blob.type || 'image/jpeg' }));
+        ref.current.files = dt.files;
+        setPreview(guardada);
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [name]);
+
   async function cambio(e: React.ChangeEvent<HTMLInputElement>) {
     const input = e.currentTarget;
     const file = input.files?.[0];
@@ -40,10 +61,14 @@ export function FotoInput({ name, label, ayuda }: { name: string; label: string;
       dt.items.add(chico);
       input.files = dt.files;
     }
-    setPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(chico);
+    const dataUrl = await new Promise<string>((res) => {
+      const lector = new FileReader();
+      lector.onload = () => res(String(lector.result ?? ''));
+      lector.onerror = () => res('');
+      lector.readAsDataURL(chico);
     });
+    if (dataUrl) guardarFoto(name, dataUrl);
+    setPreview(dataUrl || URL.createObjectURL(chico));
     setProcesando(false);
   }
 

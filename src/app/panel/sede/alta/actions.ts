@@ -60,6 +60,11 @@ export async function altaEnSede(fd: FormData): Promise<Resultado> {
     ['email', 'Completá el correo electrónico'],
   ];
   for (const [campo, msj] of requeridos) if (!str(fd, campo)) return { error: msj, campo };
+  // El mail se escribe dos veces: ahí le llega la clave para entrar al sitio.
+  const emailRepetido = str(fd, 'email_confirmacion');
+  if (emailRepetido !== null && emailRepetido.toLowerCase() !== str(fd, 'email')!.toLowerCase()) {
+    return { error: 'Los dos correos no coinciden', campo: 'email_confirmacion' };
+  }
   const nombre = str(fd, 'nombre')!;
   const apellido = str(fd, 'apellido')!;
   const dni = str(fd, 'dni')!;
@@ -88,9 +93,9 @@ export async function altaEnSede(fd: FormData): Promise<Resultado> {
     return { error: 'Completá el número y el vencimiento de la credencial', campo: !str(fd, 'repr_num') ? 'repr_num' : 'repr_exp' };
   }
 
-  // Indicación médica: el diagnóstico es obligatorio solo con REPROCANN
-  // vigente (sin REPROCANN lo define la consulta con Clinicann).
-  const faltaMedico = ['doctor', 'producto_prescripto', ...(vigente ? ['patologia'] : [])].find((c) => !str(fd, c));
+  // Indicación médica: solo el médico es obligatorio (diagnóstico, producto
+  // y dosis son opcionales).
+  const faltaMedico = ['doctor'].find((c) => !str(fd, c));
   if (faltaMedico) return { error: 'Completá los datos de la indicación médica', campo: faltaMedico };
   const dosis = str(fd, 'dosis_mensual');
   if (dosis && !(Number(dosis) >= 0)) return { error: 'La dosis mensual tiene que ser un número', campo: 'dosis_mensual' };
