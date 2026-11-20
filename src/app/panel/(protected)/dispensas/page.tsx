@@ -53,7 +53,7 @@ export default async function DispensaPage({
       supabase
         .from('dispensas')
         .select(
-          '*, member:members(name, dni), by:profiles!dispensas_registered_by_fkey(name), items:dispensa_items(strain_id, description, quantity, unit_price, bonif1_pct, bonif2_pct, total, strain:strains(name, item_type)), payments:dispensa_payments(account_id, receipt_number, created_at, amount, exchange_rate, amount_local, account:payment_accounts(name))',
+          '*, member:members(name, dni), by:profiles!dispensas_registered_by_fkey(name), items:dispensa_items(strain_id, description, quantity, unit_price, bonif1_pct, bonif2_pct, total, strain:strains(name, item_type)), payments:dispensa_payments(account_id, receipt_number, created_at, amount, exchange_rate, amount_local, account:payment_accounts(name)), caja:ledger(type, category, account_id, amount, exchange_rate, amount_local, account:payment_accounts(name))',
         )
         .order('created_at', { ascending: false })
         .limit(50),
@@ -300,6 +300,27 @@ export default async function DispensaPage({
                     account_name: account?.name ?? '—',
                   };
                 });
+                // Vuelto: egresos de caja de la dispensa.
+                const rowVueltos = ((d.caja ?? []) as {
+                  type: string;
+                  category: string;
+                  account_id: string;
+                  amount: number;
+                  exchange_rate: number;
+                  amount_local: number;
+                  account: { name: string } | { name: string }[] | null;
+                }[])
+                  .filter((l) => l.type === 'egreso' && l.category === 'Dispensa')
+                  .map((l) => {
+                    const account = Array.isArray(l.account) ? l.account[0] : l.account;
+                    return {
+                      accountId: l.account_id,
+                      amount: l.amount,
+                      exchangeRate: l.exchange_rate,
+                      amount_local: l.amount_local,
+                      account_name: account?.name ?? '—',
+                    };
+                  });
                 return (
                   <DispensaRow
                     key={d.id}
@@ -315,6 +336,7 @@ export default async function DispensaPage({
                     byName={by?.name ?? '—'}
                     items={rowItems}
                     payments={rowPayments}
+                    vueltos={rowVueltos}
                     members={allMembers ?? []}
                     catalogItems={items}
                     accounts={accounts}

@@ -13,6 +13,14 @@ import type { CatalogItem } from './register-dispensa-form';
 type Item = { strainId?: string; description: string; quantity: number; unit_price: number; bonif1_pct: number; bonif2_pct: number; total: number; itemType?: string };
 type Payment = { receipt_number: number; created_at: string; amount_local: number; account_name: string; accountId?: string; amount?: number; exchangeRate?: number };
 
+export type Vuelto = {
+  accountId: string;
+  amount: number;
+  exchangeRate: number;
+  amount_local: number;
+  account_name: string;
+};
+
 export function DispensaRow({
   id,
   number,
@@ -26,6 +34,7 @@ export function DispensaRow({
   byName,
   items,
   payments,
+  vueltos = [],
   members,
   catalogItems,
   accounts,
@@ -46,6 +55,7 @@ export function DispensaRow({
   byName: string;
   items: Item[];
   payments: Payment[];
+  vueltos?: Vuelto[];
   members: SearchableMember[];
   catalogItems: CatalogItem[];
   accounts: PaymentAccount[];
@@ -55,7 +65,7 @@ export function DispensaRow({
   generalAccountId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const paid = payments.reduce((s, p) => s + p.amount_local, 0);
+  const paid = payments.reduce((s, p) => s + p.amount_local, 0) - vueltos.reduce((s, v) => s + v.amount_local, 0);
   const diff = suggestedAmount != null ? amount - suggestedAmount : null;
 
   return (
@@ -84,6 +94,11 @@ export function DispensaRow({
               {p.account_name} · {money(p.amount_local)}
             </div>
           ))}
+          {vueltos.map((v, i) => (
+            <div key={`v${i}`} className="text-red">
+              Vuelto {v.account_name} · −{money(v.amount_local)}
+            </div>
+          ))}
         </td>
         <td className="px-4 py-2.5 text-text-soft">{fmtDateTime(createdAt)}</td>
         <td className="px-4 py-2.5 text-text-soft">{byName}</td>
@@ -109,6 +124,7 @@ export function DispensaRow({
           createdAt={createdAt}
           items={items}
           payments={payments}
+          vueltos={vueltos}
           amount={amount}
           note={note}
           voided={voided}

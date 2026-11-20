@@ -46,6 +46,7 @@ export function DispensaDetail({
   createdAt,
   items,
   payments,
+  vueltos = [],
   amount,
   note,
   voided,
@@ -56,6 +57,7 @@ export function DispensaDetail({
   createdAt: string;
   items: Item[];
   payments: Payment[];
+  vueltos?: { accountId: string; amount: number; exchangeRate: number; amount_local: number; account_name: string }[];
   amount: number;
   note?: string | null;
   voided?: boolean;
@@ -92,6 +94,11 @@ export function DispensaDetail({
             amount: String(p.amount ?? p.amount_local),
             exchangeRate: String(p.exchangeRate ?? 1),
           }))}
+        initialVueltos={vueltos.map((v) => ({
+          accountId: v.accountId,
+          amount: String(v.amount),
+          exchangeRate: String(v.exchangeRate ?? 1),
+        }))}
       />
     );
   }
@@ -148,6 +155,12 @@ export function DispensaDetail({
                     <span className="text-text-mute">{fmtDateTime(p.created_at)}</span>
                   </span>
                   <span>{money(p.amount_local)}</span>
+                </div>
+              ))}
+              {vueltos.map((v, i) => (
+                <div key={`v${i}`} className="flex justify-between text-red">
+                  <span>Vuelto · {v.account_name}</span>
+                  <span>−{money(v.amount_local)}</span>
                 </div>
               ))}
             </div>

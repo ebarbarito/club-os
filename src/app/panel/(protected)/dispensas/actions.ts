@@ -27,12 +27,13 @@ export async function completeDelivery(orderId: string, method: string) {
 
 export async function registerDispensa(formData: FormData) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc('register_dispensa', {
+  const { error } = await supabase.rpc('register_dispensa_vuelto', {
     p_member_id: String(formData.get('member_id')),
     p_items: JSON.parse(String(formData.get('items') ?? '[]')),
     p_suggested_amount: Number(formData.get('suggested_amount')),
     p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
     p_note: String(formData.get('note') ?? '').trim() || null,
+    p_vueltos: JSON.parse(String(formData.get('vueltos') ?? '[]')),
   });
   if (error) return { error: error.message };
   // Si viene de un pedido, el pedido queda entregado (la dispensa ya descontó el stock).
@@ -54,12 +55,13 @@ export async function registerDispensa(formData: FormData) {
 
 export async function updateDispensa(formData: FormData) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc('update_dispensa', {
+  const { error } = await supabase.rpc('update_dispensa_vuelto', {
     p_dispensa_id: String(formData.get('dispensa_id')),
     p_member_id: String(formData.get('member_id')),
     p_items: JSON.parse(String(formData.get('items') ?? '[]')),
     p_note: String(formData.get('note') ?? '').trim() || null,
     p_payments: JSON.parse(String(formData.get('payments') ?? '[]')),
+    p_vueltos: JSON.parse(String(formData.get('vueltos') ?? '[]')),
   });
   if (error) return { error: error.message };
   revalidatePath('/panel/dispensas');

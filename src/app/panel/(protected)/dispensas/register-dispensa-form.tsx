@@ -54,6 +54,7 @@ export function RegisterDispensaForm({
   initialNote,
   initialRows,
   initialPayments,
+  initialVueltos,
   creditsByMember = {},
   virtualAccountId,
   generalCreditsByMember = {},
@@ -70,6 +71,8 @@ export function RegisterDispensaForm({
   initialNote?: string;
   initialRows?: ItemRow[];
   initialPayments?: PaymentLine[];
+  /** Vuelto ya registrado (al editar). */
+  initialVueltos?: PaymentLine[];
   creditsByMember?: Record<string, number>;
   virtualAccountId?: string | null;
   generalCreditsByMember?: Record<string, number>;
@@ -87,6 +90,8 @@ export function RegisterDispensaForm({
   const [note, setNote] = useState(initialNote ?? '');
   const [rows, setRows] = useState<ItemRow[]>(initialRows ?? []);
   const [payments, setPayments] = useState<PaymentLine[]>(() => initialPayments ?? [newPaymentLine(accounts)]);
+  // Vuelto: como la forma de pago pero al revés (sale de la cuenta elegida).
+  const [vueltos, setVueltos] = useState<PaymentLine[]>(() => initialVueltos ?? []);
   const [useCredit, setUseCredit] = useState('');
   const [useGeneralCredit, setUseGeneralCredit] = useState('');
   const itemRefs = useRef<Array<ItemSearchHandle | null>>([]);
@@ -129,7 +134,11 @@ export function RegisterDispensaForm({
   const generalCreditUsed = Math.min(Number(useGeneralCredit) || 0, availableGeneralCredit);
   const paidTotal =
     payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0) + creditUsed + generalCreditUsed;
-  const saldo = realTotal - paidTotal;
+  const realPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0) * (Number(p.exchangeRate) || 0), 0);
+  const vueltoTotal = vueltos.reduce((sum, v) => sum + (Number(v.amount) || 0) * (Number(v.exchangeRate) || 0), 0);
+  // Lo pagado de más (sin contar créditos usados) es lo único que admite vuelto.
+  const pagadoDeMas = Math.max(0, realPaid - realTotal);
+  const saldo = realTotal - paidTotal + vueltoTotal;
 
   function updateRow(i: number, patch: Partial<ItemRow>) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -216,6 +225,10 @@ export function RegisterDispensaForm({
     // Pago en $0 es válido: el importe entero pasa a cuenta corriente.
     const validPayments = payments.filter((p) => Number(p.amount) > 0);
 
+    if (vueltoTotal > pagadoDeMas + 0.01) {
+      setError(`El vuelto (${money(vueltoTotal)}) supera lo que se pagó de más (${money(pagadoDeMas)})`);
+      return;
+    }
     if (saldo > 0.01 && !confirm(`Van a quedar ${money(saldo)} en cuenta corriente de este socio. ¿Confirmás?`)) {
       return;
     }
@@ -254,6 +267,14 @@ export function RegisterDispensaForm({
       payloadPayments.push({ account_id: generalAccountId, amount: generalCreditUsed, exchange_rate: 1 });
     }
     formData.set('payments', JSON.stringify(payloadPayments));
+    formData.set(
+      'vueltos',
+      JSON.stringify(
+        vueltos
+          .filter((v) => Number(v.amount) > 0)
+          .map((v) => ({ account_id: v.accountId, amount: Number(v.amount), exchange_rate: Number(v.exchangeRate) || 1 })),
+      ),
+    );
 
     startTransition(async () => {
       const res = mode === 'edit' ? await updateDispensa(formData) : await registerDispensa(formData);
@@ -533,6 +554,12 @@ export function RegisterDispensaForm({
             <p className="text-text-mute text-xs">Total cobrado</p>
             <p className="text-text font-medium">{money(paidTotal)}</p>
           </div>
+          {vueltoTotal > 0.005 && (
+            <div>
+              <p className="text-text-mute text-xs">Vuelto</p>
+              <p className="text-red font-medium">−{money(vueltoTotal)}</p>
+            </div>
+          )}
           <div>
             <p className="text-text-mute text-xs">{saldo < -0.01 ? 'Saldo a favor (a cta cte)' : 'Saldo (a cta cte)'}</p>
             <p className={`font-bold text-base ${saldo > 0.01 ? 'text-red' : saldo < -0.01 ? 'text-accent' : 'text-text-mute'}`}>
@@ -586,6 +613,40 @@ export function RegisterDispensaForm({
         <label className={labelCls}>Forma de pago</label>
         <PaymentSplitEditor accounts={accounts} lines={payments} onChange={setPayments} />
       </div>
+
+      {/* Vuelto: sale de la cuenta elegida y descuenta el saldo a favor. */}
+      {vueltos.length === 0 ? (
+        pagadoDeMas > 0.01 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-2 bg-surface-2 px-3 py-2.5">
+            <p className="text-xs text-text-soft">
+              Pagó {money(pagadoDeMas)} de más. Si se lo devolvés, cargá el vuelto; si no, queda como saldo a favor.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const linea = newPaymentLine(accounts);
+                setVueltos([{ ...linea, amount: String(Math.round(pagadoDeMas * 100) / 100) }]);
+              }}
+              className="rounded-lg border border-line-2 bg-surface text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+            >
+              + Dar vuelto
+            </button>
+          </div>
+        )
+      ) : (
+        <div>
+          <div className="flex items-center justify-between">
+            <label className={labelCls}>Vuelto (sale de la cuenta elegida)</label>
+            <button type="button" onClick={() => setVueltos([])} className="text-xs font-semibold text-text-mute hover:text-red">
+              Quitar vuelto
+            </button>
+          </div>
+          <PaymentSplitEditor accounts={accounts} lines={vueltos} onChange={setVueltos} />
+          {vueltoTotal > pagadoDeMas + 0.01 && (
+            <p className="text-red text-xs mt-1">El vuelto supera lo que se pagó de más ({money(pagadoDeMas)}).</p>
+          )}
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Nota (opcional)</label>
