@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useAtras, useGuardiaSalida } from '../use-atras';
 import { ImageCarousel } from '@/components/public/image-carousel';
-import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
+import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO, VIGENCIA_RESERVA_HORAS } from '@/lib/pedidos/reglas';
 import { confirmarPedido, crearClaveTablet, identificarSocio, pedirClaveTablet } from './actions';
 
 export type ArticuloCatalogo = {
@@ -366,6 +366,9 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
         <div className="mb-4 text-7xl" aria-hidden>✅</div>
         <h1 className="font-display text-3xl font-bold text-text">¡Listo, {nombre}!</h1>
         <p className="mt-2 text-xl text-text-soft">Tu pedido quedó cargado. Acercate al mostrador para retirarlo.</p>
+        <p className="mt-3 text-base font-semibold text-amber-tx">
+          La reserva vale {VIGENCIA_RESERVA_HORAS} horas: si no la retirás en ese plazo, se cancela sola.
+        </p>
         <button type="button" onClick={irAPortada} className={`${btnPrimario} mt-10`}>
           Terminar
         </button>
@@ -432,6 +435,7 @@ export function PedidosTablet({ catalogo }: { catalogo: ArticuloCatalogo[] }) {
             <button type="button" onClick={confirmar} disabled={pending || lineas.length === 0} className={`${btnPrimario} flex-1`}>
               {pending ? 'Enviando…' : `Confirmar pedido · ${pesos(total)}`}
             </button>
+          <p className="mt-2 text-center text-sm text-text-soft">La reserva vale {VIGENCIA_RESERVA_HORAS} horas para retirarla.</p>
           </div>
         </div>
       </div>

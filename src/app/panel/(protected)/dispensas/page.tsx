@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/badge';
 import { ModalTrigger } from '@/components/modal-trigger';
 import { ORDER_STATUS, nextOrderStatus } from '@/lib/status-meta';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { vencerReservas } from '@/lib/pedidos/disponibilidad';
+import { ESTADOS_QUE_VENCEN, horasRestantes } from '@/lib/pedidos/reglas';
 import { RegisterDispensaForm, type ItemRow } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
 import { DispensaRow } from './dispensa-row';
@@ -39,6 +42,7 @@ export default async function DispensaPage({
   const activeTab = tab === 'dispensas' ? 'dispensas' : 'pedidos';
 
   const supabase = await createClient();
+  await vencerReservas(createAdminClient());
 
   const [{ data: orders }, { data: dispensas }, { data: allMembers }, { data: stockRows }, { data: accountRows }] =
     await Promise.all([
@@ -169,7 +173,18 @@ export default async function DispensaPage({
                     <td className="px-4 py-2.5 text-text-soft capitalize">{o.delivery}</td>
                     <td className="px-4 py-2.5 text-text-soft capitalize">{o.method ?? '—'}</td>
                     <td className="px-4 py-2.5">
-                      <Badge label={meta.label} color={meta.color} />
+                      {o.status === 'cancelado' && o.vencida_at ? (
+                        <Badge label="Vencida (24 h)" color="gray" />
+                      ) : (
+                        <Badge label={meta.label} color={meta.color} />
+                      )}
+                      {ESTADOS_QUE_VENCEN.includes(o.status) && (
+                        <div className={`mt-1 text-xs ${horasRestantes(o.created_at) < 3 ? 'text-red font-semibold' : 'text-text-mute'}`}>
+                          {horasRestantes(o.created_at) >= 1
+                            ? `Vence en ${Math.floor(horasRestantes(o.created_at))} h`
+                            : 'Vence en menos de 1 h'}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       {next === 'entregado' ? (

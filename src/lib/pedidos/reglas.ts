@@ -9,6 +9,16 @@ export const PASO_GRAMOS = 5;
 export const PORCION_OFRECIDA = 0.7;
 // Con menos de 30 g en total, la genética figura sin stock.
 export const STOCK_MINIMO_GRAMOS = 30;
+// Las reservas valen 24 horas; después se cancelan solas (salvo las que ya
+// salieron con envío) y lo pedido vuelve a estar disponible.
+export const VIGENCIA_RESERVA_HORAS = 24;
+export const ESTADOS_QUE_VENCEN = ['reservado', 'preparacion', 'listo'];
+
+// Horas que le quedan a una reserva (0 si ya venció).
+export function horasRestantes(creadaEl: string, ahora = Date.now()): number {
+  const vence = new Date(creadaEl).getTime() + VIGENCIA_RESERVA_HORAS * 3600_000;
+  return Math.max(0, (vence - ahora) / 3600_000);
+}
 
 export type LineaPedido = { strainId: string; cantidad: number };
 export type Tope = { tope: number; esGenetica: boolean; nombre: string };

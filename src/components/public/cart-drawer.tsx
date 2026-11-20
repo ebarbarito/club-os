@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { money } from '@/lib/format';
 import { createReservation } from '@/lib/public/actions';
 import { useStore } from './store';
-import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO } from '@/lib/pedidos/reglas';
+import { PASO_GRAMOS, TOPE_GRAMOS_PEDIDO, VIGENCIA_RESERVA_HORAS } from '@/lib/pedidos/reglas';
 
 export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { cart, removeFromCart, setGrams, clearCart, member } = useStore();
@@ -52,7 +52,10 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         {done ? (
           <div className="text-center py-8">
             <p className="font-display font-bold text-text mb-2">¡Reserva confirmada!</p>
-            <p className="text-text-soft text-sm mb-4">El club te va a contactar para coordinar la entrega.</p>
+            <p className="text-text-soft text-sm mb-2">El club te va a contactar para coordinar la entrega.</p>
+            <p className="text-amber-tx text-sm font-semibold mb-4">
+              La reserva vale {VIGENCIA_RESERVA_HORAS} horas: si no se retira en ese plazo, se cancela sola.
+            </p>
             <button onClick={onClose} className="rounded-lg bg-accent text-white font-semibold text-sm px-4 py-2">
               Cerrar
             </button>
@@ -166,6 +169,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 >
                   {pending ? 'Confirmando…' : 'Confirmar reserva'}
                 </button>
+                <p className="text-center text-xs text-text-mute">La reserva vale {VIGENCIA_RESERVA_HORAS} horas.</p>
               </form>
             )}
           </>
