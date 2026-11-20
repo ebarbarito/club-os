@@ -2,6 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { money } from '@/lib/format';
+import { estadosDeSueldo } from '@/lib/empleados/sueldo-server';
+import { nombreMes, periodoSiguiente } from '@/lib/empleados/sueldo';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
 import { anularPorReceiptNumber } from '@/lib/anular-ledger';
 
@@ -99,23 +102,26 @@ export async function addMovement(formData: FormData) {
     }
   }
 
-  // Un adelanto de sueldo no puede superar la remuneración pactada menos
-  // lo que ya se retiró este mes calendario — el cupo se renueva solo el
-  // 1° de cada mes (no hay ningún reset explícito: simplemente se cuentan
-  // los adelantos desde el inicio del mes actual).
-  if (employeeId) {
-    const { data: employee } = await supabase.from('employees').select('salary').eq('id', employeeId).maybeSingle();
-    if (!employee) return { error: 'Empleado no encontrado' };
-    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
-    const { data: advanceRows } = await supabase
-      .from('ledger')
-      .select('amount_local')
-      .eq('employee_id', employeeId)
-      .gte('created_at', startOfMonth);
-    const alreadyAdvanced = (advanceRows ?? []).reduce((s, r) => s + r.amount_local, 0);
-    const available = employee.salary - alreadyAdvanced;
-    if (totalLocal > available + 0.01) {
-      return { error: `Saldo disponible insuficiente (disponible: ${available})` };
+  // Sueldo / adelanto: puede retirar lo pendiente del sueldo del mes y,
+  // una vez cobrado, a cuenta del mes siguiente (hasta un sueldo). Lo que va
+  // a cuenta se avisa y hay que confirmarlo.
+  if (employeeId && type === 'egreso') {
+    const estado = (await estadosDeSueldo(supabase, [employeeId])).get(employeeId)?.estado;
+    if (!estado) return { error: 'Empleado no encontrado' };
+    if (totalLocal > estado.maximo + 0.01) {
+      return {
+        error: `Supera lo que puede retirar: hasta ${money(estado.maximo)} (lo pendiente de este mes y el sueldo de ${nombreMes(periodoSiguiente(estado.actual.periodo))})`,
+      };
+    }
+    const aCuenta = totalLocal - estado.actual.disponible;
+    if (aCuenta > 0.01 && formData.get('a_cuenta_ok') !== '1') {
+      return {
+        confirmar: `${
+          estado.actual.disponible > 0.01
+            ? `Le quedan ${money(estado.actual.disponible)} del sueldo de este mes. `
+            : 'Ya cobró todo el sueldo de este mes. '
+        }Va a retirar ${money(aCuenta)} a cuenta del sueldo de ${nombreMes(periodoSiguiente(estado.actual.periodo))}. ¿Confirmás?`,
+      };
     }
   }
 

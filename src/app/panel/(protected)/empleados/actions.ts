@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
+import { estadosDeSueldo } from '@/lib/empleados/sueldo-server';
+import { money } from '@/lib/format';
 
 export async function pagarSueldo(formData: FormData) {
   const profile = await getSessionProfile();
@@ -26,6 +28,17 @@ export async function pagarSueldo(formData: FormData) {
     payments = JSON.parse(paymentsJson);
   } catch {
     return { error: 'Datos de pago inválidos' };
+  }
+
+  // Puede retirar lo pendiente del mes y, a cuenta, hasta el sueldo del mes
+  // siguiente (el excedente se descuenta del próximo sueldo).
+  const estado = (await estadosDeSueldo(supabase, [employeeId])).get(employeeId)?.estado;
+  if (estado) {
+    // Si es el primer pago del mes, el sueldo del mes puede venir ajustado.
+    const disponible =
+      salaryAmount != null ? Math.max(0, salaryAmount - estado.actual.consumido) : estado.actual.disponible;
+    const maximo = estado.maximo - estado.actual.disponible + disponible;
+    if (amount > maximo + 0.005) return { error: `Supera lo que puede retirar (hasta ${money(maximo)})` };
   }
 
   const { error } = await supabase.rpc('pagar_sueldo', {

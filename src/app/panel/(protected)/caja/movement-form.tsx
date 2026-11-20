@@ -74,8 +74,14 @@ export function MovementForm({
       ),
     );
     startTransition(async () => {
-      const res = await addMovement(formData);
-      if (res?.error) {
+      let res = await addMovement(formData);
+      // Retiro a cuenta del próximo sueldo: avisa cuánto y pide confirmar.
+      if (res && 'confirmar' in res && res.confirmar) {
+        if (!window.confirm(res.confirmar)) return;
+        formData.set('a_cuenta_ok', '1');
+        res = await addMovement(formData);
+      }
+      if (res && 'error' in res && res.error) {
         setError(res.error);
         return;
       }

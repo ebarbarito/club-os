@@ -8,6 +8,9 @@ import { money } from '@/lib/format';
 import { EmployeeForm } from './employee-form';
 import { SalaryPaymentForm } from './salary-payment-form';
 import { ConfigTabs } from '@/components/config-tabs';
+import { estadosDeSueldo } from '@/lib/empleados/sueldo-server';
+import { nombreMes, periodoSiguiente } from '@/lib/empleados/sueldo';
+import { HistorialAdelantos } from './historial-adelantos';
 
 export default async function EmpleadosPage() {
   const profile = await getSessionProfile();
@@ -21,10 +24,11 @@ export default async function EmpleadosPage() {
     .toISOString()
     .split('T')[0]; // '2026-09-01'
 
-  const [{ data: employees }, { data: salaryRows }, { data: accountRows }] = await Promise.all([
+  const [{ data: employees }, { data: salaryRows }, { data: accountRows }, cuentas] = await Promise.all([
     supabase.from('employees').select('*').order('name'),
     supabase.from('employee_salaries').select('id, employee_id, amount, paid_amount').eq('periodo', periodo),
     supabase.from('payment_accounts').select('id, name, is_cash, currency, exchange_rate').eq('active', true).order('name'),
+    estadosDeSueldo(supabase),
   ]);
 
   const salariesByEmployee = new Map((salaryRows ?? []).map((s) => [s.employee_id, s]));
@@ -49,7 +53,7 @@ export default async function EmpleadosPage() {
               <th className="px-4 py-2.5 font-medium">DNI</th>
               <th className="px-4 py-2.5 font-medium">Remuneración</th>
               <th className="px-4 py-2.5 font-medium">Sueldo del mes</th>
-              <th className="px-4 py-2.5 font-medium">Pagado</th>
+              <th className="px-4 py-2.5 font-medium">Retirado</th>
               <th className="px-4 py-2.5 font-medium">Pendiente</th>
               <th className="px-4 py-2.5 font-medium">Estado</th>
               <th className="px-4 py-2.5 font-medium"></th>
@@ -58,10 +62,14 @@ export default async function EmpleadosPage() {
           <tbody>
             {(employees ?? []).map((e) => {
               const salaryRecord = salariesByEmployee.get(e.id) ?? null;
-              const monthAmount = salaryRecord ? salaryRecord.amount : e.salary;
-              const paidAmount = salaryRecord?.paid_amount ?? 0;
-              const pendingAmount = monthAmount - paidAmount;
+              const cuenta = cuentas.get(e.id);
+              const actual = cuenta?.estado.actual;
+              const monthAmount = actual?.sueldo ?? e.salary;
+              const paidAmount = actual?.consumido ?? 0;
+              const pendingAmount = actual?.disponible ?? monthAmount;
+              const aCuenta = actual?.aCuentaProximo ?? 0;
               const fullyPaid = pendingAmount <= 0.01;
+              const periodoActual = actual?.periodo ?? periodo.slice(0, 7);
 
               return (
                 <tr key={e.id} className="border-t border-line">
@@ -71,7 +79,7 @@ export default async function EmpleadosPage() {
                   <td className="px-4 py-2.5 text-text-soft">{e.dni}</td>
                   <td className="px-4 py-2.5 text-text-soft">{money(e.salary)}</td>
                   <td className="px-4 py-2.5 text-text-soft">
-                    {salaryRecord ? money(salaryRecord.amount) : <span className="text-text-mute">—</span>}
+                    {money(monthAmount)}
                   </td>
                   <td className="px-4 py-2.5 text-text-soft">
                     {paidAmount > 0 ? money(paidAmount) : <span className="text-text-mute">—</span>}
@@ -82,13 +90,18 @@ export default async function EmpleadosPage() {
                     ) : (
                       money(pendingAmount)
                     )}
+                    {aCuenta > 0.005 && (
+                      <div className="text-xs font-semibold text-amber-tx">
+                        {money(aCuenta)} a cuenta de {nombreMes(periodoSiguiente(periodoActual))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge label={e.active ? 'Activo' : 'Inactivo'} color={e.active ? 'green' : 'gray'} />
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex gap-2 justify-end">
-                      {e.active && !fullyPaid && (
+                      {e.active && actual && (
                         <ModalTrigger
                           label="Pagar"
                           className="rounded-lg bg-accent text-white text-xs font-semibold px-3 py-1.5"
@@ -98,9 +111,29 @@ export default async function EmpleadosPage() {
                             employeeId={e.id}
                             employeeName={`${e.name} ${e.last_name}`}
                             baseSalary={e.salary}
-                            salary={salaryRecord ? { id: salaryRecord.id, amount: salaryRecord.amount, paid_amount: salaryRecord.paid_amount } : null}
+                            cuenta={{
+                              periodo: actual.periodo,
+                              periodoProximo: periodoSiguiente(actual.periodo),
+                              sueldo: actual.sueldo,
+                              arrastre: actual.arrastre,
+                              consumido: actual.consumido,
+                              disponible: actual.disponible,
+                              aCuentaProximo: actual.aCuentaProximo,
+                              maximo: cuenta!.estado.maximo,
+                              tieneRegistroMes: !!salaryRecord,
+                            }}
                             accounts={accounts}
                           />
+                        </ModalTrigger>
+                      )}
+                      {cuenta && (
+                        <ModalTrigger
+                          label="Historial"
+                          className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
+                          title={`Historial de pagos y adelantos — ${e.name} ${e.last_name}`}
+                          size="xl"
+                        >
+                          <HistorialAdelantos estado={cuenta.estado} retiros={cuenta.retiros} />
                         </ModalTrigger>
                       )}
                       <ModalTrigger
