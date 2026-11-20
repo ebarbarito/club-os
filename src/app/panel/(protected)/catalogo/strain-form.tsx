@@ -26,12 +26,19 @@ type Strain = {
   description: string | null;
 };
 
-export function StrainForm({ strain }: { strain?: Strain }) {
+export function StrainForm({
+  strain,
+  tipoInicial = 'genetica',
+}: {
+  strain?: Strain;
+  /** Tipo con el que arranca un artículo nuevo (según la solapa abierta). */
+  tipoInicial?: 'genetica' | 'accesorio';
+}) {
   const router = useRouter();
   const close = useModalClose();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [itemType, setItemType] = useState<'genetica' | 'accesorio'>(strain?.item_type ?? 'genetica');
+  const [itemType, setItemType] = useState<'genetica' | 'accesorio'>(strain?.item_type ?? tipoInicial);
   const isGenetica = itemType === 'genetica';
 
   function submit(formData: FormData) {

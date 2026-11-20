@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionProfile } from '@/lib/auth/get-session-profile';
@@ -15,12 +16,9 @@ const STATUS_META: Record<string, { label: string; color: 'green' | 'amber' | 'g
   inactiva: { label: 'Inactiva', color: 'gray' },
 };
 
-const ITEM_TYPE_LABEL: Record<string, string> = {
-  genetica: 'Genética',
-  accesorio: 'Accesorio',
-};
-
-export default async function CatalogoPage() {
+export default async function CatalogoPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
+  const seccion: 'genetica' | 'accesorio' = tab === 'accesorios' ? 'accesorio' : 'genetica';
   const profile = await getSessionProfile();
   if (!profile) redirect('/panel/login');
   if (profile.role !== 'admin' && profile.role !== 'dispensador') redirect(`/panel/${ROLES[profile.role].home}`);
@@ -38,7 +36,15 @@ export default async function CatalogoPage() {
     stockTotal.set(r.strain_id, (stockTotal.get(r.strain_id) ?? 0) + Number(r.grams || 0));
   }
   const conStock = (id: string) => (stockTotal.get(id) ?? 0) > 0;
-  const strains = [...(rows ?? [])].sort(
+  const todos = rows ?? [];
+  const cantidad = {
+    genetica: todos.filter((s) => s.item_type === 'genetica').length,
+    accesorio: todos.filter((s) => s.item_type !== 'genetica').length,
+  };
+  // Solapas como en la tablet: genéticas por un lado, accesorios por otro.
+  const strains = todos
+    .filter((s) => (seccion === 'genetica' ? s.item_type === 'genetica' : s.item_type !== 'genetica'))
+    .sort(
     (a, b) => Number(conStock(b.id)) - Number(conStock(a.id)) || String(a.name).localeCompare(String(b.name), 'es'),
   );
 
@@ -47,10 +53,11 @@ export default async function CatalogoPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-text">Catálogo</h1>
-          <p className="text-text-soft">Artículos del club (genéticas y accesorios) — alimentan Stock y Dispensa</p>
+          <p className="text-text-soft">Artículos del club — alimentan Stock y Dispensa</p>
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
+            {seccion === 'genetica' && (
             <ModalTrigger
               label="📷 Subir fotos en lote"
               title="Subir fotos en lote"
@@ -58,11 +65,34 @@ export default async function CatalogoPage() {
             >
               <FotosLote />
             </ModalTrigger>
-            <ModalTrigger label="+ Nuevo artículo" title="Nuevo artículo">
-              <StrainForm />
+            )}
+            <ModalTrigger
+              label={seccion === 'genetica' ? '+ Nueva genética' : '+ Nuevo accesorio'}
+              title={seccion === 'genetica' ? 'Nueva genética' : 'Nuevo accesorio'}
+            >
+              <StrainForm tipoInicial={seccion} />
             </ModalTrigger>
           </div>
         )}
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        {(
+          [
+            { key: 'genetica', label: 'Genéticas', href: '/panel/catalogo' },
+            { key: 'accesorio', label: 'Accesorios', href: '/panel/catalogo?tab=accesorios' },
+          ] as const
+        ).map((t) => (
+          <Link
+            key={t.key}
+            href={t.href}
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+              seccion === t.key ? 'bg-accent text-white' : 'border border-line-2 text-text-soft hover:border-accent hover:text-accent'
+            }`}
+          >
+            {t.label} <span className={seccion === t.key ? 'text-white/75' : 'text-text-mute'}>({cantidad[t.key]})</span>
+          </Link>
+        ))}
       </div>
 
       <div className="rounded-xl border border-line bg-surface overflow-x-auto">
@@ -71,7 +101,6 @@ export default async function CatalogoPage() {
             <tr>
               <th className="px-4 py-2.5 font-medium">Código</th>
               <th className="px-4 py-2.5 font-medium">Artículo</th>
-              <th className="px-4 py-2.5 font-medium">Tipo</th>
               <th className="px-4 py-2.5 font-medium">Precio</th>
               <th className="px-4 py-2.5 font-medium text-right">Stock</th>
               <th className="px-4 py-2.5 font-medium">Estado</th>
@@ -86,7 +115,6 @@ export default async function CatalogoPage() {
                   <div className="font-medium text-text">{s.name}</div>
                   {s.type && <div className="text-text-mute text-xs">{s.type}</div>}
                 </td>
-                <td className="px-4 py-2.5 text-text-soft">{ITEM_TYPE_LABEL[s.item_type]}</td>
                 <td className="px-4 py-2.5 text-text-soft">{money(s.price_per_gram)}</td>
                 <td className={`px-4 py-2.5 text-right tabular-nums ${conStock(s.id) ? 'text-text' : 'text-text-mute'}`}>
                   {(stockTotal.get(s.id) ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} {s.item_type === 'genetica' ? 'g' : 'u.'}
@@ -111,7 +139,7 @@ export default async function CatalogoPage() {
             {(strains ?? []).length === 0 && (
               <tr>
                 <td colSpan={isAdmin ? 6 : 5} className="px-4 py-10 text-center text-text-mute">
-                  Sin artículos cargados todavía.
+                  {seccion === 'genetica' ? 'Sin genéticas cargadas todavía.' : 'Sin accesorios cargados todavía.'}
                 </td>
               </tr>
             )}
