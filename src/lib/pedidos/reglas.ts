@@ -51,3 +51,13 @@ export function problemaDelPedido(lineas: LineaPedido[], topes: Map<string, Tope
   if (gramos > TOPE_GRAMOS_PEDIDO) return `El tope es de ${TOPE_GRAMOS_PEDIDO} g por pedido sumando todas las genéticas`;
   return null;
 }
+
+// Punto rojo (como en Socios): pedidos con algo para hacer del lado del
+// club. "Listo p/ retiro" no cuenta: ahí se espera al socio.
+export const ESTADOS_ACCION_CLUB = ['reservado', 'preparacion', 'enviando'];
+export function accionPendientePedido(status: string): string | null {
+  if (status === 'reservado') return 'Pedido nuevo: pasarlo a preparación';
+  if (status === 'preparacion') return 'En preparación: marcarlo listo';
+  if (status === 'enviando') return 'En envío: registrar la entrega';
+  return null;
+}

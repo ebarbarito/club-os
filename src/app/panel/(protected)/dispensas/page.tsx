@@ -5,7 +5,7 @@ import { ModalTrigger } from '@/components/modal-trigger';
 import { ORDER_STATUS, nextOrderStatus } from '@/lib/status-meta';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { vencerReservas } from '@/lib/pedidos/disponibilidad';
-import { ESTADOS_QUE_VENCEN, horasRestantes } from '@/lib/pedidos/reglas';
+import { accionPendientePedido, ESTADOS_QUE_VENCEN, horasRestantes } from '@/lib/pedidos/reglas';
 import { RegisterDispensaForm, type ItemRow } from './register-dispensa-form';
 import { AdvanceButton } from './advance-button';
 import { DispensaRow } from './dispensa-row';
@@ -94,6 +94,8 @@ export default async function DispensaPage({
 
   const accounts = accountRows ?? [];
 
+  const pedidosPendientes = (orders ?? []).filter((o) => accionPendientePedido(o.status)).length;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -121,6 +123,12 @@ export default async function DispensaPage({
           className={`px-3 py-2 text-sm border-b-2 -mb-px ${activeTab === 'pedidos' ? 'border-accent text-accent font-semibold' : 'border-transparent text-text-soft hover:text-text'}`}
         >
           Pedidos
+          {pedidosPendientes > 0 && (
+            <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-red" title="Pedidos para atender">
+              <span className="h-2.5 w-2.5 rounded-full bg-red ring-2 ring-red/30" />
+              {pedidosPendientes}
+            </span>
+          )}
         </Link>
         <Link
           href="/panel/dispensas?tab=dispensas"
@@ -148,10 +156,20 @@ export default async function DispensaPage({
                 const member = Array.isArray(o.member) ? o.member[0] : o.member;
                 const meta = ORDER_STATUS[o.status as keyof typeof ORDER_STATUS];
                 const next = nextOrderStatus(o.status as never, o.delivery);
+                const accion = accionPendientePedido(o.status);
                 return (
                   <tr key={o.id} className="border-t border-line">
                     <td className="px-4 py-2.5">
-                      <div className="font-medium text-text">{member?.name ?? '—'}</div>
+                      <div className="flex items-center gap-2 font-medium text-text">
+                        {accion && (
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full bg-red ring-2 ring-red/30"
+                            title={accion}
+                            aria-label={accion}
+                          />
+                        )}
+                        {member?.name ?? '—'}
+                      </div>
                       <div className="text-text-mute text-xs">DNI {member?.dni}</div>
                       {o.canal === 'tablet' && (
                         <span className="mt-1 inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[11px] font-semibold text-accent">

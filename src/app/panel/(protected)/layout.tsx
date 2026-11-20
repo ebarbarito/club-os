@@ -7,6 +7,7 @@ import { Sidebar } from './sidebar';
 import { PwaGuard } from './pwa-guard';
 import { createClient } from '@/lib/supabase/server';
 import { contarPendientesAlta } from '@/lib/alta/pendientes-server';
+import { contarPedidosPendientes } from '@/lib/pedidos/pendientes-server';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getSessionProfile();
@@ -27,10 +28,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Punto de color en "Socios" cuando hay algo pendiente del lado del club
   // en el alta (mandar 2ª parte, validar, mandar bienvenida).
+  // Lo mismo en "Dispensa" cuando hay pedidos (tablet o sitio) para atender.
   const alertas: Partial<Record<string, number>> = {};
-  if (role.nav.includes('socios')) {
+  if (role.nav.includes('socios') || role.nav.includes('dispensas')) {
     const supabase = await createClient();
-    alertas.socios = (await contarPendientesAlta(supabase)).total;
+    const [altas, pedidos] = await Promise.all([
+      role.nav.includes('socios') ? contarPendientesAlta(supabase).then((r) => r.total) : Promise.resolve(0),
+      role.nav.includes('dispensas') ? contarPedidosPendientes(supabase) : Promise.resolve(0),
+    ]);
+    if (altas) alertas.socios = altas;
+    if (pedidos) alertas.dispensas = pedidos;
   }
 
   return (
