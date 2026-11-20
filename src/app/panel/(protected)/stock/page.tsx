@@ -185,7 +185,8 @@ export default async function StockPage({
                           <ModalTrigger
                             label="Historial"
                             className="rounded-lg border border-line-2 text-xs font-semibold px-3 py-1.5 hover:border-accent hover:text-accent"
-                            title={`Historial de retiros — ${s.name}`}
+                            title={`Historial de stock dispensa — ${s.name}`}
+                            size="xl"
                           >
                             <DispensaHistory strainId={s.id} unit={unit} />
                           </ModalTrigger>
